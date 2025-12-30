@@ -1,0 +1,60 @@
+services:
+  hexapod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hexapod-ros2
+
+    # Network mode for ROS 2 DDS discovery
+    network_mode: host
+
+    # Hardware device access
+    devices:
+      - /dev/i2c-1:/dev/i2c-1       # I2C bus (PCA9685, MPU6050, ADS7830)
+      - /dev/spidev0.0:/dev/spidev0.0  # SPI (WS2812 LEDs)
+      - /dev/spidev0.1:/dev/spidev0.1
+      - /dev/gpiomem:/dev/gpiomem   # GPIO memory access
+
+    # Required for hardware access
+    privileged: true
+
+    # Keep container running for development
+    stdin_open: true
+    tty: true
+
+    # Mount source code for development
+    volumes:
+      - ./ros2_ws/src:/ros2_ws/src:rw
+      - ./config:/ros2_ws/config:ro
+      - ./reference:/ros2_ws/reference:ro
+      # Persist build artifacts
+      - ros2_build:/ros2_ws/build
+      - ros2_install:/ros2_ws/install
+      - ros2_log:/ros2_ws/log
+
+    # Environment variables
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      # For colored output
+      - TERM=xterm-256color
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Default command - can be overridden
+    command: bash
+
+  # Development shell - same as above but doesn't auto-restart
+  dev:
+    extends:
+      service: hexapod
+    container_name: hexapod-dev
+    restart: "no"
+    profiles:
+      - dev
+
+volumes:
+  ros2_build:
+  ros2_install:
+  ros2_log:

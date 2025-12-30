@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+
+# Build artifacts
+ros2_ws/build
+ros2_ws/install
+ros2_ws/log
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Documentation
+docs/
+*.pdf
+
+# Reference code (mounted separately if needed)
+# reference/

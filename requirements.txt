@@ -1,0 +1,16 @@
+# Core dependencies for hexapod hardware control
+# Install with: pip install -r requirements.txt
+
+# Hardware interfaces
+gpiozero>=2.0
+spidev>=3.6
+rpi-ws281x>=5.0.0
+mpu6050-raspberrypi>=1.2
+
+# Math/computation
+numpy>=1.26
+
+# Note: These are installed via apt, not pip:
+# - python3-smbus (I2C)
+# - python3-picamera2 (camera - from PPA)
+# - python3-lgpio (GPIO backend for gpiozero on Ubuntu)

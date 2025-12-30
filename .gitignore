@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# ROS 2 build artifacts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volumes (managed by compose)
+# Keep Dockerfile and docker-compose.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large PDF (can be downloaded from Freenove repo)
+docs/Tutorial.pdf

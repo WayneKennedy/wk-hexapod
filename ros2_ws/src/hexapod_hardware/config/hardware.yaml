@@ -1,0 +1,53 @@
+# Hexapod Hardware Configuration
+# Based on Freenove Big Hexapod Robot Kit (FNK0052)
+
+hexapod_hardware:
+  ros__parameters:
+    # I2C Configuration
+    i2c:
+      bus: 1
+      pca9685_addr_1: 0x40  # First servo driver
+      pca9685_addr_2: 0x41  # Second servo driver
+      mpu6050_addr: 0x68    # IMU
+      ads7830_addr: 0x48    # ADC for battery
+
+    # Servo Configuration
+    servos:
+      pwm_frequency: 50     # Hz
+      min_pulse_us: 500
+      max_pulse_us: 2500
+      # Leg mapping: [coxa, femur, tibia] servo channels per leg
+      # Legs numbered 0-5 (right front, right middle, right rear, left rear, left middle, left front)
+      leg_channels:
+        - [0, 1, 2]    # Leg 0 (RF)
+        - [3, 4, 5]    # Leg 1 (RM)
+        - [6, 7, 8]    # Leg 2 (RR)
+        - [16, 17, 18] # Leg 3 (LR) - on second PCA9685
+        - [19, 20, 21] # Leg 4 (LM)
+        - [22, 23, 24] # Leg 5 (LF)
+      head_channels:
+        pan: 9
+        tilt: 10
+
+    # IMU Configuration
+    imu:
+      publish_rate: 100.0   # Hz
+      accel_range: 2        # +/- 2g
+      gyro_range: 250       # +/- 250 deg/s
+
+    # Battery Configuration
+    battery:
+      publish_rate: 1.0     # Hz
+      voltage_divider: 3.0  # Scaling factor
+      low_voltage_warn: 6.5 # V per cell
+      channels: [0, 4]      # ADC channels for dual batteries
+
+    # LED Configuration
+    leds:
+      count: 7
+      brightness: 255
+      type: 'GRB'           # Color order for WS2812
+
+    # PCB/Hardware Version
+    pcb_version: 2          # V2.0 connector (SPI for LEDs)
+    pi_version: 2           # Raspberry Pi 5
