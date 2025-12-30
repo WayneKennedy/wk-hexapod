@@ -25,6 +25,7 @@ setup(
             'imu_driver = hexapod_hardware.imu_driver:main',
             'battery_monitor = hexapod_hardware.battery_monitor:main',
             'led_controller = hexapod_hardware.led_controller:main',
+            'range_finder_driver = hexapod_hardware.range_finder_driver:main',
         ],
     },
 )

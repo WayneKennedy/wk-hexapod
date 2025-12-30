@@ -48,7 +48,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python hardware libraries
 # Using --break-system-packages since we're in a container
+# Note: lgpio is required for Pi 5 GPIO support (gpiozero backend)
 RUN pip3 install --break-system-packages \
+    lgpio \
     gpiozero \
     spidev \
     rpi-ws281x \

@@ -48,6 +48,15 @@ hexapod_hardware:
       brightness: 255
       type: 'GRB'           # Color order for WS2812
 
+    # Range Finder Configuration (HC-SR04 ultrasonic)
+    range_finder:
+      publish_rate: 10.0    # Hz
+      trigger_pin: 27       # GPIO pin
+      echo_pin: 22          # GPIO pin
+      max_range: 3.0        # meters
+      min_range: 0.02       # meters (2cm)
+      field_of_view: 0.2617 # radians (~15 degrees)
+
     # PCB/Hardware Version
     pcb_version: 2          # V2.0 connector (SPI for LEDs)
     pi_version: 2           # Raspberry Pi 5

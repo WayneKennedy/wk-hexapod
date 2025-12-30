@@ -13,7 +13,9 @@ services:
       - /dev/i2c-1:/dev/i2c-1       # I2C bus (PCA9685, MPU6050, ADS7830)
       - /dev/spidev0.0:/dev/spidev0.0  # SPI (WS2812 LEDs)
       - /dev/spidev0.1:/dev/spidev0.1
-      - /dev/gpiomem:/dev/gpiomem   # GPIO memory access
+      # Pi 5 GPIO access (lgpio uses gpiochip, not gpiomem)
+      - /dev/gpiochip4:/dev/gpiochip4  # Main GPIO chip for user pins
+      - /dev/gpiomem4:/dev/gpiomem4    # GPIO memory for Pi 5
       # Pi Camera (OV5647) via libcamera - needs media controller and DMA
       - /dev/video0:/dev/video0
       - /dev/media0:/dev/media0

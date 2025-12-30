@@ -6,6 +6,7 @@ Starts all hardware interface nodes:
 - Servo driver
 - Battery monitor
 - LED controller
+- Range finder driver
 """
 
 from launch import LaunchDescription
@@ -56,6 +57,15 @@ def generate_launch_description():
             package='hexapod_hardware',
             executable='led_controller',
             name='led_controller',
+            parameters=[config_file],
+            output='screen',
+        ),
+
+        # Range Finder Driver
+        Node(
+            package='hexapod_hardware',
+            executable='range_finder_driver',
+            name='range_finder_driver',
             parameters=[config_file],
             output='screen',
         ),
