@@ -13,10 +13,12 @@ Following ROS hexapod best practices (KevinOchs pattern):
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, Pose, Vector3
+from geometry_msgs.msg import Twist, Pose, Vector3, TransformStamped
 from sensor_msgs.msg import Imu, JointState
+from nav_msgs.msg import Odometry
 from std_msgs.msg import String, Bool, Float64MultiArray
 from std_srvs.srv import Trigger, SetBool
+from tf2_ros import TransformBroadcaster
 import copy
 import math
 import numpy as np
@@ -188,6 +190,18 @@ class HexapodController(Node):
         self.imu_pitch = 0.0
         self.imu_yaw = 0.0
 
+        # ===== Odometry State =====
+        # Position in world frame (meters)
+        self.odom_x = 0.0
+        self.odom_y = 0.0
+        self.odom_yaw = 0.0  # radians
+        # Velocity (m/s, rad/s)
+        self.odom_vx = 0.0
+        self.odom_vy = 0.0
+        self.odom_vyaw = 0.0
+        # Last update time for velocity calculation
+        self.last_odom_time = None
+
         # ===== State Machine =====
         self.is_initialized = False
         self.is_walking = False
@@ -207,15 +221,25 @@ class HexapodController(Node):
         # Publishers
         self.joint_state_pub = self.create_publisher(
             JointState, 'joint_states', 10)
+        self.odom_pub = self.create_publisher(
+            Odometry, 'odom', 10)
+
+        # TF Broadcaster
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Services
         self.init_srv = self.create_service(
             Trigger, 'hexapod/initialize', self.initialize_callback)
         self.balance_srv = self.create_service(
             SetBool, 'hexapod/enable_balance', self.enable_balance_callback)
+        self.reset_odom_srv = self.create_service(
+            Trigger, 'hexapod/reset_odometry', self.reset_odometry_callback)
 
         # Balance loop timer (only runs when enabled)
         self.balance_timer = None
+
+        # Odometry publish timer (20 Hz)
+        self.odom_timer = self.create_timer(0.05, self._publish_odometry)
 
         self.get_logger().info('Hexapod controller started (NOT initialized)')
         self.get_logger().info('Call /hexapod/initialize service when robot is safe')
@@ -410,9 +434,121 @@ class HexapodController(Node):
 
         self.joint_state_pub.publish(msg)
 
+    def _update_odometry(self, dx_mm, dy_mm, dyaw_deg, dt):
+        """
+        Update odometry from gait cycle displacement.
+
+        Args:
+            dx_mm: Forward displacement in body frame (mm)
+            dy_mm: Left displacement in body frame (mm)
+            dyaw_deg: Rotation (degrees)
+            dt: Time delta (seconds)
+        """
+        # Convert mm to meters
+        dx = dx_mm / 1000.0
+        dy = dy_mm / 1000.0
+        dyaw = math.radians(dyaw_deg)
+
+        # Transform body-frame displacement to world frame
+        cos_yaw = math.cos(self.odom_yaw)
+        sin_yaw = math.sin(self.odom_yaw)
+
+        # Integrate position (body dx is forward, which maps to world based on yaw)
+        self.odom_x += dx * cos_yaw - dy * sin_yaw
+        self.odom_y += dx * sin_yaw + dy * cos_yaw
+        self.odom_yaw += dyaw
+
+        # Normalize yaw to [-pi, pi]
+        while self.odom_yaw > math.pi:
+            self.odom_yaw -= 2 * math.pi
+        while self.odom_yaw < -math.pi:
+            self.odom_yaw += 2 * math.pi
+
+        # Calculate velocities
+        if dt > 0:
+            self.odom_vx = dx / dt
+            self.odom_vy = dy / dt
+            self.odom_vyaw = dyaw / dt
+
+    def _publish_odometry(self):
+        """Publish odometry message and TF transform."""
+        now = self.get_clock().now()
+
+        # Create quaternion from yaw
+        # For 2D: qz = sin(yaw/2), qw = cos(yaw/2)
+        qz = math.sin(self.odom_yaw / 2.0)
+        qw = math.cos(self.odom_yaw / 2.0)
+
+        # Publish TF: odom -> base_link
+        t = TransformStamped()
+        t.header.stamp = now.to_msg()
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_link'
+        t.transform.translation.x = self.odom_x
+        t.transform.translation.y = self.odom_y
+        t.transform.translation.z = 0.0
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = qz
+        t.transform.rotation.w = qw
+        self.tf_broadcaster.sendTransform(t)
+
+        # Publish Odometry message
+        odom = Odometry()
+        odom.header.stamp = now.to_msg()
+        odom.header.frame_id = 'odom'
+        odom.child_frame_id = 'base_link'
+
+        # Position
+        odom.pose.pose.position.x = self.odom_x
+        odom.pose.pose.position.y = self.odom_y
+        odom.pose.pose.position.z = 0.0
+        odom.pose.pose.orientation.x = 0.0
+        odom.pose.pose.orientation.y = 0.0
+        odom.pose.pose.orientation.z = qz
+        odom.pose.pose.orientation.w = qw
+
+        # Velocity (in body frame as per REP 105)
+        odom.twist.twist.linear.x = self.odom_vx
+        odom.twist.twist.linear.y = self.odom_vy
+        odom.twist.twist.linear.z = 0.0
+        odom.twist.twist.angular.x = 0.0
+        odom.twist.twist.angular.y = 0.0
+        odom.twist.twist.angular.z = self.odom_vyaw
+
+        # Covariance (diagonal, moderate uncertainty)
+        # [x, y, z, roll, pitch, yaw]
+        pose_cov = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.02]
+        odom.pose.covariance = pose_cov
+
+        twist_cov = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+                     0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+                     0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+                     0.0, 0.0, 0.0, 0.0, 0.0, 0.02]
+        odom.twist.covariance = twist_cov
+
+        self.odom_pub.publish(odom)
+
+    def _reset_odometry(self):
+        """Reset odometry to origin."""
+        self.odom_x = 0.0
+        self.odom_y = 0.0
+        self.odom_yaw = 0.0
+        self.odom_vx = 0.0
+        self.odom_vy = 0.0
+        self.odom_vyaw = 0.0
+        self.get_logger().info('Odometry reset to origin')
+
     # ===== Body Pose Commands =====
 
-    def home(self):
+    def home(self, reset_odom=True):
         """Move to calibrated home position (flat on ground)"""
         self.get_logger().info('Moving to HOME position...')
         self.body_position = np.array([0.0, 0.0, 0.0])
@@ -430,6 +566,11 @@ class HexapodController(Node):
 
         self._update_servos()
         self.is_relaxed = False
+
+        # Reset odometry when homing (robot is at known position)
+        if reset_odom:
+            self._reset_odometry()
+
         self.get_logger().info('HOME position set')
 
     def stand(self, height=None, duration=1.0):
@@ -504,8 +645,8 @@ class HexapodController(Node):
     def _tripod_gait_cycle(self, y_move, x_move, turn):
         """
         One tripod gait cycle - tested and working.
-        y_move: forward/back in world frame (Y axis)
-        x_move: strafe left/right in world frame (X axis)
+        y_move: forward/back in world frame (Y axis) - maps to body X (forward)
+        x_move: strafe left/right in world frame (X axis) - maps to body Y (left)
         turn: rotation in degrees (not yet implemented)
         """
         step_height = self.get_parameter('gait.step_height').value
@@ -516,6 +657,7 @@ class HexapodController(Node):
 
         # Store starting positions
         start_feet = [list(f) for f in self.foot_positions]
+        cycle_start_time = time.time()
 
         for frame in range(frames):
             phase = frame / frames
@@ -550,6 +692,11 @@ class HexapodController(Node):
 
             self._update_servos()
             time.sleep(delay)
+
+        # Update odometry after cycle completes
+        # y_move is forward (body X), x_move is strafe (body Y)
+        cycle_time_actual = time.time() - cycle_start_time
+        self._update_odometry(y_move, x_move, turn, cycle_time_actual)
 
         # Reset to neutral for next cycle
         self._reset_to_stand()
@@ -808,7 +955,8 @@ class HexapodController(Node):
         cmd = msg.data.lower().strip()
 
         if cmd == 'home':
-            self.home()
+            # Don't reset odometry when homing via topic (might be during nav)
+            self.home(reset_odom=False)
         elif cmd == 'stand':
             if self.is_initialized:
                 self.stand()
@@ -861,6 +1009,13 @@ class HexapodController(Node):
 
         response.success = True
         response.message = f'Balance: {self.balance_enabled}'
+        return response
+
+    def reset_odometry_callback(self, request, response):
+        """Service: Reset odometry to origin"""
+        self._reset_odometry()
+        response.success = True
+        response.message = 'Odometry reset'
         return response
 
     def destroy_node(self):

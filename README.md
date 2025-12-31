@@ -57,10 +57,10 @@ End state: Robot boots autonomously, accepts high-level mission requests ("walk 
 - [x] Home, stand, relax poses
 - [x] Initialize service for safe startup
 
-### Phase 2: Odometry (NEXT)
-- [ ] Integrate gait cycles to estimate displacement
-- [ ] Publish `/odom` (nav_msgs/Odometry) with position and velocity
-- [ ] Publish TF transform: `odom` → `base_link`
+### Phase 2: Odometry (IN PROGRESS)
+- [x] Integrate gait cycles to estimate displacement
+- [x] Publish `/odom` (nav_msgs/Odometry) with position and velocity
+- [x] Publish TF transform: `odom` → `base_link`
 - [ ] Fuse with IMU for rotation accuracy
 - [ ] Add `MoveDistance` action server for goal-based movement
 
@@ -102,9 +102,12 @@ The hexapod uses body-centric control where foot positions are defined relative 
 **ROS 2 Topics:**
 - `/cmd_vel` (geometry_msgs/Twist) - Velocity commands for walking
 - `/pose_command` (std_msgs/String) - Pose commands: "home", "stand", "relax"
+- `/odom` (nav_msgs/Odometry) - Odometry estimate from gait integration
+- `/tf` - Transform: `odom` → `base_link`
 
 **ROS 2 Services:**
 - `/hexapod/initialize` (std_srvs/Trigger) - Home then stand sequence
+- `/hexapod/reset_odometry` (std_srvs/Trigger) - Reset odometry to origin
 
 ## Project Structure
 
