@@ -501,6 +501,59 @@ class HexapodController(Node):
         ])
         self._update_servos()
 
+    def _tripod_gait_cycle(self, y_move, x_move, turn):
+        """
+        One tripod gait cycle - tested and working.
+        y_move: forward/back in world frame (Y axis)
+        x_move: strafe left/right in world frame (X axis)
+        turn: rotation in degrees (not yet implemented)
+        """
+        step_height = self.get_parameter('gait.step_height').value
+        cycle_time = self.get_parameter('gait.cycle_time').value
+
+        frames = 64
+        delay = cycle_time / frames
+
+        # Store starting positions
+        start_feet = [list(f) for f in self.foot_positions]
+
+        for frame in range(frames):
+            phase = frame / frames
+
+            for i in range(6):
+                is_odd = (i % 2 == 1)
+
+                # Odd legs move first half, even legs move second half
+                if is_odd:
+                    leg_phase = phase * 2 if phase < 0.5 else 1.0
+                else:
+                    leg_phase = 0.0 if phase < 0.5 else (phase - 0.5) * 2
+
+                # Calculate foot position (Y is forward/back, X is strafe)
+                if leg_phase < 1.0:
+                    # Swing phase - leg in air moving forward
+                    swing = math.sin(leg_phase * math.pi)
+                    self.foot_positions[i][0] = start_feet[i][0] + x_move * (leg_phase - 0.5)
+                    self.foot_positions[i][1] = start_feet[i][1] + y_move * (leg_phase - 0.5)
+                    self.foot_positions[i][2] = self.body_position[2] + step_height * swing
+                else:
+                    # Stance complete
+                    self.foot_positions[i][0] = start_feet[i][0] + x_move * 0.5
+                    self.foot_positions[i][1] = start_feet[i][1] + y_move * 0.5
+                    self.foot_positions[i][2] = self.body_position[2]
+
+                # Push phase for grounded legs
+                if (is_odd and phase >= 0.5) or (not is_odd and phase < 0.5):
+                    push_phase = (phase - 0.5) if is_odd else phase
+                    self.foot_positions[i][0] = start_feet[i][0] - x_move * push_phase * 2
+                    self.foot_positions[i][1] = start_feet[i][1] - y_move * push_phase * 2
+
+            self._update_servos()
+            time.sleep(delay)
+
+        # Reset to neutral for next cycle
+        self._reset_to_stand()
+
     def _run_gait_step(self, x, y, turn):
         """
         Execute one gait cycle step.
@@ -711,15 +764,15 @@ class HexapodController(Node):
             return
 
         # Map Twist to gait parameters
-        # linear.x = forward/back (-1 to 1) -> (-35 to 35)mm
-        # linear.y = left/right (-1 to 1) -> (-35 to 35)mm
-        # angular.z = rotation (-1 to 1) -> (-35 to 35)deg
+        # ROS linear.x (forward) -> world Y axis
+        # ROS linear.y (left) -> world X axis
+        # angular.z = rotation
 
-        x = self._clamp(msg.linear.x * 35, -35, 35)
-        y = self._clamp(msg.linear.y * 35, -35, 35)
-        turn = self._clamp(msg.angular.z * 35, -35, 35)
+        forward = self._clamp(msg.linear.x * 25, -25, 25)  # mm per step
+        strafe = self._clamp(msg.linear.y * 25, -25, 25)
+        turn = self._clamp(msg.angular.z * 15, -15, 15)  # degrees per step
 
-        if abs(x) < 1 and abs(y) < 1 and abs(turn) < 1:
+        if abs(forward) < 1 and abs(strafe) < 1 and abs(turn) < 1:
             # Stop moving - return to neutral
             if self.is_walking:
                 self.is_walking = False
@@ -727,7 +780,7 @@ class HexapodController(Node):
             return
 
         self.is_walking = True
-        self._run_gait_step(x, y, turn)
+        self._tripod_gait_cycle(forward, strafe, turn)
 
     def body_pose_callback(self, msg):
         """Handle body pose commands"""

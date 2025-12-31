@@ -1,4 +1,4 @@
-# wk-hexapi
+# wk-hexapod
 
 ROS 2 based autonomous hexapod robot, built on Freenove Big Hexapod hardware.
 
@@ -35,16 +35,45 @@ The Freenove repository also contains:
 - Autonomous mapping and navigation (SLAM + Nav2)
 - Wander mode with return-to-home capability
 
+## Locomotion Controller
+
+The hexapod uses body-centric control where foot positions are defined relative to the body origin, and inverse kinematics calculates all servo angles.
+
+**Control model:**
+- `body_position[x, y, z]` - Body translation (Z negative = raise body)
+- `body_rotation[roll, pitch, yaw]` - Body orientation
+- Feet maintain fixed positions in world frame while body moves
+
+**Gaits:**
+- Tripod gait: Even legs (0,2,4) and odd legs (1,3,5) alternate
+- World Y axis is forward/back, X axis is left/right (strafe)
+
+**ROS 2 Topics:**
+- `/cmd_vel` (geometry_msgs/Twist) - Velocity commands for walking
+- `/pose_command` (std_msgs/String) - Pose commands: "home", "stand", "relax"
+
+**ROS 2 Services:**
+- `/hexapod/initialize` (std_srvs/Trigger) - Home then stand sequence
+
 ## Project Structure
 
 ```
-wk-hexapi/
+wk-hexapod/
 ├── ros2_ws/src/
+│   ├── hexapod_controller/   # Main locomotion controller
+│   │   ├── controller.py     # ROS 2 node with IK, gait, balance
+│   │   ├── test_init.py      # Standalone home/stand test
+│   │   ├── test_walk.py      # Standalone walk test
+│   │   └── test_ros.sh       # ROS-based integration test
 │   ├── hexapod_hardware/     # Hardware interface nodes
 │   │   ├── imu_driver        # MPU6050 IMU publisher
 │   │   ├── servo_driver      # PCA9685 servo control
+│   │   ├── range_finder      # HC-SR04 ultrasonic sensor
 │   │   ├── battery_monitor   # ADS7830 battery status
 │   │   └── led_controller    # WS2812 LED control
+│   ├── hexapod_perception/   # Vision and perception
+│   │   ├── camera_node       # Pi Camera publisher
+│   │   └── face_detector     # Face recognition node
 │   └── hexapod_bringup/      # Launch files and config
 ├── config/                   # Hardware calibration
 ├── docker/                   # Docker support files
@@ -58,8 +87,8 @@ wk-hexapi/
 
 ```bash
 # Clone the repo
-git clone <repo-url> ~/Code/wk-hexapi
-cd ~/Code/wk-hexapi
+git clone <repo-url> ~/Code/wk-hexapod
+cd ~/Code/wk-hexapod
 
 # Run hardware setup first (if not already done)
 sudo ./scripts/ubuntu-setup.sh --skip-reboot
@@ -78,6 +107,28 @@ source install/setup.bash
 # Launch hardware drivers
 ros2 launch hexapod_bringup hardware.launch.py
 ```
+
+## Testing
+
+**Standalone hardware tests** (no ROS required):
+```bash
+# Test home and stand (battery power required)
+python3 ros2_ws/src/hexapod_controller/test_init.py
+
+# Test walking forward/backward
+python3 ros2_ws/src/hexapod_controller/test_walk.py
+```
+
+**ROS integration test** (inside Docker):
+```bash
+docker compose run --rm dev ./ros2_ws/src/hexapod_controller/test_ros.sh
+```
+
+This builds the workspace, starts the controller node, and runs through:
+1. Initialize (home -> stand)
+2. Walk forward 150mm
+3. Walk backward 150mm
+4. Home and relax
 
 ## Development Workflow
 
