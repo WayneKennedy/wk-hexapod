@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
-Test script: Initialize, stand, walk forward 150mm, reverse 150mm
-Direct hardware test - no ROS required.
+Test: Walk forward 150mm, then backward 150mm
+Uses body-centric controller with tripod gait.
 """
 
-import copy
 import math
-import numpy as np
 import time
 import smbus
 
 
 class PCA9685:
-    """PCA9685 PWM driver"""
     MODE1 = 0x00
     PRESCALE = 0xFE
     LED0_ON_L = 0x06
@@ -41,53 +38,36 @@ class PCA9685:
         self.set_pwm(channel, 4096, 4096)
 
 
-class HexapodTest:
-    """Direct hardware test for hexapod controller"""
-
+class HexapodWalk:
     LEG_CHANNELS = [
-        [15, 14, 13],  # Leg 0 (RF)
-        [12, 11, 10],  # Leg 1 (RM)
-        [9, 8, 31],    # Leg 2 (RR)
-        [22, 23, 27],  # Leg 3 (LR)
-        [19, 20, 21],  # Leg 4 (LM)
-        [16, 17, 18],  # Leg 5 (LF)
+        [15, 14, 13], [12, 11, 10], [9, 8, 31],
+        [22, 23, 27], [19, 20, 21], [16, 17, 18],
     ]
 
-    L1, L2, L3 = 33.0, 90.0, 110.0  # Link lengths
+    L1, L2, L3 = 33.0, 90.0, 110.0
+    LEG_ANGLES = [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]
+    LEG_OFFSETS = [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]
+    HEIGHT_OFFSET = 14.0
+
+    FOOT_XY = [
+        (137.1, 189.4), (225.0, 0.0), (137.1, -189.4),
+        (-137.1, -189.4), (-225.0, 0.0), (-137.1, 189.4),
+    ]
 
     def __init__(self):
-        print("Initializing PCA9685 drivers...")
+        print("Initializing...")
         self.pwm_41 = PCA9685(1, 0x41)
         self.pwm_41.set_pwm_freq(50)
         self.pwm_40 = PCA9685(1, 0x40)
         self.pwm_40.set_pwm_freq(50)
         time.sleep(0.1)
 
-        # Body geometry
-        self.leg_angles = [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]
-        self.leg_offsets = [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]
-        self.height_offset = 14.0
-        self.default_height = 30.0
+        self.body_z = 0.0
+        # Foot positions [x, y, z] - will be modified during gait
+        self.feet = [[fx, fy, 0.0] for fx, fy in self.FOOT_XY]
 
-        # State
-        self.body_position = np.array([0.0, 0.0, 0.0])
-        self.body_orientation = np.array([0.0, 0.0, 0.0])
-        self.foot_positions = np.array([
-            [137.1, 189.4, 0.0],
-            [225.0, 0.0, 0.0],
-            [137.1, -189.4, 0.0],
-            [-137.1, -189.4, 0.0],
-            [-225.0, 0.0, 0.0],
-            [-137.1, 189.4, 0.0],
-        ])
-        self.leg_positions = [[140.0, 0.0, 0.0] for _ in range(6)]
-        self.current_angles = [[90.0, 90.0, 90.0] for _ in range(6)]
-
-        # Load calibration
-        self.calibration_positions = self._load_calibration()
-        self.calibration_angles = [[0.0, 0.0, 0.0] for _ in range(6)]
-        self._calculate_calibration()
-
+        self.calibration = self._load_calibration()
+        self.cal_angles = self._calc_calibration()
         print("Ready")
 
     def _load_calibration(self):
@@ -98,271 +78,190 @@ class HexapodTest:
         for path in paths:
             try:
                 with open(path, 'r') as f:
-                    data = [list(map(int, line.strip().split('\t')))
-                            for line in f if line.strip()]
-                    print(f"Loaded calibration from {path}")
-                    return data
+                    return [list(map(int, line.strip().split('\t'))) for line in f if line.strip()]
             except:
                 pass
-        print("Using default calibration")
         return [[140, 0, 0] for _ in range(6)]
 
-    def _calculate_calibration(self):
+    def _calc_calibration(self):
+        cal_angles = []
         for i in range(6):
-            cal = self._coordinate_to_angle(
-                -self.calibration_positions[i][2],
-                self.calibration_positions[i][0],
-                self.calibration_positions[i][1])
-            default = self._coordinate_to_angle(0, 140, 0)
-            self.calibration_angles[i] = [cal[j] - default[j] for j in range(3)]
+            cal = self._ik(-self.calibration[i][2], self.calibration[i][0], self.calibration[i][1])
+            default = self._ik(0, 140, 0)
+            cal_angles.append([cal[j] - default[j] for j in range(3)])
+        return cal_angles
 
     def _clamp(self, val, lo, hi):
         return max(lo, min(hi, val))
 
-    def _coordinate_to_angle(self, x, y, z):
-        """IK: leg endpoint to servo angles"""
+    def _ik(self, x, y, z):
         a = math.pi / 2 - math.atan2(z, y)
         x_4 = self.L1 * math.sin(a)
         x_5 = self.L1 * math.cos(a)
         l23 = math.sqrt((z - x_5)**2 + (y - x_4)**2 + x**2)
-
         w = self._clamp(x / l23, -1, 1)
         v = self._clamp((self.L2**2 + l23**2 - self.L3**2) / (2 * self.L2 * l23), -1, 1)
         u = self._clamp((self.L2**2 + self.L3**2 - l23**2) / (2 * self.L3 * self.L2), -1, 1)
-
         b = math.asin(round(w, 2)) - math.acos(round(v, 2))
         c = math.pi - math.acos(round(u, 2))
-
         return [round(math.degrees(a)), round(math.degrees(b)), round(math.degrees(c))]
 
-    def _world_to_leg(self, foot_pos, leg_idx):
-        """World frame to leg-local frame"""
-        angle_rad = math.radians(self.leg_angles[leg_idx])
-        offset = self.leg_offsets[leg_idx]
+    def _world_to_leg(self, foot_x, foot_y, foot_z, leg_idx):
+        angle = math.radians(self.LEG_ANGLES[leg_idx])
+        offset = self.LEG_OFFSETS[leg_idx]
+        x = foot_x * math.cos(angle) + foot_y * math.sin(angle) - offset
+        y = -foot_x * math.sin(angle) + foot_y * math.cos(angle)
+        z = foot_z - self.HEIGHT_OFFSET
+        return x, y, z
 
-        x = (foot_pos[0] * math.cos(angle_rad) +
-             foot_pos[1] * math.sin(angle_rad) - offset)
-        y = (-foot_pos[0] * math.sin(angle_rad) +
-             foot_pos[1] * math.cos(angle_rad))
-        z = foot_pos[2] - self.height_offset
-
-        return [x, y, z]
-
-    def _calculate_rotation_matrix(self, roll, pitch, yaw):
-        r, p, y = math.radians(roll), math.radians(pitch), math.radians(yaw)
-        Rx = np.array([[1, 0, 0], [0, math.cos(p), -math.sin(p)], [0, math.sin(p), math.cos(p)]])
-        Ry = np.array([[math.cos(r), 0, -math.sin(r)], [0, 1, 0], [math.sin(r), 0, math.cos(r)]])
-        Rz = np.array([[math.cos(y), -math.sin(y), 0], [math.sin(y), math.cos(y), 0], [0, 0, 1]])
-        return Rx @ Ry @ Rz
-
-    def _apply_body_transform(self):
-        R = self._calculate_rotation_matrix(*self.body_orientation)
-        for i in range(6):
-            foot = np.array(self.foot_positions[i])
-            transformed = R @ foot + self.body_position
-            self.leg_positions[i] = self._world_to_leg(transformed, i)
-
-    def _set_servo_angle(self, channel, angle):
+    def _set_servo(self, channel, angle):
         angle = self._clamp(angle, 0, 180)
-        duty = (angle / 180.0) * (2500 - 500) + 500
+        duty = (angle / 180.0) * 2000 + 500
         pwm_val = int(duty / 20000.0 * 4095)
-
         if channel < 16:
             self.pwm_41.set_pwm(channel, 0, pwm_val)
-        elif channel < 32:
+        else:
             self.pwm_40.set_pwm(channel - 16, 0, pwm_val)
 
     def _update_servos(self):
-        """Calculate and send all servo angles"""
-        self._apply_body_transform()
-
         for i in range(6):
-            raw = self._coordinate_to_angle(
-                -self.leg_positions[i][2],
-                self.leg_positions[i][0],
-                self.leg_positions[i][1])
-
-            if i < 3:  # Right side
-                self.current_angles[i][0] = self._clamp(raw[0] + self.calibration_angles[i][0], 0, 180)
-                self.current_angles[i][1] = self._clamp(90 - (raw[1] + self.calibration_angles[i][1]), 0, 180)
-                self.current_angles[i][2] = self._clamp(raw[2] + self.calibration_angles[i][2], 0, 180)
-            else:  # Left side
-                self.current_angles[i][0] = self._clamp(raw[0] + self.calibration_angles[i][0], 0, 180)
-                self.current_angles[i][1] = self._clamp(90 + raw[1] + self.calibration_angles[i][1], 0, 180)
-                self.current_angles[i][2] = self._clamp(180 - (raw[2] + self.calibration_angles[i][2]), 0, 180)
-
-        for leg_idx in range(6):
-            channels = self.LEG_CHANNELS[leg_idx]
-            for j in range(3):
-                self._set_servo_angle(channels[j], self.current_angles[leg_idx][j])
-
-    def _relax_servos(self):
-        for i in range(16):
-            self.pwm_40.set_pwm_off(i)
-            self.pwm_41.set_pwm_off(i)
-        print("Servos relaxed")
-
-    # ===== Commands =====
+            lx, ly, lz = self._world_to_leg(self.feet[i][0], self.feet[i][1], self.feet[i][2], i)
+            raw = self._ik(-lz, lx, ly)
+            if i < 3:
+                a0 = self._clamp(raw[0] + self.cal_angles[i][0], 0, 180)
+                a1 = self._clamp(90 - (raw[1] + self.cal_angles[i][1]), 0, 180)
+                a2 = self._clamp(raw[2] + self.cal_angles[i][2], 0, 180)
+            else:
+                a0 = self._clamp(raw[0] + self.cal_angles[i][0], 0, 180)
+                a1 = self._clamp(90 + raw[1] + self.cal_angles[i][1], 0, 180)
+                a2 = self._clamp(180 - (raw[2] + self.cal_angles[i][2]), 0, 180)
+            ch = self.LEG_CHANNELS[i]
+            self._set_servo(ch[0], a0)
+            self._set_servo(ch[1], a1)
+            self._set_servo(ch[2], a2)
 
     def home(self):
-        """Move to calibrated home position"""
         print("HOME...")
-        self.body_position = np.array([0.0, 0.0, 0.0])
-        self.body_orientation = np.array([0.0, 0.0, 0.0])
-        self.foot_positions = np.array([
-            [137.1, 189.4, 0.0],
-            [225.0, 0.0, 0.0],
-            [137.1, -189.4, 0.0],
-            [-137.1, -189.4, 0.0],
-            [-225.0, 0.0, 0.0],
-            [-137.1, 189.4, 0.0],
-        ])
+        self.body_z = 0.0
+        for i, (fx, fy) in enumerate(self.FOOT_XY):
+            self.feet[i] = [fx, fy, self.body_z]
         self._update_servos()
-        print("HOME done")
 
-    def stand(self, height=None, duration=1.0):
-        """Raise body to standing height using body position control"""
-        if height is None:
-            height = self.default_height
-
-        print(f"STAND (raising body {height}mm)...")
+    def stand(self, height=30.0, duration=1.0):
+        print(f"STAND ({height}mm)...")
         steps = 50
-        start_z = self.body_position[2]
+        start_z = self.body_z
         end_z = -height
-
         for step in range(steps + 1):
             t = step / steps
-            t = t * t * (3 - 2 * t)  # Ease in-out
-            self.body_position[2] = start_z + t * (end_z - start_z)
+            t = t * t * (3 - 2 * t)
+            self.body_z = start_z + t * (end_z - start_z)
+            for i, (fx, fy) in enumerate(self.FOOT_XY):
+                self.feet[i] = [fx, fy, self.body_z]
             self._update_servos()
             time.sleep(duration / steps)
 
-        print("STAND done")
-
     def walk(self, distance_mm, step_size=25, step_height=40.0, cycle_time=0.8):
-        """Walk using tripod gait"""
         direction = "FORWARD" if distance_mm > 0 else "BACKWARD"
         print(f"WALK {direction} {abs(distance_mm)}mm...")
 
-        cycles = int(abs(distance_mm) / step_size)
-        x_per_step = step_size if distance_mm > 0 else -step_size
+        cycles = max(1, int(abs(distance_mm) / step_size))
+        x_step = step_size if distance_mm > 0 else -step_size
 
         for cycle in range(cycles):
             print(f"  Step {cycle+1}/{cycles}")
-            self._tripod_gait_cycle(x_per_step, 0, 0, step_height, cycle_time)
+            self._tripod_cycle(x_step, step_height, cycle_time)
 
-        # Return to neutral
-        self._reset_stance()
+        # Reset to neutral stance
+        for i, (fx, fy) in enumerate(self.FOOT_XY):
+            self.feet[i] = [fx, fy, self.body_z]
+        self._update_servos()
         print(f"WALK {direction} done")
 
-    def _reset_stance(self):
-        """Reset to neutral standing stance"""
-        self.foot_positions = np.array([
-            [137.1, 189.4, self.body_position[2]],
-            [225.0, 0.0, self.body_position[2]],
-            [137.1, -189.4, self.body_position[2]],
-            [-137.1, -189.4, self.body_position[2]],
-            [-225.0, 0.0, self.body_position[2]],
-            [-137.1, 189.4, self.body_position[2]],
-        ])
-        self._update_servos()
-
-    def _tripod_gait_cycle(self, x, y, turn, step_height, cycle_time):
-        """One full tripod gait cycle"""
-        angle_rad = math.radians(turn)
-        base_points = copy.deepcopy(self.foot_positions)
-
-        # Movement delta for each leg
-        xy_delta = []
-        for i in range(6):
-            rot_x = (base_points[i][0] * math.cos(angle_rad) +
-                     base_points[i][1] * math.sin(angle_rad) - base_points[i][0])
-            rot_y = (-base_points[i][0] * math.sin(angle_rad) +
-                     base_points[i][1] * math.cos(angle_rad) - base_points[i][1])
-            xy_delta.append([rot_x + x, rot_y + y])
-
+    def _tripod_cycle(self, y_move, step_height, cycle_time):
+        """One tripod gait cycle - even legs (0,2,4) and odd legs (1,3,5) alternate
+        Y axis is forward/back in world frame.
+        """
         frames = 64
-        z_delta = step_height / frames
         delay = cycle_time / frames
 
-        for j in range(frames):
-            for i in range(3):
-                even, odd = 2 * i, 2 * i + 1
+        # Store starting positions
+        start_feet = [f[:] for f in self.feet]
 
-                if j < frames // 8:
-                    base_points[even][0] -= 4 * xy_delta[even][0] / frames
-                    base_points[even][1] -= 4 * xy_delta[even][1] / frames
-                    base_points[odd][0] += 8 * xy_delta[odd][0] / frames
-                    base_points[odd][1] += 8 * xy_delta[odd][1] / frames
-                    base_points[odd][2] = self.body_position[2] + step_height
-                elif j < frames // 4:
-                    base_points[even][0] -= 4 * xy_delta[even][0] / frames
-                    base_points[even][1] -= 4 * xy_delta[even][1] / frames
-                    base_points[odd][2] -= z_delta * 8
-                elif j < 3 * frames // 8:
-                    base_points[even][2] += z_delta * 8
-                    base_points[odd][0] -= 4 * xy_delta[odd][0] / frames
-                    base_points[odd][1] -= 4 * xy_delta[odd][1] / frames
-                elif j < 5 * frames // 8:
-                    base_points[even][0] += 8 * xy_delta[even][0] / frames
-                    base_points[even][1] += 8 * xy_delta[even][1] / frames
-                    base_points[odd][0] -= 4 * xy_delta[odd][0] / frames
-                    base_points[odd][1] -= 4 * xy_delta[odd][1] / frames
-                elif j < 3 * frames // 4:
-                    base_points[even][2] -= z_delta * 8
-                    base_points[odd][0] -= 4 * xy_delta[odd][0] / frames
-                    base_points[odd][1] -= 4 * xy_delta[odd][1] / frames
-                elif j < 7 * frames // 8:
-                    base_points[even][0] -= 4 * xy_delta[even][0] / frames
-                    base_points[even][1] -= 4 * xy_delta[even][1] / frames
-                    base_points[odd][2] += z_delta * 8
+        for frame in range(frames):
+            phase = frame / frames
+
+            for i in range(6):
+                is_odd = (i % 2 == 1)
+
+                # Odd legs move first half, even legs move second half
+                if is_odd:
+                    leg_phase = phase * 2 if phase < 0.5 else 1.0
                 else:
-                    base_points[even][0] -= 4 * xy_delta[even][0] / frames
-                    base_points[even][1] -= 4 * xy_delta[even][1] / frames
-                    base_points[odd][0] += 8 * xy_delta[odd][0] / frames
-                    base_points[odd][1] += 8 * xy_delta[odd][1] / frames
+                    leg_phase = 0.0 if phase < 0.5 else (phase - 0.5) * 2
 
-            self.foot_positions = np.array(base_points)
+                # Calculate foot position (Y is forward/back)
+                if leg_phase < 1.0:
+                    # Swing phase - leg in air moving forward
+                    swing = math.sin(leg_phase * math.pi)
+                    self.feet[i][1] = start_feet[i][1] + y_move * (leg_phase - 0.5)
+                    self.feet[i][2] = self.body_z + step_height * swing
+                else:
+                    # Stance complete
+                    self.feet[i][1] = start_feet[i][1] + y_move * 0.5
+                    self.feet[i][2] = self.body_z
+
+                # Push phase for grounded legs
+                if (is_odd and phase >= 0.5) or (not is_odd and phase < 0.5):
+                    push_phase = (phase - 0.5) if is_odd else phase
+                    self.feet[i][1] = start_feet[i][1] - y_move * push_phase * 2
+
             self._update_servos()
             time.sleep(delay)
 
+        # Update start positions for next cycle
+        for i, (fx, fy) in enumerate(self.FOOT_XY):
+            self.feet[i] = [fx, fy, self.body_z]
+
+    def relax(self):
+        for i in range(16):
+            self.pwm_40.set_pwm_off(i)
+            self.pwm_41.set_pwm_off(i)
+        print("Relaxed")
+
 
 def main():
-    print("=" * 50)
-    print("Hexapod Walk Test")
-    print("HOME -> STAND -> FORWARD 150mm -> BACKWARD 150mm")
-    print("=" * 50)
+    print("=" * 40)
+    print("Walk Test: Forward 150mm, Back 150mm")
+    print("=" * 40)
 
-    try:
-        robot = HexapodTest()
+    robot = HexapodWalk()
 
-        input("\nPress Enter to HOME...")
-        robot.home()
-        time.sleep(0.5)
+    print("\n>>> HOME in 2s...")
+    time.sleep(2)
+    robot.home()
 
-        input("\nPress Enter to STAND...")
-        robot.stand()
-        time.sleep(0.5)
+    print("\n>>> STAND in 2s...")
+    time.sleep(2)
+    robot.stand(30.0)
+    time.sleep(1)
 
-        input("\nPress Enter to WALK FORWARD 150mm...")
-        robot.walk(150)
-        time.sleep(0.5)
+    print("\n>>> WALK FORWARD 150mm...")
+    robot.walk(150)
+    time.sleep(1)
 
-        input("\nPress Enter to WALK BACKWARD 150mm...")
-        robot.walk(-150)
-        time.sleep(0.5)
+    print("\n>>> WALK BACKWARD 150mm...")
+    robot.walk(-150)
+    time.sleep(1)
 
-        input("\nPress Enter to RELAX...")
-        robot._relax_servos()
+    print("\n>>> HOME before relax...")
+    robot.home()
+    time.sleep(1)
 
-        print("\n=== TEST COMPLETE ===")
+    print("\n>>> RELAX...")
+    robot.relax()
 
-    except KeyboardInterrupt:
-        print("\nAborted")
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-        traceback.print_exc()
+    print("\n=== TEST COMPLETE ===")
 
 
 if __name__ == '__main__':
