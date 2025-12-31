@@ -1,0 +1,23 @@
+[Unit]
+Description=Hexapod Robot ROS 2 Services
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=wkenn
+Group=wkenn
+WorkingDirectory=/home/wkenn/Code/wk-hexapod
+ExecStart=/usr/bin/docker compose up
+ExecStop=/usr/bin/docker compose down
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment="HOME=/home/wkenn"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=multi-user.target

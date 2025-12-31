@@ -1,0 +1,26 @@
+# Hexapod Robot Configuration
+# Used by robot.launch.py
+
+hexapod_controller:
+  ros__parameters:
+    # Body geometry
+    body.leg_angles: [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]
+    body.leg_offsets: [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]
+    body.default_height: 30.0
+    body.height_offset: 14.0
+
+    # Balance control
+    balance.enabled: false
+    balance.kp: 0.5
+    balance.ki: 0.0
+    balance.kd: 0.0025
+    balance.update_rate: 50.0
+
+    # Gait parameters
+    gait.default: "tripod"
+    gait.step_height: 40.0
+    gait.cycle_time: 1.0
+
+    # Odometry
+    odometry.imu_fusion: true
+    odometry.imu_yaw_weight: 0.98

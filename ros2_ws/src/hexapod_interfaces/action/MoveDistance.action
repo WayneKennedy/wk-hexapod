@@ -1,0 +1,12 @@
+# Goal: Move a specified distance
+float32 distance        # Distance to move in meters (positive=forward, negative=backward)
+float32 max_speed       # Maximum speed in m/s (default 0.1 if 0)
+---
+# Result
+bool success            # True if goal reached
+float32 actual_distance # Actual distance traveled
+string message          # Status message
+---
+# Feedback
+float32 distance_remaining  # Distance left to travel
+float32 current_speed       # Current speed in m/s

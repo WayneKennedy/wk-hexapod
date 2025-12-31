@@ -57,31 +57,33 @@ End state: Robot boots autonomously, accepts high-level mission requests ("walk 
 - [x] Home, stand, relax poses
 - [x] Initialize service for safe startup
 
-### Phase 2: Odometry (IN PROGRESS)
+### Phase 2: Odometry (DONE)
 - [x] Integrate gait cycles to estimate displacement
 - [x] Publish `/odom` (nav_msgs/Odometry) with position and velocity
 - [x] Publish TF transform: `odom` → `base_link`
 - [x] Fuse with IMU for rotation accuracy (complementary filter)
-- [ ] Add `MoveDistance` action server for goal-based movement
+- [x] Add `MoveDistance` action server for goal-based movement
 
-### Phase 3: Perception
+### Phase 3: Perception (DONE)
 - [ ] Configure camera for depth estimation or visual odometry
-- [ ] Ultrasonic sensor for close obstacle detection
-- [ ] Publish sensor data for costmap integration
+- [x] Ultrasonic sensor driver publishes `/range_finder/range`
+- [x] Nav2 costmap configured to use range data
 
 ### Phase 4: SLAM
 - [ ] Configure slam_toolbox or rtabmap
 - [ ] Build occupancy grid from sensors
 - [ ] Save/load maps for persistent navigation
 
-### Phase 5: Navigation (Nav2)
-- [ ] Configure Nav2 with hexapod-specific parameters
+### Phase 5: Navigation (IN PROGRESS)
+- [x] Configure Nav2 with hexapod-specific parameters
+- [x] Nav2 params tuned for slow hexapod motion
 - [ ] Tune local/global planners for hexapod motion
 - [ ] Add semantic waypoints ("kitchen", "charging station")
 - [ ] Implement return-to-home behavior
 
-### Phase 6: Autonomous Operation
-- [ ] Auto-start on boot via systemd
+### Phase 6: Autonomous Operation (IN PROGRESS)
+- [x] Auto-start on boot via systemd
+- [x] Robot launch file for full stack startup
 - [ ] Mission queue for accepting external requests
 - [ ] Battery-aware behavior (return to charge)
 - [ ] Wander mode with exploration
@@ -108,6 +110,9 @@ The hexapod uses body-centric control where foot positions are defined relative 
 **ROS 2 Services:**
 - `/hexapod/initialize` (std_srvs/Trigger) - Home then stand sequence
 - `/hexapod/reset_odometry` (std_srvs/Trigger) - Reset odometry to origin
+
+**ROS 2 Actions:**
+- `/hexapod/move_distance` (hexapod_interfaces/MoveDistance) - Move specified distance with odometry feedback
 
 ## Project Structure
 

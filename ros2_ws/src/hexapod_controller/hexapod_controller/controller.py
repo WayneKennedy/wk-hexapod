@@ -13,12 +13,15 @@ Following ROS hexapod best practices (KevinOchs pattern):
 
 import rclpy
 from rclpy.node import Node
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
 from geometry_msgs.msg import Twist, Pose, Vector3, TransformStamped
 from sensor_msgs.msg import Imu, JointState
 from nav_msgs.msg import Odometry
 from std_msgs.msg import String, Bool, Float64MultiArray
 from std_srvs.srv import Trigger, SetBool
 from tf2_ros import TransformBroadcaster
+from hexapod_interfaces.action import MoveDistance
 import copy
 import math
 import numpy as np
@@ -237,6 +240,21 @@ class HexapodController(Node):
             SetBool, 'hexapod/enable_balance', self.enable_balance_callback)
         self.reset_odom_srv = self.create_service(
             Trigger, 'hexapod/reset_odometry', self.reset_odometry_callback)
+
+        # Action servers (use reentrant callback group for concurrent execution)
+        self.action_cb_group = ReentrantCallbackGroup()
+        self.move_distance_action = ActionServer(
+            self,
+            MoveDistance,
+            'hexapod/move_distance',
+            execute_callback=self.move_distance_execute,
+            goal_callback=self.move_distance_goal_callback,
+            cancel_callback=self.move_distance_cancel_callback,
+            callback_group=self.action_cb_group
+        )
+
+        # Action state
+        self.action_in_progress = False
 
         # Balance loop timer (only runs when enabled)
         self.balance_timer = None
@@ -1067,6 +1085,106 @@ class HexapodController(Node):
         response.success = True
         response.message = 'Odometry reset'
         return response
+
+    # ===== MoveDistance Action Server =====
+
+    def move_distance_goal_callback(self, goal_request):
+        """Accept or reject a goal request"""
+        if not self.is_initialized:
+            self.get_logger().warn('MoveDistance rejected: not initialized')
+            return GoalResponse.REJECT
+        if self.action_in_progress:
+            self.get_logger().warn('MoveDistance rejected: action in progress')
+            return GoalResponse.REJECT
+        if self.is_relaxed:
+            self.get_logger().warn('MoveDistance rejected: servos relaxed')
+            return GoalResponse.REJECT
+
+        self.get_logger().info(f'MoveDistance accepted: {goal_request.distance:.3f}m')
+        return GoalResponse.ACCEPT
+
+    def move_distance_cancel_callback(self, goal_handle):
+        """Accept or reject a cancel request"""
+        self.get_logger().info('MoveDistance cancel requested')
+        return CancelResponse.ACCEPT
+
+    async def move_distance_execute(self, goal_handle):
+        """Execute the MoveDistance action"""
+        self.action_in_progress = True
+        self.get_logger().info('MoveDistance executing...')
+
+        goal = goal_handle.request
+        distance = goal.distance  # meters
+        max_speed = goal.max_speed if goal.max_speed > 0 else 0.1  # m/s
+
+        # Record starting position
+        start_x = self.odom_x
+        start_y = self.odom_y
+        start_yaw = self.odom_yaw
+
+        # Calculate direction (forward or backward)
+        direction = 1.0 if distance >= 0 else -1.0
+        target_distance = abs(distance)
+
+        # Feedback message
+        feedback = MoveDistance.Feedback()
+        result = MoveDistance.Result()
+
+        # Gait parameters
+        step_size = 0.025  # 25mm per cycle
+        cycle_time = self.get_parameter('gait.cycle_time').value
+
+        traveled = 0.0
+        last_feedback_time = time.time()
+
+        try:
+            while traveled < target_distance:
+                # Check for cancel
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    result.success = False
+                    result.actual_distance = traveled
+                    result.message = 'Canceled'
+                    self.action_in_progress = False
+                    self._reset_to_stand()
+                    return result
+
+                # Execute one gait cycle
+                y_move = step_size * 1000 * direction  # Convert to mm
+                self._tripod_gait_cycle(y_move, 0.0, 0.0)
+
+                # Calculate distance traveled from odometry
+                dx = self.odom_x - start_x
+                dy = self.odom_y - start_y
+                traveled = math.sqrt(dx*dx + dy*dy)
+
+                # Publish feedback (max 10Hz)
+                now = time.time()
+                if now - last_feedback_time >= 0.1:
+                    feedback.distance_remaining = max(0.0, target_distance - traveled)
+                    feedback.current_speed = step_size / cycle_time
+                    goal_handle.publish_feedback(feedback)
+                    last_feedback_time = now
+
+            # Goal reached
+            goal_handle.succeed()
+            result.success = True
+            result.actual_distance = traveled
+            result.message = f'Traveled {traveled:.3f}m'
+            self.get_logger().info(f'MoveDistance complete: {traveled:.3f}m')
+
+        except Exception as e:
+            goal_handle.abort()
+            result.success = False
+            result.actual_distance = traveled
+            result.message = f'Error: {e}'
+            self.get_logger().error(f'MoveDistance failed: {e}')
+
+        finally:
+            self.action_in_progress = False
+            self._reset_to_stand()
+
+        return result
 
     def destroy_node(self):
         self._relax_servos()
