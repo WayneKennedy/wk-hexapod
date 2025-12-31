@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<robot name="hexapod">
+  <!--
+    Simplified URDF for Hexapod Robot
+    Defines TF frames for navigation and sensor integration
+
+    Frame conventions (REP 103):
+    - X forward, Y left, Z up
+    - base_link at body center, ground level when standing
+  -->
+
+  <!-- Base link - body center -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.20 0.15 0.05"/>
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.3 0.3 0.3 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.15" length="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Base footprint - projection on ground -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.03" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IMU link - MPU6050 on body -->
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Head pan link -->
+  <link name="head_pan_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.02" length="0.03"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="head_pan_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="head_pan_link"/>
+    <origin xyz="0.10 0 0.03" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- Head tilt link -->
+  <link name="head_tilt_link">
+    <visual>
+      <geometry>
+        <box size="0.04 0.06 0.03"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="head_tilt_joint" type="revolute">
+    <parent link="head_pan_link"/>
+    <child link="head_tilt_link"/>
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.5" upper="0.5" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- Ultrasonic sensor link - on head -->
+  <link name="ultrasonic_link"/>
+  <joint name="ultrasonic_joint" type="fixed">
+    <parent link="head_tilt_link"/>
+    <child link="ultrasonic_link"/>
+    <origin xyz="0.03 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera link - on head -->
+  <link name="camera_link"/>
+  <joint name="camera_joint" type="fixed">
+    <parent link="head_tilt_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.02 0 0.01" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera optical frame (Z forward, X right, Y down) -->
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+  <!-- Laser frame (for future lidar or virtual scan) -->
+  <link name="laser_frame"/>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_frame"/>
+    <origin xyz="0.05 0 0.04" rpy="0 0 0"/>
+  </joint>
+
+</robot>

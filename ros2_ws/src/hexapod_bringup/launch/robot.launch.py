@@ -2,6 +2,7 @@
 Main launch file for Hexapod Robot
 
 Starts all robot components:
+- Robot state publisher (URDF/TF)
 - Hardware drivers (IMU, battery, range finder)
 - Locomotion controller
 - Optionally: Camera for perception
@@ -14,7 +15,7 @@ Usage:
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration, Command
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -29,6 +30,11 @@ def generate_launch_description():
     # Config file paths
     hardware_config = os.path.join(hardware_pkg, 'config', 'hardware.yaml')
     robot_config = os.path.join(bringup_pkg, 'config', 'robot.yaml')
+    urdf_file = os.path.join(bringup_pkg, 'urdf', 'hexapod.urdf')
+
+    # Read URDF file
+    with open(urdf_file, 'r') as f:
+        robot_description = f.read()
 
     # Launch arguments
     use_camera_arg = DeclareLaunchArgument(
@@ -46,6 +52,19 @@ def generate_launch_description():
     return LaunchDescription([
         use_camera_arg,
         use_sim_arg,
+
+        # ===== Robot State Publisher (URDF/TF) =====
+
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{
+                'robot_description': robot_description,
+                'use_sim_time': False,
+            }],
+        ),
 
         # ===== Hardware Drivers =====
 

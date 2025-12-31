@@ -69,8 +69,11 @@ End state: Robot boots autonomously, accepts high-level mission requests ("walk 
 - [x] Ultrasonic sensor driver publishes `/range_finder/range`
 - [x] Nav2 costmap configured to use range data
 
-### Phase 4: SLAM
-- [ ] Configure slam_toolbox or rtabmap
+### Phase 4: SLAM (IN PROGRESS)
+- [x] Configure slam_toolbox parameters
+- [x] Add robot URDF with sensor frames
+- [x] SLAM launch file ready
+- [ ] Add lidar or depth camera for proper mapping
 - [ ] Build occupancy grid from sensors
 - [ ] Save/load maps for persistent navigation
 
