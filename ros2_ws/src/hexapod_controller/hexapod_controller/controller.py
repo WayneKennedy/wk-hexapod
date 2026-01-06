@@ -229,6 +229,9 @@ class HexapodController(Node):
             JointState, 'joint_states', 10)
         self.odom_pub = self.create_publisher(
             Odometry, 'odom', 10)
+        # Servo commands to servo_driver (18 leg angles + 2 head angles)
+        self.joint_cmd_pub = self.create_publisher(
+            Float64MultiArray, 'joint_commands', 10)
 
         # TF Broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -423,11 +426,8 @@ class HexapodController(Node):
                 self.current_angles[i][2] = self._clamp(
                     180 - (raw[2] + self.calibration_angles[i][2]), 0, 180)
 
-        # Send to servos
-        for leg_idx in range(6):
-            channels = self.LEG_CHANNELS[leg_idx]
-            for j in range(3):
-                self._set_servo_angle(channels[j], self.current_angles[leg_idx][j])
+        # Send to servo_driver via topic
+        self._publish_joint_commands()
 
         # Publish joint states for visualization
         self._publish_joint_states()
@@ -442,6 +442,20 @@ class HexapodController(Node):
                 self.pwm_41.set_pwm_off(i)
         self.is_relaxed = True
         self.get_logger().info('Servos relaxed')
+
+    def _publish_joint_commands(self):
+        """Publish joint angles to servo_driver"""
+        msg = Float64MultiArray()
+        # Format: [leg0_coxa, leg0_femur, leg0_tibia, leg1_coxa, ..., pan, tilt]
+        data = []
+        for i in range(6):
+            for j in range(3):
+                data.append(float(self.current_angles[i][j]))
+        # Add head angles (default centered for now)
+        data.append(90.0)  # pan
+        data.append(90.0)  # tilt
+        msg.data = data
+        self.joint_cmd_pub.publish(msg)
 
     def _publish_joint_states(self):
         """Publish joint states for rviz visualization"""
@@ -669,18 +683,47 @@ class HexapodController(Node):
         ])
         self._update_servos()
 
+    # Neutral foot positions (X, Y) for rotation calculations
+    # These define where each foot sits relative to body center
+    NEUTRAL_FEET = [
+        [137.1, 189.4],    # leg 0 - right front
+        [225.0, 0.0],      # leg 1 - right middle
+        [137.1, -189.4],   # leg 2 - right rear
+        [-137.1, -189.4],  # leg 3 - left rear
+        [-225.0, 0.0],     # leg 4 - left middle
+        [-137.1, 189.4],   # leg 5 - left front
+    ]
+
     def _tripod_gait_cycle(self, y_move, x_move, turn):
         """
-        One tripod gait cycle - tested and working.
-        y_move: forward/back in world frame (Y axis) - maps to body X (forward)
-        x_move: strafe left/right in world frame (X axis) - maps to body Y (left)
-        turn: rotation in degrees (not yet implemented)
+        One tripod gait cycle with full omni-directional movement.
+        Based on fn-hexapod control.py rotation math.
+
+        y_move: forward/back (mm per cycle)
+        x_move: strafe left/right (mm per cycle)
+        turn: rotation in degrees per cycle
         """
         step_height = self.get_parameter('gait.step_height').value
         cycle_time = self.get_parameter('gait.cycle_time').value
 
         frames = 64
         delay = cycle_time / frames
+
+        # Calculate per-leg movement including rotation
+        # Rotation: each foot moves based on rotating around body center
+        # Negate turn: positive angular.z = CCW, but our math gives CCW for positive angle
+        angle_rad = math.radians(-turn)
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+
+        leg_moves = []
+        for i in range(6):
+            nx, ny = self.NEUTRAL_FEET[i]
+            # Rotation contribution: delta from rotating foot position around origin
+            rot_x = nx * cos_a + ny * sin_a - nx
+            rot_y = -nx * sin_a + ny * cos_a - ny
+            # Total movement = rotation + translation
+            leg_moves.append([rot_x + x_move, rot_y + y_move])
 
         # Store starting positions
         start_feet = [list(f) for f in self.foot_positions]
@@ -691,6 +734,7 @@ class HexapodController(Node):
 
             for i in range(6):
                 is_odd = (i % 2 == 1)
+                move_x, move_y = leg_moves[i]
 
                 # Odd legs move first half, even legs move second half
                 if is_odd:
@@ -698,30 +742,29 @@ class HexapodController(Node):
                 else:
                     leg_phase = 0.0 if phase < 0.5 else (phase - 0.5) * 2
 
-                # Calculate foot position (Y is forward/back, X is strafe)
+                # Calculate foot position
                 if leg_phase < 1.0:
                     # Swing phase - leg in air moving forward
                     swing = math.sin(leg_phase * math.pi)
-                    self.foot_positions[i][0] = start_feet[i][0] + x_move * (leg_phase - 0.5)
-                    self.foot_positions[i][1] = start_feet[i][1] + y_move * (leg_phase - 0.5)
+                    self.foot_positions[i][0] = start_feet[i][0] + move_x * (leg_phase - 0.5)
+                    self.foot_positions[i][1] = start_feet[i][1] + move_y * (leg_phase - 0.5)
                     self.foot_positions[i][2] = self.body_position[2] + step_height * swing
                 else:
                     # Stance complete
-                    self.foot_positions[i][0] = start_feet[i][0] + x_move * 0.5
-                    self.foot_positions[i][1] = start_feet[i][1] + y_move * 0.5
+                    self.foot_positions[i][0] = start_feet[i][0] + move_x * 0.5
+                    self.foot_positions[i][1] = start_feet[i][1] + move_y * 0.5
                     self.foot_positions[i][2] = self.body_position[2]
 
                 # Push phase for grounded legs
                 if (is_odd and phase >= 0.5) or (not is_odd and phase < 0.5):
                     push_phase = (phase - 0.5) if is_odd else phase
-                    self.foot_positions[i][0] = start_feet[i][0] - x_move * push_phase * 2
-                    self.foot_positions[i][1] = start_feet[i][1] - y_move * push_phase * 2
+                    self.foot_positions[i][0] = start_feet[i][0] - move_x * push_phase * 2
+                    self.foot_positions[i][1] = start_feet[i][1] - move_y * push_phase * 2
 
             self._update_servos()
             time.sleep(delay)
 
         # Update odometry after cycle completes
-        # y_move is forward (body X), x_move is strafe (body Y)
         cycle_time_actual = time.time() - cycle_start_time
         self._update_odometry(y_move, x_move, turn, cycle_time_actual)
 
@@ -943,8 +986,8 @@ class HexapodController(Node):
         # angular.z = rotation
 
         forward = self._clamp(msg.linear.x * 25, -25, 25)  # mm per step
-        strafe = self._clamp(msg.linear.y * 25, -25, 25)
-        turn = self._clamp(msg.angular.z * 15, -15, 15)  # degrees per step
+        strafe = self._clamp(-msg.linear.y * 25, -25, 25)  # negate for correct direction
+        turn = self._clamp(msg.angular.z * 12, -15, 15)  # degrees per step
 
         if abs(forward) < 1 and abs(strafe) < 1 and abs(turn) < 1:
             # Stop moving - return to neutral
@@ -1025,11 +1068,12 @@ class HexapodController(Node):
         if cmd == 'home':
             # Don't reset odometry when homing via topic (might be during nav)
             self.home(reset_odom=False)
+            self.is_initialized = True  # Ready for stand/walk after home
         elif cmd == 'stand':
             if self.is_initialized:
                 self.stand()
             else:
-                self.get_logger().warn('Not initialized')
+                self.get_logger().warn('Not initialized - send home first')
         elif cmd == 'relax':
             self._relax_servos()
         else:

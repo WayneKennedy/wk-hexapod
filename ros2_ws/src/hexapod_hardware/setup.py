@@ -26,6 +26,9 @@ setup(
             'battery_monitor = hexapod_hardware.battery_monitor:main',
             'led_controller = hexapod_hardware.led_controller:main',
             'range_finder_driver = hexapod_hardware.range_finder_driver:main',
+            'buzzer_controller = hexapod_hardware.buzzer_controller:main',
+            'power_indicator = hexapod_hardware.power_indicator:main',
+            'startup_sequence = hexapod_hardware.startup_sequence:main',
         ],
     },
 )

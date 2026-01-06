@@ -7,6 +7,9 @@ Starts all hardware interface nodes:
 - Battery monitor
 - LED controller
 - Range finder driver
+- Buzzer controller
+- Power indicator (LED status based on battery)
+- Startup sequence (safe servo initialization)
 """
 
 from launch import LaunchDescription
@@ -66,6 +69,33 @@ def generate_launch_description():
             package='hexapod_hardware',
             executable='range_finder_driver',
             name='range_finder_driver',
+            parameters=[config_file],
+            output='screen',
+        ),
+
+        # Buzzer Controller
+        Node(
+            package='hexapod_hardware',
+            executable='buzzer_controller',
+            name='buzzer_controller',
+            parameters=[config_file],
+            output='screen',
+        ),
+
+        # Power Indicator (LED status based on battery)
+        Node(
+            package='hexapod_hardware',
+            executable='power_indicator',
+            name='power_indicator',
+            parameters=[config_file],
+            output='screen',
+        ),
+
+        # Startup Sequence (safe servo initialization)
+        Node(
+            package='hexapod_hardware',
+            executable='startup_sequence',
+            name='startup_sequence',
             parameters=[config_file],
             output='screen',
         ),

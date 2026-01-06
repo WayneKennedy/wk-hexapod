@@ -21,6 +21,8 @@ services:
       - /dev/media0:/dev/media0
       - /dev/media1:/dev/media1
       - /dev/dma_heap:/dev/dma_heap
+      # Intel RealSense D435i (USB 3.0)
+      - /dev/bus/usb:/dev/bus/usb
 
     # Required for hardware access
     privileged: true
@@ -53,8 +55,12 @@ services:
     # Restart policy
     restart: unless-stopped
 
-    # Default command - can be overridden
-    command: bash
+    # Default command - launch robot on boot
+    # Override with: docker compose run hexapod bash
+    command: >
+      bash -c "source /opt/ros/jazzy/setup.bash &&
+               source /ros2_ws/install/setup.bash &&
+               ros2 launch hexapod_bringup robot.launch.py"
 
   # Development shell - same as above but doesn't auto-restart
   dev:

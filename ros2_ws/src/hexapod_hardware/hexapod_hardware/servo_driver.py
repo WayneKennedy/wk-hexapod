@@ -458,6 +458,7 @@ class ServoDriver(Node):
         for i in range(6):
             self.leg_positions[i] = [140, 0, 0]
         self.set_leg_angles()
+        self.is_initialized = True  # Ready for stand after home
         self.get_logger().info('HOME position set')
 
     def stand(self, height=30, duration=1.0, steps=50):
@@ -493,20 +494,16 @@ class ServoDriver(Node):
         self.get_logger().info('STAND position set')
 
     def pose_callback(self, msg):
-        """Handle pose commands: home, stand, relax"""
+        """Handle pose commands - only relax (home/stand via controller's joint_commands)"""
         command = msg.data.lower().strip()
 
-        if command == 'home':
-            self.home()
-        elif command == 'stand':
-            if not self.is_initialized:
-                self.get_logger().warn('Cannot stand - not initialized. Call /servo_driver/initialize first')
-                return
-            self.stand()
-        elif command == 'relax':
+        if command == 'relax':
             self.relax_servos()
+        elif command in ['home', 'stand']:
+            # Handled by hexapod_controller which publishes to joint_commands
+            pass
         else:
-            self.get_logger().warn(f'Unknown pose command: {command}. Use: home, stand, relax')
+            self.get_logger().warn(f'Unknown pose command: {command}')
 
     def initialize_callback(self, request, response):
         """

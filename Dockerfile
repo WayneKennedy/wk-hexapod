@@ -149,23 +149,63 @@ RUN git clone --depth 1 --branch v2.56.4 https://github.com/IntelRealSense/libre
     rm -rf /tmp/librealsense
 
 # Install ROS 2 packages for vision pipeline
-# Pin Ubuntu ffmpeg packages to avoid conflicts with Pi repo
+# Pin Ubuntu ffmpeg packages and fix GTK conflict with Pi repo
 RUN echo 'Package: libavcodec* libavformat* libavutil* libswresample* libswscale*\nPin: release o=Ubuntu\nPin-Priority: 1001' > /etc/apt/preferences.d/ffmpeg-ubuntu && \
-    apt-get update && apt-get install -y --no-install-recommends \
+    apt-get update && \
+    apt-get download libgtk-3-0t64 && \
+    dpkg --force-overwrite -i libgtk-3-0t64*.deb && \
+    rm -f libgtk-3-0t64*.deb && \
+    apt-get install -y --no-install-recommends -f \
     ros-jazzy-depthimage-to-laserscan \
     ros-jazzy-image-transport \
     ros-jazzy-diagnostic-updater \
     ros-jazzy-cv-bridge \
+    ros-jazzy-nav2-costmap-2d \
+    ros-jazzy-nav2-msgs \
+    ros-jazzy-pcl-conversions \
+    ros-jazzy-pcl-ros \
+    ros-jazzy-laser-geometry \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone and build realsense-ros from source (4.56.4 supports Jazzy)
 # Install to /opt/realsense_ros which will be sourced in entrypoint
-# Note: rtabmap-ros can be added later - requires additional setup
 RUN mkdir -p /opt/realsense_ros/src && \
     cd /opt/realsense_ros/src && \
     git clone --depth 1 --branch 4.56.4 https://github.com/IntelRealSense/realsense-ros.git && \
     cd /opt/realsense_ros && \
     . /opt/ros/jazzy/setup.sh && \
+    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# Build RTAB-Map library from source for arm64
+# PCL already installed via ros-jazzy-pcl-conversions
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-dev \
+    liboctomap-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build rtabmap library
+RUN git clone --depth 1 --branch 0.21.10-jazzy https://github.com/introlab/rtabmap.git /tmp/rtabmap && \
+    mkdir -p /tmp/rtabmap/build && \
+    cd /tmp/rtabmap/build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DWITH_QT=OFF \
+        -DBUILD_APP=OFF \
+        -DBUILD_TOOLS=OFF && \
+    make -j$(nproc) && \
+    make install && \
+    ldconfig && \
+    rm -rf /tmp/rtabmap
+
+# Build rtabmap_ros for ROS 2 Jazzy (skip rviz plugins for headless)
+RUN mkdir -p /opt/rtabmap_ros/src && \
+    cd /opt/rtabmap_ros/src && \
+    git clone --depth 1 --branch 0.21.9-jazzy https://github.com/introlab/rtabmap_ros.git && \
+    touch /opt/rtabmap_ros/src/rtabmap_ros/rtabmap_rviz_plugins/COLCON_IGNORE && \
+    cd /opt/rtabmap_ros && \
+    . /opt/ros/jazzy/setup.sh && \
+    . /opt/realsense_ros/install/setup.sh && \
     colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # Create workspace

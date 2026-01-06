@@ -1,7 +1,8 @@
 # Hexapod Hardware Configuration
 # Based on Freenove Big Hexapod Robot Kit (FNK0052)
 
-hexapod_hardware:
+# Use wildcard to apply to all nodes
+/**:
   ros__parameters:
     # I2C Configuration
     i2c:
@@ -20,13 +21,12 @@ hexapod_hardware:
       # Leg mapping: [coxa, femur, tibia] servo channels per leg
       # From fn-hexapod control.py - note legs 3,4 have non-contiguous tibia channels
       # Channel routing: 0-15 -> PCA9685 @ 0x41, 16-31 -> PCA9685 @ 0x40
-      leg_channels:
-        - [15, 14, 13]  # Leg 1 (RF)
-        - [12, 11, 10]  # Leg 2 (RM)
-        - [9, 8, 31]    # Leg 3 (RR) - tibia on ch 31!
-        - [22, 23, 27]  # Leg 4 (LR) - tibia on ch 27!
-        - [19, 20, 21]  # Leg 5 (LM)
-        - [16, 17, 18]  # Leg 6 (LF)
+      leg_1: [15, 14, 13]  # RF
+      leg_2: [12, 11, 10]  # RM
+      leg_3: [9, 8, 31]    # RR - tibia on ch 31!
+      leg_4: [22, 23, 27]  # LR - tibia on ch 27!
+      leg_5: [19, 20, 21]  # LM
+      leg_6: [16, 17, 18]  # LF
       # Head/camera servo channels (from fn-hexapod server.py CMD_CAMERA handler)
       head_channels:
         pan: 0    # Channel 0 on PCA9685 @ 0x41
@@ -54,7 +54,7 @@ hexapod_hardware:
     # LED Configuration
     leds:
       count: 7
-      brightness: 255
+      brightness: 127       # 50% brightness
       type: 'GRB'           # Color order for WS2812
 
     # Range Finder Configuration (HC-SR04 ultrasonic)
@@ -65,6 +65,29 @@ hexapod_hardware:
       max_range: 3.0        # meters
       min_range: 0.02       # meters (2cm)
       field_of_view: 0.2617 # radians (~15 degrees)
+
+    # Buzzer Configuration
+    buzzer:
+      gpio_pin: 17                # GPIO pin for buzzer
+      default_beep_duration: 0.2  # seconds for single beep
+
+    # Power Indicator Configuration
+    # Maps battery voltages to LED colors:
+    #   LOAD battery -> Left LEDs (L1, L2, L3)
+    #   CTRL battery -> Right LEDs (R1, R2, R3)
+    power_indicator:
+      update_interval: 10.0       # seconds between LED updates
+      voltage_usb: 0.5            # < this: blue (USB/no battery)
+      voltage_good: 7.0           # >= this: green
+      voltage_warn: 6.5           # >= this: yellow, below: red
+
+    # Startup Sequence Configuration
+    # Safe servo initialization with visual/audio warning
+    startup:
+      auto_start: true        # Auto-run sequence on boot
+      warning_duration: 2.0   # seconds of warning before servo snap
+      beep_interval: 0.5      # seconds between warning beeps
+      place_delay: 10.0       # seconds to place robot on floor after home
 
     # PCB/Hardware Version
     pcb_version: 2          # V2.0 connector (SPI for LEDs)

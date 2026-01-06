@@ -9,6 +9,11 @@ if [ -f /opt/realsense_ros/install/setup.bash ]; then
     source /opt/realsense_ros/install/setup.bash
 fi
 
+# Source RTAB-Map ROS wrapper if built
+if [ -f /opt/rtabmap_ros/install/setup.bash ]; then
+    source /opt/rtabmap_ros/install/setup.bash
+fi
+
 # Source workspace if built
 if [ -f /ros2_ws/install/setup.bash ]; then
     source /ros2_ws/install/setup.bash

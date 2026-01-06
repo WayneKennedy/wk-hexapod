@@ -3,7 +3,8 @@ Main launch file for Hexapod Robot
 
 Starts all robot components:
 - Robot state publisher (URDF/TF)
-- Hardware drivers (IMU, battery, range finder)
+- Hardware drivers (servo, IMU, battery, LED, buzzer)
+- Power indicator and startup sequence
 - Locomotion controller
 - Optionally: Camera for perception
 
@@ -86,11 +87,56 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # Range Finder Driver
+        # Range Finder Driver (disabled - no ultrasonic mounted)
+        # Node(
+        #     package='hexapod_hardware',
+        #     executable='range_finder_driver',
+        #     name='range_finder_driver',
+        #     parameters=[hardware_config],
+        #     output='screen',
+        # ),
+
+        # Servo Driver
         Node(
             package='hexapod_hardware',
-            executable='range_finder_driver',
-            name='range_finder_driver',
+            executable='servo_driver',
+            name='servo_driver',
+            parameters=[hardware_config],
+            output='screen',
+        ),
+
+        # LED Controller
+        Node(
+            package='hexapod_hardware',
+            executable='led_controller',
+            name='led_controller',
+            parameters=[hardware_config],
+            output='screen',
+        ),
+
+        # Buzzer Controller
+        Node(
+            package='hexapod_hardware',
+            executable='buzzer_controller',
+            name='buzzer_controller',
+            parameters=[hardware_config],
+            output='screen',
+        ),
+
+        # Power Indicator (battery status on LEDs)
+        Node(
+            package='hexapod_hardware',
+            executable='power_indicator',
+            name='power_indicator',
+            parameters=[hardware_config],
+            output='screen',
+        ),
+
+        # Startup Sequence (safe servo initialization)
+        Node(
+            package='hexapod_hardware',
+            executable='startup_sequence',
+            name='startup_sequence',
             parameters=[hardware_config],
             output='screen',
         ),
