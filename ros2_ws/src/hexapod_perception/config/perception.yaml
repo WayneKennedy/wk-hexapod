@@ -22,7 +22,7 @@ hexapod_perception:
       process_every_n_frames: 10
 
       # Detection model: "hog" (faster, CPU) or "cnn" (more accurate, GPU)
-      detection_model: "hog"
+      detection_model: "cnn"
 
       # Recognition tolerance (lower = stricter matching)
       # Range: 0.4 (very strict) to 0.6 (lenient)
