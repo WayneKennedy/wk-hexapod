@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'camera_node = hexapod_perception.camera_node:main',
             'face_recognition_node = hexapod_perception.face_recognition_node:main',
+            'web_dashboard = hexapod_perception.web_dashboard:main',
         ],
     },
 )

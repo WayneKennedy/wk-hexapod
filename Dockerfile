@@ -165,6 +165,9 @@ RUN echo 'Package: libavcodec* libavformat* libavutil* libswresample* libswscale
     ros-jazzy-pcl-conversions \
     ros-jazzy-pcl-ros \
     ros-jazzy-laser-geometry \
+    # Web visualization bridge
+    ros-jazzy-foxglove-bridge \
+    ros-jazzy-foxglove-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone and build realsense-ros from source (4.56.4 supports Jazzy)
