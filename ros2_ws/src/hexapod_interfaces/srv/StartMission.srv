@@ -1,0 +1,19 @@
+# Start a mission
+
+# Mission type: "explore", "patrol", "navigate", "return_home"
+string mission_type
+
+# Waypoints for patrol/navigate missions (optional)
+geometry_msgs/PoseStamped[] waypoints
+
+# Mission timeout in seconds (0 = no timeout)
+float32 timeout_sec
+---
+# True if mission was accepted
+bool accepted
+
+# Human-readable response message
+string message
+
+# Assigned mission ID for tracking
+string mission_id

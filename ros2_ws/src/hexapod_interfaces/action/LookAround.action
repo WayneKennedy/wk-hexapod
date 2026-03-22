@@ -1,0 +1,15 @@
+# Look around action - head and body sweep to gather visual features
+
+# Goal
+bool check_localization  # If true, check for localization during sweep
+float32 timeout_sec      # Maximum duration (0 = use default)
+---
+# Result
+bool success             # True if completed without error
+bool localized           # True if localization was achieved (if check_localization)
+string message           # Human-readable result message
+---
+# Feedback
+string current_phase     # "head_sweep", "body_rotation", "combined"
+float32 progress         # 0.0 to 1.0
+bool localization_detected  # True if localization detected during sweep

@@ -1,0 +1,13 @@
+# Stop current or specified mission
+
+# Mission ID to stop (empty = stop current mission)
+string mission_id
+
+# If true, robot returns to starting position after stopping
+bool return_home
+---
+# True if mission was stopped successfully
+bool success
+
+# Human-readable response message
+string message

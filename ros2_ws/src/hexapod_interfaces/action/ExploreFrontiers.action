@@ -1,0 +1,17 @@
+# Frontier-based exploration action
+
+# Goal
+float32 max_duration_sec   # Maximum exploration time (0 = unlimited)
+float32 min_frontier_size  # Minimum frontier size in meters (0 = use default)
+---
+# Result
+bool success               # True if exploration completed without critical error
+uint32 frontiers_explored  # Number of frontiers visited
+float32 area_mapped_m2     # Estimated area mapped in square meters
+string message             # Human-readable result message
+---
+# Feedback
+uint32 frontiers_remaining     # Number of frontiers left to explore
+geometry_msgs/PoseStamped current_goal  # Current navigation target
+float32 progress_percent       # Estimated progress (may be rough)
+string status                  # Current status description

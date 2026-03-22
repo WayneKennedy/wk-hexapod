@@ -1,0 +1,63 @@
+# Autonomy System Configuration
+
+autonomy_manager:
+  ros__parameters:
+    # Time to wait for external mission before auto-exploring
+    mission_timeout_sec: 60.0
+    # Path to RTAB-Map database
+    map_db_path: "~/.ros/rtabmap.db"
+    # State publish rate
+    state_publish_rate_hz: 2.0
+
+slam_monitor:
+  ros__parameters:
+    # Path to RTAB-Map database
+    map_db_path: "~/.ros/rtabmap.db"
+    # Minimum consecutive loop closures to confirm localization
+    min_loop_closures: 3
+    # Timeout before declaring localization failed
+    localization_timeout_sec: 15.0
+    # Status publish rate
+    publish_rate_hz: 2.0
+
+look_around:
+  ros__parameters:
+    # Head pan limits (degrees)
+    head_pan_min: 45.0
+    head_pan_max: 135.0
+    head_pan_center: 90.0
+    # Head tilt limits (degrees)
+    head_tilt_min: 70.0
+    head_tilt_max: 110.0
+    head_tilt_center: 90.0
+    # Body rotation speed (rad/s for cmd_vel)
+    body_yaw_speed: 0.3
+    # Duration for each body rotation direction
+    body_rotation_duration: 0.5
+    # Time to hold each position
+    position_hold_time: 0.4
+    # Default action timeout
+    default_timeout: 15.0
+
+frontier_explorer:
+  ros__parameters:
+    # Minimum frontier size to consider (meters)
+    min_frontier_size: 0.3
+    # Goal tolerance for navigation
+    goal_tolerance: 0.3
+    # Maximum exploration time per session
+    exploration_timeout_sec: 300.0
+    # Goal selection strategy: "closest" or "largest"
+    goal_selection_strategy: "closest"
+    # OccupancyGrid value thresholds
+    unknown_threshold: -1
+    free_threshold: 50
+    # Maximum navigation failures before aborting
+    max_nav_failures: 3
+
+mission_server:
+  ros__parameters:
+    # Navigation timeout per waypoint
+    navigation_timeout_sec: 120.0
+    # Return to start on abort
+    return_home_on_abort: true

@@ -150,7 +150,8 @@ RUN git clone --depth 1 --branch v2.56.4 https://github.com/IntelRealSense/libre
 
 # Install ROS 2 packages for vision pipeline
 # Pin Ubuntu ffmpeg packages and fix GTK conflict with Pi repo
-RUN echo 'Package: libavcodec* libavformat* libavutil* libswresample* libswscale*\nPin: release o=Ubuntu\nPin-Priority: 1001' > /etc/apt/preferences.d/ffmpeg-ubuntu && \
+# Extended pinning to include all av* and libpostproc* for Nav2 compatibility
+RUN echo 'Package: libav* libpostproc* libswresample* libswscale*\nPin: release o=Ubuntu\nPin-Priority: 1001' > /etc/apt/preferences.d/ffmpeg-ubuntu && \
     apt-get update && \
     apt-get download libgtk-3-0t64 && \
     dpkg --force-overwrite -i libgtk-3-0t64*.deb && \
@@ -165,9 +166,16 @@ RUN echo 'Package: libavcodec* libavformat* libavutil* libswresample* libswscale
     ros-jazzy-pcl-conversions \
     ros-jazzy-pcl-ros \
     ros-jazzy-laser-geometry \
-    # Web visualization bridge
     ros-jazzy-foxglove-bridge \
     ros-jazzy-foxglove-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Nav2 navigation stack for autonomous exploration
+# Separate step to avoid dependency conflicts with Pi repo packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ros-jazzy-nav2-bringup \
+    ros-jazzy-navigation2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone and build realsense-ros from source (4.56.4 supports Jazzy)
@@ -201,11 +209,12 @@ RUN git clone --depth 1 --branch 0.21.10-jazzy https://github.com/introlab/rtabm
     ldconfig && \
     rm -rf /tmp/rtabmap
 
-# Build rtabmap_ros for ROS 2 Jazzy (skip rviz plugins for headless)
+# Build rtabmap_ros for ROS 2 Jazzy (skip viz packages for headless)
 RUN mkdir -p /opt/rtabmap_ros/src && \
     cd /opt/rtabmap_ros/src && \
     git clone --depth 1 --branch 0.21.9-jazzy https://github.com/introlab/rtabmap_ros.git && \
     touch /opt/rtabmap_ros/src/rtabmap_ros/rtabmap_rviz_plugins/COLCON_IGNORE && \
+    touch /opt/rtabmap_ros/src/rtabmap_ros/rtabmap_viz/COLCON_IGNORE && \
     cd /opt/rtabmap_ros && \
     . /opt/ros/jazzy/setup.sh && \
     . /opt/realsense_ros/install/setup.sh && \

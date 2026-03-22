@@ -14,14 +14,24 @@ Access at http://<robot-ip>:8080
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import Image
 from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Float32MultiArray
+from geometry_msgs.msg import PoseStamped
 import numpy as np
 import cv2
 import threading
-from flask import Flask, Response, render_template_string
+from flask import Flask, Response, render_template_string, request
 import json
+
+# Try to import autonomy messages
+try:
+    from hexapod_interfaces.msg import AutonomyState
+    from hexapod_interfaces.srv import StartMission, StopMission, GetAutonomyState
+    AUTONOMY_MSGS_AVAILABLE = True
+except ImportError:
+    AUTONOMY_MSGS_AVAILABLE = False
 
 # Try to import face detection messages
 try:
@@ -35,6 +45,8 @@ class WebDashboard(Node):
     def __init__(self):
         super().__init__('web_dashboard')
 
+        self.callback_group = ReentrantCallbackGroup()
+
         # Parameters
         self.declare_parameter('port', 8080)
         self.declare_parameter('quality', 80)
@@ -47,9 +59,11 @@ class WebDashboard(Node):
         self.current_map = None
         self.current_faces = []
         self.battery_voltages = [0.0, 0.0]
+        self.autonomy_state = None
         self.frame_lock = threading.Lock()
         self.depth_lock = threading.Lock()
         self.map_lock = threading.Lock()
+        self.autonomy_lock = threading.Lock()
 
         # Subscribe to color camera
         self.image_sub = self.create_subscription(
@@ -91,6 +105,35 @@ class WebDashboard(Node):
             self.battery_callback,
             10
         )
+
+        # Autonomy integration
+        self.start_mission_client = None
+        self.stop_mission_client = None
+        self.get_state_client = None
+
+        if AUTONOMY_MSGS_AVAILABLE:
+            # Subscribe to autonomy state
+            self.autonomy_sub = self.create_subscription(
+                AutonomyState,
+                '/autonomy/state',
+                self.autonomy_callback,
+                10,
+                callback_group=self.callback_group
+            )
+
+            # Service clients for mission control
+            self.start_mission_client = self.create_client(
+                StartMission, '/mission/start',
+                callback_group=self.callback_group
+            )
+            self.stop_mission_client = self.create_client(
+                StopMission, '/mission/stop',
+                callback_group=self.callback_group
+            )
+            self.get_state_client = self.create_client(
+                GetAutonomyState, '/autonomy/get_state',
+                callback_group=self.callback_group
+            )
 
         self.get_logger().info(f'Web dashboard starting on port {self.port}')
 
@@ -186,6 +229,66 @@ class WebDashboard(Node):
         if len(msg.data) >= 2:
             self.battery_voltages = [msg.data[0], msg.data[1]]
 
+    def autonomy_callback(self, msg):
+        """Store autonomy state"""
+        with self.autonomy_lock:
+            self.autonomy_state = msg
+
+    def call_start_mission(self, mission_type, timeout=0.0):
+        """Call start mission service synchronously"""
+        if self.start_mission_client is None:
+            return {'accepted': False, 'message': 'Autonomy not available'}
+
+        if not self.start_mission_client.wait_for_service(timeout_sec=2.0):
+            return {'accepted': False, 'message': 'Mission service not available'}
+
+        request = StartMission.Request()
+        request.mission_type = mission_type
+        request.timeout_sec = timeout
+
+        future = self.start_mission_client.call_async(request)
+
+        # Wait for result with timeout
+        import time
+        start = time.time()
+        while not future.done() and (time.time() - start) < 5.0:
+            time.sleep(0.1)
+
+        if future.done():
+            result = future.result()
+            return {
+                'accepted': result.accepted,
+                'message': result.message,
+                'mission_id': result.mission_id
+            }
+        return {'accepted': False, 'message': 'Service call timeout'}
+
+    def call_stop_mission(self, return_home=False):
+        """Call stop mission service synchronously"""
+        if self.stop_mission_client is None:
+            return {'success': False, 'message': 'Autonomy not available'}
+
+        if not self.stop_mission_client.wait_for_service(timeout_sec=2.0):
+            return {'success': False, 'message': 'Mission service not available'}
+
+        request = StopMission.Request()
+        request.return_home = return_home
+
+        future = self.stop_mission_client.call_async(request)
+
+        import time
+        start = time.time()
+        while not future.done() and (time.time() - start) < 5.0:
+            time.sleep(0.1)
+
+        if future.done():
+            result = future.result()
+            return {
+                'success': result.success,
+                'message': result.message
+            }
+        return {'success': False, 'message': 'Service call timeout'}
+
     def get_frame_with_overlay(self):
         """Get current frame with face detection overlay"""
         with self.frame_lock:
@@ -256,6 +359,32 @@ class WebDashboard(Node):
         with self.depth_lock:
             has_depth = self.current_depth is not None
 
+        # Autonomy state
+        autonomy_info = {
+            'available': AUTONOMY_MSGS_AVAILABLE,
+            'state': 'unknown',
+            'state_name': 'unknown',
+            'slam_mode': 'unknown',
+            'mission_active': False,
+            'mission_id': '',
+            'exploration_progress': 0.0,
+            'mission_timeout_remaining': 0.0
+        }
+
+        with self.autonomy_lock:
+            if self.autonomy_state is not None:
+                autonomy_info['state'] = self.autonomy_state.state
+                autonomy_info['state_name'] = self.autonomy_state.state_name
+                autonomy_info['slam_mode'] = self.autonomy_state.slam_mode
+                autonomy_info['mission_active'] = self.autonomy_state.mission_active
+                autonomy_info['mission_id'] = self.autonomy_state.mission_id
+                autonomy_info['exploration_progress'] = round(
+                    self.autonomy_state.exploration_progress * 100, 1
+                )
+                autonomy_info['mission_timeout_remaining'] = round(
+                    self.autonomy_state.mission_timeout_remaining, 1
+                )
+
         return {
             'battery': {
                 'load': round(self.battery_voltages[0], 2),
@@ -268,7 +397,8 @@ class WebDashboard(Node):
             'slam': {
                 'map_available': has_map,
                 'depth_available': has_depth
-            }
+            },
+            'autonomy': autonomy_info
         }
 
 
@@ -377,6 +507,27 @@ HTML_TEMPLATE = '''
             margin-right: 8px;
             border-radius: 2px;
         }
+        .mission-btn {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #4ade80;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .mission-btn:hover { background: #22c55e; }
+        .mission-btn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+        .mission-btn.stop {
+            background: #f87171;
+        }
+        .mission-btn.stop:hover { background: #ef4444; }
     </style>
 </head>
 <body>
@@ -431,6 +582,41 @@ HTML_TEMPLATE = '''
                     </div>
                 </div>
             </div>
+            <div class="panel status-panel" style="grid-column: span 2;">
+                <div class="panel-header" style="background: #0f3460; margin: -15px -15px 15px -15px; padding: 10px 15px;">Mission Control</div>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <div class="stat">
+                            <span class="stat-label">Autonomy State</span>
+                            <span class="stat-value" id="autonomy-state">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">SLAM Mode</span>
+                            <span class="stat-value" id="slam-mode">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Mission</span>
+                            <span class="stat-value" id="mission-status">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Exploration</span>
+                            <span class="stat-value" id="exploration-progress">--</span>
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button class="mission-btn" onclick="startMission('explore')">Start Exploration</button>
+                            <button class="mission-btn" onclick="startMission('return_home')">Return Home</button>
+                            <button class="mission-btn stop" onclick="stopMission()">Stop Mission</button>
+                        </div>
+                        <div id="mission-result" style="margin-top: 10px; font-size: 0.85em; color: #888;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel video-panel" style="grid-column: span 1;">
+                <div class="panel-header">SLAM Map</div>
+                <img src="/stream/map" alt="SLAM Map" style="width: 100%; height: auto;">
+            </div>
         </div>
     </div>
     <script>
@@ -480,8 +666,78 @@ HTML_TEMPLATE = '''
                     } else {
                         facesDiv.innerHTML = '';
                     }
+
+                    // Autonomy state
+                    if (data.autonomy) {
+                        const stateEl = document.getElementById('autonomy-state');
+                        stateEl.textContent = data.autonomy.state_name || '--';
+                        stateEl.className = 'stat-value ' + (
+                            data.autonomy.state_name === 'exploring' ? 'good' :
+                            data.autonomy.state_name === 'waiting_for_mission' ? 'info' :
+                            data.autonomy.state_name === 'error' ? 'bad' : ''
+                        );
+
+                        document.getElementById('slam-mode').textContent =
+                            data.autonomy.slam_mode || '--';
+
+                        const missionEl = document.getElementById('mission-status');
+                        if (data.autonomy.mission_active) {
+                            missionEl.textContent = 'Active: ' + data.autonomy.mission_id;
+                            missionEl.className = 'stat-value good';
+                        } else if (data.autonomy.mission_timeout_remaining > 0) {
+                            missionEl.textContent = 'Waiting (' +
+                                Math.round(data.autonomy.mission_timeout_remaining) + 's)';
+                            missionEl.className = 'stat-value info';
+                        } else {
+                            missionEl.textContent = 'None';
+                            missionEl.className = 'stat-value';
+                        }
+
+                        const progressEl = document.getElementById('exploration-progress');
+                        if (data.autonomy.state_name === 'exploring') {
+                            progressEl.textContent = data.autonomy.exploration_progress + '%';
+                            progressEl.className = 'stat-value good';
+                        } else {
+                            progressEl.textContent = '--';
+                            progressEl.className = 'stat-value';
+                        }
+                    }
                 })
                 .catch(e => console.error('Status update failed:', e));
+        }
+
+        function startMission(missionType) {
+            document.getElementById('mission-result').textContent = 'Starting...';
+            fetch('/api/mission/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mission_type: missionType})
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('mission-result').textContent =
+                    data.accepted ? 'Started: ' + data.mission_id : 'Failed: ' + data.message;
+            })
+            .catch(e => {
+                document.getElementById('mission-result').textContent = 'Error: ' + e;
+            });
+        }
+
+        function stopMission() {
+            document.getElementById('mission-result').textContent = 'Stopping...';
+            fetch('/api/mission/stop', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({return_home: false})
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('mission-result').textContent =
+                    data.success ? 'Stopped' : 'Failed: ' + data.message;
+            })
+            .catch(e => {
+                document.getElementById('mission-result').textContent = 'Error: ' + e;
+            });
         }
 
         setInterval(updateStatus, 2000);
@@ -518,6 +774,34 @@ def stream_legacy():
 @app.route('/status')
 def status():
     return json.dumps(dashboard_node.get_status())
+
+
+@app.route('/api/mission/start', methods=['POST'])
+def api_start_mission():
+    """Start a mission via API"""
+    data = request.get_json() or {}
+    mission_type = data.get('mission_type', 'explore')
+    timeout = data.get('timeout_sec', 0.0)
+
+    result = dashboard_node.call_start_mission(mission_type, timeout)
+    return json.dumps(result)
+
+
+@app.route('/api/mission/stop', methods=['POST'])
+def api_stop_mission():
+    """Stop current mission via API"""
+    data = request.get_json() or {}
+    return_home = data.get('return_home', False)
+
+    result = dashboard_node.call_stop_mission(return_home)
+    return json.dumps(result)
+
+
+@app.route('/api/autonomy/state')
+def api_autonomy_state():
+    """Get autonomy state via API"""
+    status_data = dashboard_node.get_status()
+    return json.dumps(status_data.get('autonomy', {}))
 
 
 def main(args=None):

@@ -50,6 +50,7 @@ class StartupSequence(Node):
         self.led_pub = self.create_publisher(String, 'leds/zone', 10)
         self.buzzer_pub = self.create_publisher(Bool, 'buzzer/state', 10)
         self.pose_pub = self.create_publisher(String, 'pose_command', 10)
+        self.initialized_pub = self.create_publisher(Bool, '/robot/initialized', 10)
 
         # Service to trigger startup sequence
         self.startup_srv = self.create_service(
@@ -106,6 +107,12 @@ class StartupSequence(Node):
         msg.data = command
         self.pose_pub.publish(msg)
         self.get_logger().info(f'Sent pose command: {command}')
+
+    def _publish_initialized(self):
+        """Publish initialization status (called periodically after init)"""
+        msg = Bool()
+        msg.data = self.initialized
+        self.initialized_pub.publish(msg)
 
     def auto_start_callback(self):
         """One-shot callback for auto-start"""
@@ -171,6 +178,12 @@ class StartupSequence(Node):
             self.get_logger().info('Phase 6: SAFE - robot ready')
             self.set_rear_led('green')
             self.initialized = True
+
+            # Publish initialization complete and start periodic republishing
+            self._publish_initialized()
+            self._init_status_timer = self.create_timer(
+                1.0, self._publish_initialized, callback_group=self.callback_group
+            )
 
             self.sequence_running = False
             return True, 'Startup sequence complete'

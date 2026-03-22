@@ -7,10 +7,12 @@ Starts all robot components:
 - Power indicator and startup sequence
 - Locomotion controller
 - Optionally: Camera for perception
+- Optionally: Autonomous behavior system
 
 Usage:
   ros2 launch hexapod_bringup robot.launch.py
   ros2 launch hexapod_bringup robot.launch.py use_camera:=true
+  ros2 launch hexapod_bringup robot.launch.py autonomy:=true
 """
 
 from launch import LaunchDescription
@@ -50,9 +52,23 @@ def generate_launch_description():
         description='Run in simulation mode (no hardware)'
     )
 
+    autonomy_arg = DeclareLaunchArgument(
+        'autonomy',
+        default_value='false',
+        description='Enable autonomous behavior system'
+    )
+
+    mission_timeout_arg = DeclareLaunchArgument(
+        'mission_timeout',
+        default_value='60.0',
+        description='Seconds to wait for mission before auto-exploring (when autonomy:=true)'
+    )
+
     return LaunchDescription([
         use_camera_arg,
         use_sim_arg,
+        autonomy_arg,
+        mission_timeout_arg,
 
         # ===== Robot State Publisher (URDF/TF) =====
 
@@ -161,4 +177,17 @@ def generate_launch_description():
         #     condition=IfCondition(LaunchConfiguration('use_camera')),
         #     output='screen',
         # ),
+
+        # ===== Optional: Autonomous Behavior =====
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                get_package_share_directory('hexapod_autonomy'),
+                '/launch/autonomy.launch.py'
+            ]),
+            launch_arguments={
+                'mission_timeout': LaunchConfiguration('mission_timeout'),
+            }.items(),
+            condition=IfCondition(LaunchConfiguration('autonomy')),
+        ),
     ])

@@ -55,12 +55,14 @@ services:
     # Restart policy
     restart: unless-stopped
 
-    # Default command - launch robot on boot
+    # Default command - launch robot with autonomy on boot
     # Override with: docker compose run hexapod bash
     command: >
       bash -c "source /opt/ros/jazzy/setup.bash &&
+               source /opt/realsense_ros/install/setup.bash &&
+               source /opt/rtabmap_ros/install/setup.bash &&
                source /ros2_ws/install/setup.bash &&
-               ros2 launch hexapod_bringup robot.launch.py"
+               ros2 launch hexapod_bringup robot.launch.py autonomy:=true"
 
   # Development shell - same as above but doesn't auto-restart
   dev:

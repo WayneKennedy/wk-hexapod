@@ -1,0 +1,3 @@
+# Query current autonomy state
+---
+hexapod_interfaces/AutonomyState state
