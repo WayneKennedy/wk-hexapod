@@ -1,0 +1,17 @@
+[Unit]
+Description=Hold the hexapod shield buzzer (GPIO 17) silent
+# The buzzer sounds whenever GPIO 17 is left floating (e.g. after any process
+# that claimed it exits). This service keeps the line driven low at all times,
+# independent of the ROS stack. Stop it only if you enable buzzer.enabled in
+# hexapod_hardware/config/hardware.yaml and want beeps.
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/gpioset --mode=signal gpiochip4 17=0
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=sysinit.target

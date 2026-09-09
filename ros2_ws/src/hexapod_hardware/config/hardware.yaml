@@ -70,6 +70,10 @@
     buzzer:
       gpio_pin: 17                # GPIO pin for buzzer
       default_beep_duration: 0.2  # seconds for single beep
+      # The shield buzzer is extremely loud. Off by default; beep requests are
+      # ignored and GPIO 17 is left to hexapod-buzzer-guard.service, which holds
+      # it low. To use the buzzer: set true AND stop/disable the guard service.
+      enabled: false
 
     # Power Indicator Configuration
     # Maps battery voltages to LED colors:

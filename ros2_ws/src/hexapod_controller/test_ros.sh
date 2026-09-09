@@ -1,8 +1,13 @@
 #!/bin/bash
-# ROS 2 Controller Test
-# Run inside Docker container: docker-compose run --rm dev ./test_ros.sh
+# ROS 2 Controller Test (standalone controller, battery power required)
+# Usage: ros2_ws/src/hexapod_controller/test_ros.sh
+#
+# Runs the controller alone with direct servo hardware access, so do NOT run
+# this while the full robot stack (servo_driver) is running:
+#   sudo systemctl stop hexapod
 
 set -e
+WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 echo "=========================================="
 echo "Hexapod ROS 2 Controller Test"
@@ -14,14 +19,14 @@ source /opt/ros/jazzy/setup.bash
 # Build the package
 echo ""
 echo ">>> Building hexapod_controller..."
-cd /ros2_ws
+cd "$WS_DIR"
 colcon build --packages-select hexapod_controller --symlink-install
 source install/setup.bash
 
 # Start controller in background
 echo ""
 echo ">>> Starting hexapod_controller node..."
-ros2 run hexapod_controller controller &
+ros2 run hexapod_controller controller --ros-args -p hardware.direct:=true &
 CONTROLLER_PID=$!
 sleep 2
 

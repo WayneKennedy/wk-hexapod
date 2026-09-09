@@ -43,6 +43,8 @@ def generate_launch_description():
     )
 
     # RealSense D435i camera node
+    # realsense-ros prefixes topics with <namespace>/<node name>, so streams
+    # appear as /camera/camera/color/image_raw etc.
     realsense_node = Node(
         package='realsense2_camera',
         executable='realsense2_camera_node',
@@ -59,8 +61,8 @@ def generate_launch_description():
         executable='depthimage_to_laserscan_node',
         name='depthimage_to_laserscan',
         remappings=[
-            ('depth', '/camera/aligned_depth_to_color/image_raw'),
-            ('depth_camera_info', '/camera/aligned_depth_to_color/camera_info'),
+            ('depth', '/camera/camera/aligned_depth_to_color/image_raw'),
+            ('depth_camera_info', '/camera/camera/aligned_depth_to_color/camera_info'),
             ('scan', '/scan'),
         ],
         parameters=[{
@@ -85,9 +87,9 @@ def generate_launch_description():
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
         ],
         remappings=[
-            ('rgb/image', '/camera/color/image_raw'),
-            ('rgb/camera_info', '/camera/color/camera_info'),
-            ('depth/image', '/camera/aligned_depth_to_color/image_raw'),
+            ('rgb/image', '/camera/camera/color/image_raw'),
+            ('rgb/camera_info', '/camera/camera/color/camera_info'),
+            ('depth/image', '/camera/camera/aligned_depth_to_color/image_raw'),
             ('odom', '/odom'),
         ],
         arguments=['--delete_db_on_start'],  # Fresh map each time in mapping mode
@@ -109,9 +111,9 @@ def generate_launch_description():
             },
         ],
         remappings=[
-            ('rgb/image', '/camera/color/image_raw'),
-            ('rgb/camera_info', '/camera/color/camera_info'),
-            ('depth/image', '/camera/aligned_depth_to_color/image_raw'),
+            ('rgb/image', '/camera/camera/color/image_raw'),
+            ('rgb/camera_info', '/camera/camera/color/camera_info'),
+            ('depth/image', '/camera/camera/aligned_depth_to_color/image_raw'),
             ('odom', '/odom'),
         ],
     )
@@ -124,9 +126,9 @@ def generate_launch_description():
     #     output='screen',
     #     parameters=[rtabmap_config],
     #     remappings=[
-    #         ('rgb/image', '/camera/color/image_raw'),
-    #         ('rgb/camera_info', '/camera/color/camera_info'),
-    #         ('depth/image', '/camera/aligned_depth_to_color/image_raw'),
+    #         ('rgb/image', '/camera/camera/color/image_raw'),
+    #         ('rgb/camera_info', '/camera/camera/color/camera_info'),
+    #         ('depth/image', '/camera/camera/aligned_depth_to_color/image_raw'),
     #     ],
     # )
 

@@ -1,6 +1,7 @@
 # wk-hexapod
 
-ROS 2 based autonomous hexapod robot, built on Freenove Big Hexapod hardware.
+ROS 2 based autonomous hexapod robot, built on Freenove Big Hexapod hardware and
+running natively on Ubuntu Server 24.04 / ROS 2 Jazzy on a Raspberry Pi 5.
 
 ## Reference
 
@@ -13,37 +14,47 @@ Working reference code is in `../fn-hexapod/Code/Server/`:
 - `pca9685.py` - Low-level PWM driver
 - `control.py` - Full gait control and IK
 
-The Freenove repository also contains:
-- `Tutorial.pdf` - Comprehensive setup and usage guide
-- `Calibration_Graph.pdf` - Servo calibration reference
-- `Datasheet/` - Component datasheets (PCA9685, MPU6050, ADS7830)
-
 ## Hardware
 
-- Raspberry Pi 5 (8GB)
-- 20 servos (18 leg + 2 head pan/tilt) via PCA9685
-- Intel RealSense D435i (RGB-D camera + IMU on pan/tilt head)
-- MPU6050 IMU (body)
-- ADS7830 ADC for dual battery monitoring
-- WS2812 LEDs
-- Buzzer
+- Raspberry Pi 5 (8GB), host name `spid`
+- Freenove shield: 2x PCA9685 (20 servos: 18 leg + 2 head pan/tilt), ADS7830 battery ADC,
+  MPU6050 IMU, WS2812 LED strip (SPI), buzzer (GPIO 17), servo power enable (GPIO 4)
+- Intel RealSense D435i on the pan/tilt head (RGB-D + IMU). Replaces the original
+  Pi Camera and ultrasonic sensor.
 
-### Sensors
+### Power modes
 
-The Intel RealSense D435i replaces the original Pi Camera and ultrasonic sensor, providing:
-- RGB camera for face recognition and visual features
-- Depth camera for obstacle detection and SLAM
-- Built-in IMU for visual-inertial odometry
+| Mode | Power | What works |
+|------|-------|------------|
+| Battery | 2x 18650 | Everything |
+| USB | USB-C | Sensors, LEDs, RealSense. No servos (PCA9685 is battery powered) |
+
+### Buzzer warning
+
+The shield buzzer is extremely loud, and it sounds whenever GPIO 17 is left
+floating, which happens after any process that claimed the pin exits. Two
+safeguards keep it silent:
+
+1. `/boot/firmware/config.txt` drives GPIO 17 low from firmware boot (`gpio=17=op,dl`).
+2. `systemd/hexapod-buzzer-guard.service` holds GPIO 17 low at all times, independently
+   of the ROS stack.
+
+`buzzer.enabled` in `hexapod_hardware/config/hardware.yaml` is `false` by default, so beep
+requests are logged and dropped. To use the buzzer, set it to `true` and stop the guard
+service. Do not run the buzzer node against the pin while the guard is active.
 
 ## Goals
 
-- ROS 2 Jazzy on Ubuntu Server 24.04
-- Autonomous mapping and navigation (SLAM + Nav2)
+- Autonomous exploration and mapping of the local area (RTAB-Map SLAM + Nav2)
+- Missions supplied by an approved external mission planner take priority over
+  autonomous exploration. Today that is an HTTP API on the robot (see Remote missions);
+  authentication and a formal planner interface are still to be defined.
 - Wander mode with return-to-home capability
 
-## Autonomy Roadmap
+## Autonomy roadmap
 
-End state: Robot boots autonomously, accepts high-level mission requests ("walk forward 150mm", "go to kitchen"), and ROS handles planning and execution.
+End state: the robot boots, accepts high-level mission requests ("explore", "go to
+kitchen"), and ROS handles planning and execution.
 
 ```
 ┌─────────────────┐     ┌─────────────┐     ┌────────────────┐     ┌──────────────┐
@@ -53,187 +64,137 @@ End state: Robot boots autonomously, accepts high-level mission requests ("walk 
                               ▲                                           │
                               │              ┌────────────────┐           │
                               └──────────────│    /odom       │◀──────────┘
-                                             │ (position)     │
                                              └────────────────┘
 ```
 
-### Phase 1: Locomotion (DONE)
-- [x] Hexapod controller with IK and tripod gait
-- [x] cmd_vel subscriber for velocity commands
-- [x] Home, stand, relax poses
-- [x] Initialize service for safe startup
+- Phase 1 Locomotion: DONE. IK, tripod gait, cmd_vel, home/stand/relax, initialize service.
+- Phase 2 Odometry: DONE. Gait integration, IMU fusion, `/odom` and TF, MoveDistance action.
+- Phase 3 Perception: DONE. RealSense D435i, depth to LaserScan, camera frames in URDF.
+  Face recognition subscribes to the RealSense colour stream.
+- Phase 4 SLAM: IN PROGRESS. RTAB-Map configured for RGB-D. Needs tuning on the robot and
+  map save/load for persistent navigation.
+- Phase 5 Navigation: IN PROGRESS. Nav2 params tuned for slow motion. Planner tuning,
+  semantic waypoints and return-to-home still open.
+- Phase 6 Autonomous operation: IN PROGRESS. `hexapod_autonomy` provides the state
+  machine (startup, localize, explore), frontier exploration, look-around, mission
+  server and web dashboard. Battery-aware return and the approved planner interface
+  are open.
 
-### Phase 2: Odometry (DONE)
-- [x] Integrate gait cycles to estimate displacement
-- [x] Publish `/odom` (nav_msgs/Odometry) with position and velocity
-- [x] Publish TF transform: `odom` → `base_link`
-- [x] Fuse with IMU for rotation accuracy (complementary filter)
-- [x] Add `MoveDistance` action server for goal-based movement
+## Setup (native)
 
-### Phase 3: Perception (DONE)
-- [x] Intel RealSense D435i configured (RGB-D + IMU)
-- [x] Depth to LaserScan conversion for Nav2 costmap
-- [x] Camera frames defined in URDF
-- [ ] Face recognition using RGB stream (future)
+```bash
+git clone <repo-url> ~/Code/wk-hexapod
+cd ~/Code/wk-hexapod
+sudo ./scripts/ubuntu-setup.sh     # ROS 2 Jazzy, Nav2, RTAB-Map, RealSense, Python deps, build
+sudo reboot                        # if config.txt or groups changed
+./systemd/install.sh               # buzzer guard + auto-start on boot
+```
 
-### Phase 4: SLAM (IN PROGRESS)
-- [x] Configure slam_toolbox parameters
-- [x] Add robot URDF with sensor frames
-- [x] SLAM launch file ready
-- [x] RTAB-Map configured for RGB-D visual SLAM
-- [x] RealSense launch file with mapping/localization modes
-- [ ] Test and tune RTAB-Map with physical D435i
-- [ ] Save/load maps for persistent navigation
+The setup script installs everything from Ubuntu and ROS apt repositories. Only
+`face_recognition` (dlib) is built from source, about 20 minutes on a Pi 5.
 
-### Phase 5: Navigation (IN PROGRESS)
-- [x] Configure Nav2 with hexapod-specific parameters
-- [x] Nav2 params tuned for slow hexapod motion
-- [ ] Tune local/global planners for hexapod motion
-- [ ] Add semantic waypoints ("kitchen", "charging station")
-- [ ] Implement return-to-home behavior
+If the host previously had Raspberry Pi OS (bookworm) packages installed, they block the
+ROS packages. See `docs/ubuntu-hardware-setup.md`, "Foreign packages".
 
-### Phase 6: Autonomous Operation (IN PROGRESS)
-- [x] Auto-start on boot via systemd
-- [x] Robot launch file for full stack startup
-- [ ] Mission queue for accepting external requests
-- [ ] Battery-aware behavior (return to charge)
-- [ ] Wander mode with exploration
+## Running
 
-## Locomotion Controller
+```bash
+scripts/launch.sh                       # full stack, autonomy on (what the service runs)
+scripts/launch.sh autonomy:=false       # hardware drivers + controller only
+scripts/launch.sh hardware.launch.py    # any hexapod_bringup launch file
 
-The hexapod uses body-centric control where foot positions are defined relative to the body origin, and inverse kinematics calculates all servo angles.
+sudo systemctl start|stop|status hexapod
+journalctl -u hexapod -f
+```
 
-**Control model:**
-- `body_position[x, y, z]` - Body translation (Z negative = raise body)
-- `body_rotation[roll, pitch, yaw]` - Body orientation
-- Feet maintain fixed positions in world frame while body moves
+Boot sequence with `autonomy:=true`: hardware drivers, startup sequence (LED warning,
+home, stand), RealSense + RTAB-Map, autonomy nodes, and the web dashboard on port 8080.
+Without a saved map the robot waits `mission_timeout` seconds for an external mission,
+then explores.
 
-**Gaits:**
-- Tripod gait: Even legs (0,2,4) and odd legs (1,3,5) alternate
-- World Y axis is forward/back, X axis is left/right (strafe)
+## Remote missions
 
-**ROS 2 Topics:**
-- `/cmd_vel` (geometry_msgs/Twist) - Velocity commands for walking
-- `/pose_command` (std_msgs/String) - Pose commands: "home", "stand", "relax"
-- `/odom` (nav_msgs/Odometry) - Odometry estimate from gait integration
-- `/tf` - Transform: `odom` → `base_link`
+The web dashboard (`hexapod_perception/web_dashboard`) serves a mission API on port 8080.
+It is reachable on the LAN and over Tailscale, and needs nothing but curl on the
+client, so a Claude CLI session on another machine can drive the robot:
 
-**ROS 2 Services:**
-- `/hexapod/initialize` (std_srvs/Trigger) - Home then stand sequence
-- `/hexapod/reset_odometry` (std_srvs/Trigger) - Reset odometry to origin
+```bash
+scripts/mission.sh -H spid state                  # autonomy state
+scripts/mission.sh -H spid start explore 600      # explore for up to 600 s
+scripts/mission.sh -H spid stop --return-home
+scripts/mission.sh -H spid status                 # battery, faces, mission
+export HEXAPOD_HOST=spid                          # default host for the script
+```
 
-**ROS 2 Actions:**
-- `/hexapod/move_distance` (hexapod_interfaces/MoveDistance) - Move specified distance with odometry feedback
+Underlying endpoints: `POST /api/mission/start` `{mission_type, timeout_sec}`,
+`POST /api/mission/stop` `{return_home}`, `GET /api/autonomy/state`, `GET /status`.
+Mission types: `explore`, `patrol`, `navigate`, `return_home`.
 
-## Project Structure
+Clients with ROS 2 installed can instead call the services directly
+(`/mission/start`, `/mission/stop`) with `ROS_DOMAIN_ID=0` on the same subnet.
+
+There is no authentication yet. Treat the API as trusted-LAN only until the approved
+planner interface is defined.
+
+## Locomotion controller
+
+Body-centric control: foot positions are defined relative to the body origin and
+inverse kinematics calculates all servo angles.
+
+- `body_position[x, y, z]`, `body_rotation[roll, pitch, yaw]`
+- Tripod gait: legs (0,2,4) and (1,3,5) alternate. World Y is forward, X is strafe.
+
+Servo ownership: the controller computes calibrated joint angles and publishes them on
+`/joint_commands`; `hexapod_hardware/servo_driver` owns the PCA9685 chips and the servo
+power GPIO. Set `hardware.direct:=true` on the controller only when running it standalone
+without the servo driver (what `test_ros.sh` does).
+
+Calibration is read from, in order: the `hardware.calibration_file` parameter,
+`~/.hexapod/servo_calibration.txt`, then the copy installed with `hexapod_hardware`.
+
+**Topics:** `/cmd_vel`, `/pose_command` (home, stand, relax), `/odom`, `/tf`, `/joint_commands`.
+**Services:** `/hexapod/initialize`, `/hexapod/reset_odometry`.
+**Actions:** `/hexapod/move_distance`.
+
+## Project structure
 
 ```
 wk-hexapod/
 ├── ros2_ws/src/
-│   ├── hexapod_controller/   # Main locomotion controller
-│   │   ├── controller.py     # ROS 2 node with IK, gait, balance
-│   │   ├── test_init.py      # Standalone home/stand test
-│   │   ├── test_walk.py      # Standalone walk test
-│   │   └── test_ros.sh       # ROS-based integration test
-│   ├── hexapod_hardware/     # Hardware interface nodes
-│   │   ├── imu_driver        # MPU6050 IMU publisher
-│   │   ├── servo_driver      # PCA9685 servo control
-│   │   ├── range_finder      # HC-SR04 ultrasonic sensor
-│   │   ├── battery_monitor   # ADS7830 battery status
-│   │   └── led_controller    # WS2812 LED control
-│   ├── hexapod_perception/   # Vision and perception
-│   │   ├── camera_node       # Pi Camera publisher
-│   │   └── face_detector     # Face recognition node
-│   ├── hexapod_interfaces/   # Custom action/service definitions
-│   └── hexapod_bringup/      # Launch files and config
-│       ├── config/           # RealSense, RTAB-Map, Nav2 params
-│       ├── launch/           # Robot, SLAM, navigation launch files
-│       └── urdf/             # Robot description (hexapod.urdf)
-├── config/                   # Hardware calibration
-├── docker/                   # Docker support files
-├── scripts/                  # Setup scripts
-└── docs/                     # Documentation
-
-../fn-hexapod/                # Sibling repo with working Freenove code
-```
-
-## Quick Start (Docker - Recommended)
-
-```bash
-# Clone the repo
-git clone <repo-url> ~/Code/wk-hexapod
-cd ~/Code/wk-hexapod
-
-# Run hardware setup first (if not already done)
-sudo ./scripts/ubuntu-setup.sh --skip-reboot
-
-# Build and start container
-docker compose build
-docker compose up -d
-
-# Enter container
-docker compose exec hexapod bash
-
-# Inside container: build ROS 2 workspace
-colcon build --symlink-install
-source install/setup.bash
-
-# Launch hardware drivers
-ros2 launch hexapod_bringup hardware.launch.py
+│   ├── hexapod_hardware/     # servo, IMU, battery, LED, buzzer, power indicator, startup sequence
+│   ├── hexapod_controller/   # IK, gait, odometry, MoveDistance action; standalone tests
+│   ├── hexapod_perception/   # face recognition, web dashboard (legacy Pi Camera node)
+│   ├── hexapod_autonomy/     # state machine, frontier explorer, look-around, mission server
+│   ├── hexapod_interfaces/   # custom msg/srv/action definitions
+│   └── hexapod_bringup/      # launch files, RealSense/RTAB-Map/Nav2 config, URDF
+├── config/                   # servo calibration
+├── scripts/                  # ubuntu-setup.sh, launch.sh, mission.sh
+├── systemd/                  # hexapod.service, hexapod-buzzer-guard.service, install.sh
+└── docs/
 ```
 
 ## Testing
 
-**Standalone hardware tests** (no ROS required):
-```bash
-# Test home and stand (battery power required)
-python3 ros2_ws/src/hexapod_controller/test_init.py
+Standalone hardware tests (battery required, stop the service first):
 
-# Test walking forward/backward
-python3 ros2_ws/src/hexapod_controller/test_walk.py
+```bash
+sudo systemctl stop hexapod
+python3 ros2_ws/src/hexapod_controller/test_init.py    # home and stand
+python3 ros2_ws/src/hexapod_controller/test_walk.py    # walk forward/backward
+ros2_ws/src/hexapod_controller/test_ros.sh             # ROS controller: init, walk, home, relax
 ```
 
-**ROS integration test** (inside Docker):
-```bash
-docker compose run --rm dev ./ros2_ws/src/hexapod_controller/test_ros.sh
-```
-
-This builds the workspace, starts the controller node, and runs through:
-1. Initialize (home -> stand)
-2. Walk forward 150mm
-3. Walk backward 150mm
-4. Home and relax
-
-## Development Workflow
+Development loop:
 
 ```bash
-# Start development shell
-docker compose --profile dev run --rm dev
-
-# Build workspace
-colcon build --symlink-install
-
-# Source workspace
-source install/setup.bash
-
-# Test IMU
+source /opt/ros/jazzy/setup.bash
+cd ros2_ws && colcon build --symlink-install && source install/setup.bash
 ros2 topic echo /imu/data_raw
-
-# Test battery monitor
 ros2 topic echo /battery/voltages
 ```
 
-## Native Setup (Alternative)
-
-```bash
-# Run setup script
-sudo ./scripts/ubuntu-setup.sh
-
-# Activate venv
-source .venv/bin/activate
-
-# Install ROS 2 Jazzy (see docs.ros.org)
-```
+Python nodes are symlink-installed, so edits take effect on restart without rebuilding.
+Rebuild after changing `hexapod_interfaces` or any `setup.py`.
 
 ## License
 

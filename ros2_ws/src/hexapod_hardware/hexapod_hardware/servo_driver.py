@@ -11,6 +11,7 @@ Based on working reference implementation in ../fn-hexapod/Code/Server/:
 """
 
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray, Bool, String
 from std_srvs.srv import Trigger
@@ -113,6 +114,7 @@ class ServoDriver(Node):
         self.declare_parameter('servos.min_pulse_us', 500)
         self.declare_parameter('servos.max_pulse_us', 2500)
         self.declare_parameter('servos.power_gpio', 4)
+        self.declare_parameter('servos.calibration_file', '')
         # Head servo channels (from fn-hexapod server.py CMD_CAMERA handler: channels 0,1)
         self.declare_parameter('servos.head_channels.pan', 0)
         self.declare_parameter('servos.head_channels.tilt', 1)
@@ -233,13 +235,21 @@ class ServoDriver(Node):
         self.get_logger().info('Servo driver started (NOT initialized - call /servo_driver/initialize when safe)')
 
     def load_calibration(self):
-        """Load calibration data from point.txt (fn-hexapod control.py)"""
-        # Try multiple locations
-        search_paths = [
-            '/ros2_ws/config/servo_calibration.txt',
-            '/ros2_ws/src/hexapod_hardware/config/servo_calibration.txt',
-            'point.txt',
-        ]
+        """Load calibration data (fn-hexapod point.txt format: one leg per line, x\ty\tz)"""
+        # Highest priority first: explicit parameter, per-robot override in the
+        # home directory, then the file installed with this package.
+        search_paths = []
+        configured = self.get_parameter('servos.calibration_file').value
+        if configured:
+            search_paths.append(os.path.expanduser(configured))
+        search_paths.append(os.path.expanduser('~/.hexapod/servo_calibration.txt'))
+        try:
+            share = get_package_share_directory('hexapod_hardware')
+            search_paths.append(os.path.join(share, 'config', 'servo_calibration.txt'))
+        except Exception:
+            pass
+        search_paths.append(os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), '..', 'config', 'servo_calibration.txt')))
 
         for path in search_paths:
             if os.path.exists(path):

@@ -1,23 +1,27 @@
 [Unit]
-Description=Hexapod Robot ROS 2 Services
-After=network.target docker.service
-Requires=docker.service
+Description=Hexapod Robot ROS 2 stack
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=wkenn
-Group=wkenn
-WorkingDirectory=/home/wkenn/Code/wk-hexapod
-ExecStart=/usr/bin/docker compose up
-ExecStop=/usr/bin/docker compose down
+User=__USER__
+Group=__USER__
+WorkingDirectory=__REPO_DIR__
+Environment=HOME=__HOME__
+Environment=ROS_DOMAIN_ID=0
+Environment=RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+Environment=GPIOZERO_PIN_FACTORY=lgpio
+ExecStart=__REPO_DIR__/scripts/launch.sh autonomy:=true
+# ros2 launch shuts its nodes down cleanly on SIGINT (servos relax)
+KillSignal=SIGINT
+TimeoutStopSec=30
+# Whatever happened above, leave the buzzer (GPIO 17) silent and servo power off
+ExecStopPost=-/usr/bin/gpioset --mode=exit gpiochip4 17=0 4=1
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-
-# Environment
-Environment="HOME=/home/wkenn"
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 
 [Install]
 WantedBy=multi-user.target

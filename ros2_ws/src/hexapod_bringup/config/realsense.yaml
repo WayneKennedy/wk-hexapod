@@ -10,9 +10,10 @@
     # Device type filter
     device_type: "d435i"
 
-    # Frame rates (lower = less CPU, more stable on Pi)
-    depth_module.profile: "640x480x15"
-    rgb_camera.profile: "640x480x15"
+    # Stream profiles (lower = less CPU, more stable on Pi)
+    # realsense-ros >= 4.55 parameter names
+    depth_module.depth_profile: "640x480x15"
+    rgb_camera.color_profile: "640x480x15"
 
     # Enable streams
     enable_depth: true

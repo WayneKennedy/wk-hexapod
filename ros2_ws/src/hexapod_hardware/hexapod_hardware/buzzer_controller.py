@@ -26,14 +26,21 @@ class BuzzerController(Node):
         # Declare parameters
         self.declare_parameter('buzzer.gpio_pin', 17)
         self.declare_parameter('buzzer.default_beep_duration', 0.2)
+        # The shield buzzer is painfully loud. Disabled by default: every beep
+        # request is logged and dropped, and the GPIO is not touched at all
+        # (systemd/hexapod-buzzer-guard.service holds it low instead).
+        self.declare_parameter('buzzer.enabled', False)
 
         # Get parameters
         gpio_pin = self.get_parameter('buzzer.gpio_pin').value
         self.default_beep_duration = self.get_parameter('buzzer.default_beep_duration').value
+        self.enabled = self.get_parameter('buzzer.enabled').value
 
         # Initialize buzzer
         self.buzzer = None
-        if HARDWARE_AVAILABLE:
+        if not self.enabled:
+            self.get_logger().info('Buzzer DISABLED (buzzer.enabled=false) - beep requests ignored')
+        elif HARDWARE_AVAILABLE:
             try:
                 self.buzzer = OutputDevice(gpio_pin)
                 self.get_logger().info(f'Buzzer initialized on GPIO {gpio_pin}')
@@ -78,7 +85,7 @@ class BuzzerController(Node):
         """Single beep service - turns buzzer on then off after default duration"""
         if not self.buzzer:
             response.success = False
-            response.message = 'Buzzer hardware not available'
+            response.message = 'Buzzer disabled or hardware not available'
             return response
 
         # Cancel any existing beep timer

@@ -5,6 +5,7 @@ Uses body-centric controller with tripod gait.
 """
 
 import math
+import os
 import time
 import smbus
 
@@ -71,9 +72,11 @@ class HexapodWalk:
         print("Ready")
 
     def _load_calibration(self):
+        here = os.path.dirname(os.path.abspath(__file__))
         paths = [
-            '/home/wkenn/Code/wk-hexapod/ros2_ws/src/hexapod_hardware/config/servo_calibration.txt',
-            '/home/wkenn/Code/fn-hexapod/Code/Server/point.txt',
+            os.path.expanduser('~/.hexapod/servo_calibration.txt'),
+            os.path.join(here, '..', 'hexapod_hardware', 'config', 'servo_calibration.txt'),
+            os.path.join(here, '..', '..', '..', '..', 'fn-hexapod', 'Code', 'Server', 'point.txt'),
         ]
         for path in paths:
             try:

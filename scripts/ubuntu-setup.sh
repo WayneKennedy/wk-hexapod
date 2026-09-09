@@ -1,324 +1,141 @@
 #!/bin/bash
 #
-# Ubuntu Server Setup Script for Hexapod (Raspberry Pi 5)
+# Native setup for the hexapod on Ubuntu Server 24.04 (Raspberry Pi 5).
+# Installs ROS 2 Jazzy plus every apt/pip dependency, configures hardware
+# interfaces, and builds the workspace. Idempotent: safe to re-run.
 #
-# This script configures hardware interfaces and installs dependencies
-# for the Freenove Big Hexapod Robot on Ubuntu Server 24.04.
+# Usage: sudo ./scripts/ubuntu-setup.sh [--skip-build] [--skip-pip] [--dry-run]
 #
-# Usage: sudo ./ubuntu-setup.sh [options]
-#
-# Options:
-#   --camera-port PORT   Camera port: cam0 or cam1 (default: cam0)
-#   --camera-model MODEL Camera model: ov5647 or imx219 (default: ov5647)
-#   --skip-reboot        Don't prompt for reboot at end
-#   --dry-run            Show what would be done without making changes
-#
-
 set -e
 
-# Defaults
-CAMERA_PORT="cam0"
-CAMERA_MODEL="ov5647"
-SKIP_REBOOT=false
+SKIP_BUILD=false
+SKIP_PIP=false
 DRY_RUN=false
 CONFIG_FILE="/boot/firmware/config.txt"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ACTUAL_USER="${SUDO_USER:-$USER}"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --camera-port)
-            CAMERA_PORT="$2"
-            shift 2
-            ;;
-        --camera-model)
-            CAMERA_MODEL="$2"
-            shift 2
-            ;;
-        --skip-reboot)
-            SKIP_REBOOT=true
-            shift
-            ;;
-        --dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        -h|--help)
-            head -20 "$0" | tail -n +2 | sed 's/^# //' | sed 's/^#//'
-            exit 0
-            ;;
-        *)
-            log_error "Unknown option: $1"
-            exit 1
-            ;;
+for arg in "$@"; do
+    case $arg in
+        --skip-build) SKIP_BUILD=true ;;
+        --skip-pip)   SKIP_PIP=true ;;
+        --dry-run)    DRY_RUN=true ;;
+        -h|--help)    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "Unknown option: $arg" >&2; exit 1 ;;
     esac
 done
 
-# Check if running as root
-if [[ $EUID -ne 0 ]] && [[ "$DRY_RUN" == "false" ]]; then
-    log_error "This script must be run as root (use sudo)"
-    exit 1
+log()  { echo -e "\033[0;32m[INFO]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+run()  { if $DRY_RUN; then echo "  [dry-run] $*"; else "$@"; fi; }
+
+if [[ $EUID -ne 0 ]] && ! $DRY_RUN; then
+    echo "Run with sudo" >&2; exit 1
 fi
 
-# Validate camera options
-if [[ "$CAMERA_PORT" != "cam0" && "$CAMERA_PORT" != "cam1" ]]; then
-    log_error "Invalid camera port: $CAMERA_PORT (must be cam0 or cam1)"
-    exit 1
-fi
-
-if [[ "$CAMERA_MODEL" != "ov5647" && "$CAMERA_MODEL" != "imx219" ]]; then
-    log_error "Invalid camera model: $CAMERA_MODEL (must be ov5647 or imx219)"
-    exit 1
-fi
-
-log_info "Ubuntu Server Setup for Hexapod"
-log_info "================================"
-log_info "Camera: $CAMERA_MODEL on $CAMERA_PORT"
-echo ""
-
-if [[ "$DRY_RUN" == "true" ]]; then
-    log_warn "DRY RUN MODE - no changes will be made"
-    echo ""
-fi
-
-# Backup config.txt
-backup_config() {
-    if [[ -f "$CONFIG_FILE" ]]; then
-        BACKUP="${CONFIG_FILE}.bak.$(date +%Y%m%d_%H%M%S)"
-        if [[ "$DRY_RUN" == "false" ]]; then
-            cp "$CONFIG_FILE" "$BACKUP"
-            log_info "Backed up config to $BACKUP"
-        else
-            log_info "[DRY RUN] Would backup config to $BACKUP"
-        fi
-    fi
-}
-
-# Update config.txt setting
-update_config() {
-    local pattern="$1"
-    local replacement="$2"
-    local description="$3"
-
-    if grep -q "$pattern" "$CONFIG_FILE" 2>/dev/null; then
-        if [[ "$DRY_RUN" == "false" ]]; then
-            sed -i "s|$pattern|$replacement|" "$CONFIG_FILE"
-        fi
-        log_info "$description"
-    else
-        log_warn "Pattern not found: $pattern"
-    fi
-}
-
-# Add line to config.txt if not present
-add_config() {
+# ---------------------------------------------------------------------------
+log "Step 1: /boot/firmware/config.txt (I2C 400kHz, SPI, safe GPIO defaults)"
+ensure_config_line() {
     local line="$1"
-    local after="$2"
-    local description="$3"
-
-    if ! grep -q "^${line}$" "$CONFIG_FILE" 2>/dev/null; then
-        if [[ "$DRY_RUN" == "false" ]]; then
-            if [[ -n "$after" ]]; then
-                sed -i "/$after/a $line" "$CONFIG_FILE"
-            else
-                echo "$line" >> "$CONFIG_FILE"
-            fi
-        fi
-        log_info "$description"
+    if grep -qF "$line" "$CONFIG_FILE"; then
+        log "  present: $line"
     else
-        log_info "$description (already set)"
+        log "  adding:  $line"
+        $DRY_RUN || echo "$line" >> "$CONFIG_FILE"
     fi
 }
-
-# Step 1: Backup config
-log_info "Step 1: Backing up configuration"
-backup_config
-
-# Step 2: Configure I2C with fast baud rate
-log_info "Step 2: Configuring I2C"
-
-if grep -q "dtparam=i2c_arm=on,i2c_arm_baudrate=400000" "$CONFIG_FILE" 2>/dev/null; then
-    log_info "I2C already configured with 400kHz baud rate"
-elif grep -q "dtparam=i2c_arm=on" "$CONFIG_FILE" 2>/dev/null; then
-    update_config \
-        "dtparam=i2c_arm=on$" \
-        "dtparam=i2c_arm=on,i2c_arm_baudrate=400000" \
-        "Updated I2C baud rate to 400kHz (faster servo response)"
+if grep -q "^dtparam=i2c_arm=on,i2c_arm_baudrate=400000" "$CONFIG_FILE"; then
+    log "  I2C already at 400kHz"
+elif grep -q "^dtparam=i2c_arm=on" "$CONFIG_FILE"; then
+    log "  raising I2C baud rate to 400kHz (servo response)"
+    $DRY_RUN || sed -i 's/^dtparam=i2c_arm=on.*/dtparam=i2c_arm=on,i2c_arm_baudrate=400000/' "$CONFIG_FILE"
 else
-    add_config "dtparam=i2c_arm=on,i2c_arm_baudrate=400000" "dtparam=audio" \
-        "Added I2C with 400kHz baud rate"
+    ensure_config_line "dtparam=i2c_arm=on,i2c_arm_baudrate=400000"
 fi
+ensure_config_line "dtparam=spi=on"
+# Buzzer (GPIO 17) floats high and sounds continuously if nothing drives it.
+ensure_config_line "gpio=17=op,dl"
+# Servo power enable (GPIO 4, low = enabled): keep servos off until the driver runs.
+ensure_config_line "gpio=4=op,dh"
 
-# Step 3: Ensure SPI is enabled (for WS2812 LEDs on Pi 5)
-log_info "Step 3: Configuring SPI"
-
-if grep -q "^dtparam=spi=on" "$CONFIG_FILE" 2>/dev/null; then
-    log_info "SPI already enabled"
+# ---------------------------------------------------------------------------
+log "Step 2: ROS 2 apt repository"
+if [[ ! -f /etc/apt/sources.list.d/ros2.sources ]] && ! ls /etc/apt/sources.list.d/ros2* >/dev/null 2>&1; then
+    run apt-get install -y -qq curl
+    V=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F tag_name | awk -F\" '{print $4}')
+    run curl -sL -o /tmp/ros2-apt-source.deb \
+        "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${V}/ros2-apt-source_${V}.noble_all.deb"
+    run dpkg -i /tmp/ros2-apt-source.deb
 else
-    add_config "dtparam=spi=on" "dtparam=i2c_arm" \
-        "Enabled SPI (required for WS2812 LEDs on Pi 5)"
+    log "  already configured"
 fi
 
-# Step 4: Configure camera
-log_info "Step 4: Configuring camera ($CAMERA_MODEL on $CAMERA_PORT)"
-
-# Disable auto-detect
-if grep -q "camera_auto_detect=1" "$CONFIG_FILE" 2>/dev/null; then
-    update_config \
-        "camera_auto_detect=1" \
-        "camera_auto_detect=0" \
-        "Disabled camera auto-detect"
+# ---------------------------------------------------------------------------
+log "Step 3: apt packages (ROS 2 Jazzy, Nav2, RTAB-Map, RealSense, Python libs)"
+if dpkg-query -W -f='${Version}\n' '*' 2>/dev/null | grep -q -E 'rpt|deb12'; then
+    warn "  Raspberry Pi OS (bookworm) packages are installed on this host."
+    warn "  They conflict with ROS packages. See docs/ubuntu-hardware-setup.md, 'Foreign packages'."
 fi
-
-# Remove any existing camera overlay for our model
-if [[ "$DRY_RUN" == "false" ]]; then
-    sed -i "/^dtoverlay=${CAMERA_MODEL}/d" "$CONFIG_FILE"
-fi
-
-# Add camera overlay
-CAMERA_OVERLAY="dtoverlay=${CAMERA_MODEL},${CAMERA_PORT}"
-add_config "$CAMERA_OVERLAY" "camera_auto_detect" \
-    "Added camera overlay: $CAMERA_OVERLAY"
-
-# Step 5: Install system packages
-log_info "Step 5: Installing system packages"
-
-PACKAGES=(
-    i2c-tools
-    python3-smbus
-    python3-dev
-    python3-pip
-    python3-venv
-    python3-lgpio
-    libcap-dev
-    ffmpeg
+APT_PACKAGES=(
+    ros-jazzy-ros-base ros-dev-tools python3-colcon-common-extensions python3-rosdep python3-vcstool
+    ros-jazzy-robot-state-publisher ros-jazzy-rmw-fastrtps-cpp
+    ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-slam-toolbox
+    ros-jazzy-rtabmap-ros ros-jazzy-realsense2-camera ros-jazzy-depthimage-to-laserscan
+    ros-jazzy-cv-bridge ros-jazzy-image-transport ros-jazzy-diagnostic-updater
+    ros-jazzy-foxglove-bridge ros-jazzy-pcl-ros ros-jazzy-laser-geometry
+    python3-gpiozero python3-lgpio python3-spidev python3-smbus python3-numpy python3-opencv python3-flask
+    python3-pip python3-dev build-essential cmake libopenblas-dev liblapack-dev
+    i2c-tools gpiod
 )
+run apt-get update -qq
+run apt-get install -y -qq --no-install-recommends "${APT_PACKAGES[@]}"
 
-if [[ "$DRY_RUN" == "false" ]]; then
-    apt-get update -qq
-    apt-get install -y "${PACKAGES[@]}"
-    log_info "Installed: ${PACKAGES[*]}"
+# ---------------------------------------------------------------------------
+log "Step 4: udev rules (RealSense as non-root)"
+if [[ ! -f /etc/udev/rules.d/99-realsense-libusb.rules ]]; then
+    run curl -sL -o /etc/udev/rules.d/99-realsense-libusb.rules \
+        https://raw.githubusercontent.com/IntelRealSense/librealsense/master/config/99-realsense-libusb.rules
+    run udevadm control --reload-rules
+    run udevadm trigger
 else
-    log_info "[DRY RUN] Would install: ${PACKAGES[*]}"
+    log "  present"
 fi
 
-# Step 6: Camera setup notes
-log_info "Step 6: Camera setup"
+# ---------------------------------------------------------------------------
+log "Step 5: user groups for $ACTUAL_USER"
+for grp in i2c spi gpio dialout video plugdev; do
+    if getent group "$grp" >/dev/null && ! id -nG "$ACTUAL_USER" | grep -qw "$grp"; then
+        run usermod -aG "$grp" "$ACTUAL_USER"
+        log "  added to $grp"
+    fi
+done
 
-# Note: picamera2 PPA (ppa:r41k0u/python3-simplejpeg) does not support Ubuntu 24.04 (noble)
-# Options:
-#   1. For ROS 2: Use ros2_camera_node or similar ROS 2 camera packages
-#   2. For direct Python: Build libcamera from Raspberry Pi fork (complex)
-#   3. Wait for Ubuntu 25.04+ where camera support is improved
-#
-# See: https://github.com/raspberrypi/picamera2/issues/1337
-
-log_warn "picamera2 not available via PPA for Ubuntu 24.04"
-log_info "For ROS 2: camera will be handled via ros2_camera_node"
-log_info "libcamera tools should work: rpicam-hello, rpicam-still, etc."
-
-# Install libcamera tools if available
-if [[ "$DRY_RUN" == "false" ]]; then
-    apt-get install -y libcamera-tools 2>/dev/null || log_warn "libcamera-tools not available"
-fi
-
-# Step 7: Set up user permissions
-log_info "Step 7: Configuring user permissions"
-
-# Get the actual user (not root)
-ACTUAL_USER="${SUDO_USER:-$USER}"
-
-if [[ "$ACTUAL_USER" != "root" ]]; then
-    GROUPS_TO_ADD=(i2c dialout gpio)
-
-    for grp in "${GROUPS_TO_ADD[@]}"; do
-        if getent group "$grp" > /dev/null 2>&1; then
-            if [[ "$DRY_RUN" == "false" ]]; then
-                usermod -aG "$grp" "$ACTUAL_USER" 2>/dev/null || true
-            fi
-            log_info "Added $ACTUAL_USER to group: $grp"
-        else
-            log_warn "Group $grp does not exist"
-        fi
-    done
+# ---------------------------------------------------------------------------
+if $SKIP_PIP; then
+    log "Step 6: pip packages skipped"
 else
-    log_warn "Running as root without SUDO_USER set, skipping group setup"
+    log "Step 6: pip packages (system interpreter; dlib build takes ~20 min)"
+    run sudo -u "$ACTUAL_USER" pip3 install --break-system-packages -r "$REPO_DIR/requirements.txt"
 fi
 
-# Step 8: Create Python virtual environment and install dependencies
-log_info "Step 8: Python virtual environment and dependencies"
+# ---------------------------------------------------------------------------
+log "Step 7: rosdep"
+[[ -f /etc/ros/rosdep/sources.list.d/20-default.list ]] || run rosdep init
+run sudo -u "$ACTUAL_USER" rosdep update
 
-REPO_PATH="/home/${ACTUAL_USER}/Code/wk-hexapi"
-VENV_PATH="${REPO_PATH}/.venv"
-
-if [[ "$ACTUAL_USER" != "root" ]] && [[ -d "$REPO_PATH" ]]; then
-    if [[ ! -d "$VENV_PATH" ]]; then
-        if [[ "$DRY_RUN" == "false" ]]; then
-            sudo -u "$ACTUAL_USER" python3 -m venv --system-site-packages "$VENV_PATH"
-            log_info "Created virtual environment at $VENV_PATH"
-        else
-            log_info "[DRY RUN] Would create venv at $VENV_PATH"
-        fi
-    else
-        log_info "Virtual environment already exists at $VENV_PATH"
-    fi
-
-    # Install Python dependencies
-    if [[ -f "${REPO_PATH}/requirements.txt" ]]; then
-        if [[ "$DRY_RUN" == "false" ]]; then
-            sudo -u "$ACTUAL_USER" "${VENV_PATH}/bin/pip" install --upgrade pip
-            sudo -u "$ACTUAL_USER" "${VENV_PATH}/bin/pip" install -r "${REPO_PATH}/requirements.txt"
-            log_info "Installed Python dependencies from requirements.txt"
-        else
-            log_info "[DRY RUN] Would install dependencies from requirements.txt"
-        fi
-    fi
+# ---------------------------------------------------------------------------
+if $SKIP_BUILD; then
+    log "Step 8: workspace build skipped"
+else
+    log "Step 8: build workspace"
+    run sudo -u "$ACTUAL_USER" bash -c "source /opt/ros/jazzy/setup.bash && cd '$REPO_DIR/ros2_ws' && \
+        rosdep install --from-paths src --ignore-src -y -r && colcon build --symlink-install"
 fi
 
-# Summary
+# ---------------------------------------------------------------------------
 echo ""
-log_info "================================"
-log_info "Setup complete!"
-echo ""
-log_info "Configuration summary:"
-echo "  - I2C: enabled at 400kHz"
-echo "  - SPI: enabled"
-echo "  - Camera: $CAMERA_MODEL on $CAMERA_PORT"
-echo ""
-log_info "After reboot, verify with:"
-echo "  sudo i2cdetect -y 1        # Check I2C devices"
-echo "  libcamera-hello --list     # Check camera"
-echo "  ls /dev/spidev*            # Check SPI"
-echo ""
-
-if [[ "$DRY_RUN" == "false" ]]; then
-    log_warn "A reboot is required for changes to take effect."
-
-    if [[ "$SKIP_REBOOT" == "false" ]]; then
-        read -p "Reboot now? [y/N] " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Rebooting..."
-            reboot
-        else
-            log_info "Remember to reboot manually: sudo reboot"
-        fi
-    fi
-fi
+log "Setup complete."
+log "  Reboot if config.txt or group membership changed."
+log "  Start manually:   scripts/launch.sh"
+log "  Install service:  systemd/install.sh   (auto-start on boot)"
+log "  Verify I2C:       i2cdetect -y 1   (expect 0x40 0x41 0x48 0x68)"

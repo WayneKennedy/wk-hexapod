@@ -5,13 +5,45 @@ cross-referenced with Freenove Tutorial Chapter 1 and community findings.
 
 ## Automated Setup
 
-Use the setup script for automated configuration:
+Use the setup script for automated configuration (config.txt, ROS 2 Jazzy and all
+dependencies from apt, pip packages, udev rules, groups, workspace build):
 
 ```bash
-sudo ./scripts/ubuntu-setup.sh --camera-model ov5647 --camera-port cam0
+sudo ./scripts/ubuntu-setup.sh
 ```
 
 Run with `--dry-run` to preview changes without applying them.
+
+## Safe GPIO defaults (buzzer)
+
+The shield buzzer on GPIO 17 sounds continuously whenever the pin floats, which is the
+state after any process that claimed it exits. `config.txt` therefore carries:
+
+```
+gpio=17=op,dl    # buzzer output low from firmware boot
+gpio=4=op,dh     # servo power disabled until servo_driver enables it
+```
+
+and `systemd/hexapod-buzzer-guard.service` holds GPIO 17 low while the system runs.
+Do not read the pin with `gpioget`; it turns the line into an input.
+
+## Foreign packages
+
+If Raspberry Pi OS (bookworm) apt sources were ever enabled on this host, packages such
+as `libswresample4`, `libwayland-*`, `libssl3`, `libcamera*` and `linux-libc-dev` may be
+the `+rpt`/`deb12` builds. They block ROS packages with errors like
+`libswresample-dev : Depends: libswresample4 (= 7:6.1.1-3ubuntu5) but 8:5.1.8-0+deb12u1+rpt1 is to be installed`.
+
+Find them with:
+
+```bash
+dpkg-query -W -f='${Package}\t${Version}\n' | grep -E 'rpt|deb12'
+```
+
+Fix: disable the Pi repo, then downgrade each to the noble version with
+`apt-get install --allow-downgrades pkg=<noble version>` (from `apt-cache madison pkg`),
+and remove bookworm-only packages (`libavutil57`, `libssl3`, `libcamera*`, `rpicam-apps*`).
+`initramfs-tools` from the Pi repo can stay; it does not conflict.
 
 ## Manual Configuration
 
@@ -37,22 +69,12 @@ dtparam=i2c_arm=on,i2c_arm_baudrate=400000
 Per Freenove: "Default is 100000. We change to 400000 to speed up servo response.
 If baud rate is 100,000, the robot walks slowly."
 
-### 3. Camera Configuration
+### 3. Camera
 
-Two options:
-
-**Option A: Auto-detect (current)**
-```
-camera_auto_detect=1
-```
-
-**Option B: Explicit overlay (Freenove method)**
-```
-camera_auto_detect=0
-dtoverlay=ov5647,cam0
-```
-
-Note: Pi 5 has two camera ports (cam0, cam1). Check physical connection.
+The Pi Camera is no longer fitted; the Intel RealSense D435i on USB 3 provides RGB, depth
+and IMU. It needs the librealsense udev rules (installed by the setup script to
+`/etc/udev/rules.d/99-realsense-libusb.rules`) so the ROS node can open it as a normal user.
+Any leftover `dtoverlay=ov5647` line in config.txt is harmless.
 
 ### 4. Verify I2C is working
 

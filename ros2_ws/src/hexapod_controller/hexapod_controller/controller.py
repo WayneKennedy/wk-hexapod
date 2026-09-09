@@ -24,7 +24,9 @@ from tf2_ros import TransformBroadcaster
 from hexapod_interfaces.action import MoveDistance
 import copy
 import math
+import os
 import numpy as np
+from ament_index_python.packages import get_package_share_directory
 import time
 import threading
 
@@ -142,7 +144,16 @@ class HexapodController(Node):
             ('gait.cycle_time', 1.0),
             ('odometry.imu_fusion', True),
             ('odometry.imu_yaw_weight', 0.98),
+            # Servo hardware ownership. Default: this node publishes joint
+            # angles on /joint_commands and hexapod_hardware/servo_driver owns
+            # the PCA9685 chips and the servo power GPIO. Set true only when
+            # running the controller standalone (no servo_driver), e.g. test_ros.sh.
+            ('hardware.direct', False),
+            # Servo calibration file (tab-separated foot positions, one leg per
+            # line). Empty = search the standard locations.
+            ('hardware.calibration_file', ''),
         ])
+        self.direct_hardware = self.get_parameter('hardware.direct').value
 
         self.leg_angles = self.get_parameter('body.leg_angles').value
         self.leg_offsets = self.get_parameter('body.leg_offsets').value
@@ -232,6 +243,7 @@ class HexapodController(Node):
         # Servo commands to servo_driver (18 leg angles + 2 head angles)
         self.joint_cmd_pub = self.create_publisher(
             Float64MultiArray, 'joint_commands', 10)
+        self.relax_pub = self.create_publisher(Bool, 'servo_relax', 10)
 
         # TF Broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -269,13 +281,20 @@ class HexapodController(Node):
         self.get_logger().info('Call /hexapod/initialize service when robot is safe')
 
     def _init_hardware(self):
-        """Initialize PCA9685 servo drivers"""
+        """Initialize PCA9685 servo drivers (only when this node owns the hardware)"""
+        if not self.direct_hardware:
+            self.get_logger().info(
+                'Servo output via /joint_commands (servo_driver owns hardware)')
+            return
+
         if not HARDWARE_AVAILABLE:
             self.get_logger().warn('smbus not available, running in simulation')
             return
 
         try:
-            # Servo power control (GPIO 4, low = enabled)
+            # Servo power control (GPIO 4, low = enabled).
+            # Only claimed in direct mode; otherwise servo_driver owns it and a
+            # second claim fails with 'GPIO busy'.
             if GPIOZERO_AVAILABLE:
                 self.servo_power = OutputDevice(4)
                 self.servo_power.off()
@@ -290,13 +309,29 @@ class HexapodController(Node):
         except Exception as e:
             self.get_logger().error(f'Hardware init failed: {e}')
 
+    def _calibration_search_paths(self):
+        """Candidate calibration file locations, highest priority first"""
+        paths = []
+        configured = self.get_parameter('hardware.calibration_file').value
+        if configured:
+            paths.append(os.path.expanduser(configured))
+        paths.append(os.path.expanduser('~/.hexapod/servo_calibration.txt'))
+        try:
+            share = get_package_share_directory('hexapod_hardware')
+            paths.append(os.path.join(share, 'config', 'servo_calibration.txt'))
+        except Exception:
+            pass
+        # Source tree / reference repo (development checkouts)
+        here = os.path.dirname(os.path.abspath(__file__))
+        paths.append(os.path.normpath(os.path.join(
+            here, '..', '..', 'hexapod_hardware', 'config', 'servo_calibration.txt')))
+        paths.append(os.path.normpath(os.path.join(
+            here, '..', '..', '..', '..', '..', 'fn-hexapod', 'Code', 'Server', 'point.txt')))
+        return paths
+
     def _load_calibration(self):
         """Load servo calibration from file"""
-        paths = [
-            '/home/wkenn/Code/wk-hexapod/ros2_ws/src/hexapod_hardware/config/servo_calibration.txt',
-            '/home/wkenn/Code/fn-hexapod/Code/Server/point.txt',
-        ]
-        for path in paths:
+        for path in self._calibration_search_paths():
             try:
                 with open(path, 'r') as f:
                     data = [list(map(int, line.strip().split('\t')))
@@ -434,6 +469,10 @@ class HexapodController(Node):
 
     def _relax_servos(self):
         """Turn off all servo PWM"""
+        if not self.direct_hardware:
+            msg = Bool()
+            msg.data = True
+            self.relax_pub.publish(msg)
         if self.pwm_40:
             for i in range(16):
                 self.pwm_40.set_pwm_off(i)
@@ -896,6 +935,7 @@ class HexapodController(Node):
                 channels = self.LEG_CHANNELS[leg_idx]
                 for k in range(3):
                     self._set_servo_angle(channels[k], self.current_angles[leg_idx][k])
+            self._publish_joint_commands()
 
             time.sleep(delay)
 
@@ -970,6 +1010,8 @@ class HexapodController(Node):
                     channels = self.LEG_CHANNELS[leg_idx]
                     for m in range(3):
                         self._set_servo_angle(channels[m], self.current_angles[leg_idx][m])
+
+                self._publish_joint_commands()
 
                 time.sleep(delay)
 
