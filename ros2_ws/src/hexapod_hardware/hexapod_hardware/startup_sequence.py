@@ -16,8 +16,11 @@ The sequence can be triggered:
 - Via /robot/safe_startup service (for leg reset after pickup)
 """
 
+import time
+
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from std_msgs.msg import String, Bool
 from std_srvs.srv import Trigger
@@ -70,9 +73,11 @@ class StartupSequence(Node):
         self.get_logger().info('  REAR LED: YELLOW (waiting for /robot/safe_startup)')
 
         # Auto-start if configured
+        self._auto_start_timer = None
         if self.auto_start:
             self.get_logger().info('Auto-start enabled, beginning sequence in 2 seconds...')
-            self.create_timer(2.0, self.auto_start_callback, callback_group=self.callback_group)
+            self._auto_start_timer = self.create_timer(
+                2.0, self.auto_start_callback, callback_group=self.callback_group)
 
     def _set_initial_led(self):
         """Set initial LED state after delay (one-shot timer)"""
@@ -116,8 +121,10 @@ class StartupSequence(Node):
 
     def auto_start_callback(self):
         """One-shot callback for auto-start"""
-        # Cancel the timer after first run
-        self.destroy_timer(self._timers[0])
+        # Cancel the timer before running so the sequence cannot re-trigger
+        if self._auto_start_timer is not None:
+            self._auto_start_timer.cancel()
+            self._auto_start_timer = None
         self.run_startup_sequence()
 
     def safe_startup_callback(self, request, response):
@@ -195,23 +202,27 @@ class StartupSequence(Node):
             return False, f'Error: {e}'
 
     def _sleep(self, duration):
-        """Sleep while allowing callbacks"""
-        start = self.get_clock().now()
-        while (self.get_clock().now() - start).nanoseconds / 1e9 < duration:
-            rclpy.spin_once(self, timeout_sec=0.01)
+        """Blocking sleep. Other callbacks keep running on the multithreaded executor."""
+        time.sleep(duration)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = StartupSequence()
+    # The sequence blocks inside a callback for ~15 s; a multithreaded executor
+    # keeps the service, timers and publishers responsive meanwhile.
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
 
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

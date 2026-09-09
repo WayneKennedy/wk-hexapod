@@ -16,8 +16,9 @@ ExecStart=__REPO_DIR__/scripts/launch.sh autonomy:=true
 # ros2 launch shuts its nodes down cleanly on SIGINT (servos relax)
 KillSignal=SIGINT
 TimeoutStopSec=30
-# Whatever happened above, leave the buzzer (GPIO 17) silent and servo power off
-ExecStopPost=-/usr/bin/gpioset --mode=exit gpiochip4 17=0 4=1
+# Whatever happened above, leave servo power disabled (GPIO 4 high). The buzzer
+# pin is owned by hexapod-buzzer-guard.service and is not touched here.
+ExecStopPost=-/usr/bin/gpioset --mode=exit gpiochip4 4=1
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

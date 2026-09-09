@@ -16,6 +16,8 @@ from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.task import Future
+from action_msgs.msg import GoalStatus
 from rclpy.duration import Duration
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, Point
@@ -75,6 +77,11 @@ class FrontierExplorer(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Nav2 action client (optional)
+        # Goals Nav2 failed to reach; nearby frontiers are skipped afterwards
+        self.failed_goals = []
+        self.declare_parameter('blacklist_radius', 0.3)
+        self.blacklist_radius = self.get_parameter('blacklist_radius').value
+
         self.nav_client = None
         if NAV2_AVAILABLE:
             self.nav_client = ActionClient(
@@ -333,6 +340,11 @@ class FrontierExplorer(Node):
 
         self.frontier_marker_pub.publish(marker_array)
 
+    def _is_blacklisted(self, x, y):
+        """True if (x, y) is within blacklist_radius of a goal Nav2 failed to reach."""
+        return any(math.hypot(x - fx, y - fy) < self.blacklist_radius
+                   for fx, fy in self.failed_goals)
+
     async def navigate_to(self, goal_pose):
         """Send navigation goal and wait for result."""
         if self.nav_client is None:
@@ -359,9 +371,15 @@ class FrontierExplorer(Node):
             result_future = self.nav_goal_handle.get_result_async()
             result = await result_future
 
-            # NavigateToPose result doesn't have success field in standard Nav2
-            # Check based on result code or just assume success if no exception
-            return True, 'Navigation complete'
+            # NavigateToPose has no success field; the action status tells us
+            # whether Nav2 reached the goal, aborted, or was cancelled.
+            if result.status == GoalStatus.STATUS_SUCCEEDED:
+                return True, 'Navigation complete'
+            status_names = {
+                GoalStatus.STATUS_ABORTED: 'aborted',
+                GoalStatus.STATUS_CANCELED: 'canceled',
+            }
+            return False, f'Navigation {status_names.get(result.status, result.status)}'
 
         except Exception as e:
             return False, str(e)
@@ -373,6 +391,7 @@ class FrontierExplorer(Node):
         """Execute frontier exploration."""
         self.goal_handle = goal_handle
         self.frontiers_explored = 0
+        self.failed_goals = []
         self.nav_failures = 0
 
         request = goal_handle.request
@@ -434,6 +453,16 @@ class FrontierExplorer(Node):
                     goal_handle.succeed()
                     return result
 
+                # Skip frontiers near goals Nav2 already failed to reach
+                frontiers = [f for f in frontiers if not self._is_blacklisted(f[0], f[1])]
+                if not frontiers:
+                    self.get_logger().info('All remaining frontiers are unreachable, exploration complete')
+                    result.success = True
+                    result.message = 'Remaining frontiers unreachable'
+                    result.frontiers_explored = self.frontiers_explored
+                    goal_handle.succeed()
+                    return result
+
                 # Get robot pose and select goal
                 robot_x, robot_y = self.get_robot_pose()
                 selected = self.select_goal(frontiers, robot_x, robot_y, self.goal_strategy)
@@ -465,6 +494,7 @@ class FrontierExplorer(Node):
                     self.get_logger().info(f'Reached frontier, total explored: {self.frontiers_explored}')
                 else:
                     self.nav_failures += 1
+                    self.failed_goals.append((goal_x, goal_y))
                     self.get_logger().warn(f'Navigation failed: {message}')
 
                     if self.nav_failures >= self.max_nav_failures:
@@ -488,10 +518,27 @@ class FrontierExplorer(Node):
         finally:
             self.goal_handle = None
 
-    async def _sleep(self, duration):
-        """Async-friendly sleep."""
-        import asyncio
-        await asyncio.sleep(duration)
+    def _sleep(self, duration):
+        """Awaitable sleep driven by the rclpy executor.
+
+        asyncio.sleep() cannot be used inside rclpy coroutine callbacks: rclpy
+        drives the coroutine itself and there is no asyncio event loop running.
+        A one-shot timer completing an rclpy Future yields correctly instead.
+        """
+        future = Future()
+        timer = None
+
+        def _done():
+            timer.cancel()
+            try:
+                self.destroy_timer(timer)
+            except Exception:
+                pass
+            if not future.done():
+                future.set_result(None)
+
+        timer = self.create_timer(duration, _done, callback_group=self.callback_group)
+        return future
 
 
 def main(args=None):

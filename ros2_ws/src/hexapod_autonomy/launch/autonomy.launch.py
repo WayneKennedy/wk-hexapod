@@ -2,8 +2,9 @@
 """
 Autonomous Behavior Launch File for Hexapod Robot
 
-Launches all autonomy nodes plus SLAM/perception:
+Launches all autonomy nodes plus SLAM/navigation/perception:
 - RealSense D435i camera + RTAB-Map SLAM
+- Nav2 navigation servers
 - slam_monitor: Monitors RTAB-Map localization status
 - look_around: Action server for head/body sweep
 - frontier_explorer: Frontier-based exploration
@@ -15,6 +16,7 @@ Usage:
   ros2 launch hexapod_autonomy autonomy.launch.py
   ros2 launch hexapod_autonomy autonomy.launch.py mission_timeout:=120.0
   ros2 launch hexapod_autonomy autonomy.launch.py slam:=false  # Skip SLAM
+  ros2 launch hexapod_autonomy autonomy.launch.py nav:=false   # Skip Nav2
 """
 
 from launch import LaunchDescription
@@ -34,9 +36,11 @@ def generate_launch_description():
     perception_pkg = get_package_share_directory('hexapod_perception')
     config_file = os.path.join(autonomy_pkg, 'config', 'autonomy_params.yaml')
 
-    # Check if RTAB-Map database exists (determines localization vs mapping mode)
-    rtabmap_db_path = os.path.expanduser('~/.ros/rtabmap.db')
-    map_exists = os.path.exists(rtabmap_db_path)
+    # A saved map selects localization mode. RTAB-Map's working database
+    # (~/.ros/rtabmap.db) is created on every mapping run, so it must not be
+    # used as the signal; only a map copied by scripts/save-map.sh counts.
+    saved_map_path = os.path.expanduser('~/.hexapod/maps/rtabmap.db')
+    map_exists = os.path.exists(saved_map_path)
 
     # Declare launch arguments
     mission_timeout_arg = DeclareLaunchArgument(
@@ -57,6 +61,21 @@ def generate_launch_description():
         description='Launch web dashboard for mission control'
     )
 
+    nav_arg = DeclareLaunchArgument(
+        'nav',
+        default_value='true',
+        description='Launch Nav2 (required for exploration and navigate missions)'
+    )
+
+    # Nav2 navigation servers (planner, controller, behaviors). Map and
+    # localization come from RTAB-Map above.
+    navigation_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            bringup_pkg, '/launch/navigation.launch.py'
+        ]),
+        condition=IfCondition(LaunchConfiguration('nav')),
+    )
+
     # Include RealSense + RTAB-Map SLAM (conditional)
     # Starts in localization mode if map exists, mapping mode otherwise
     realsense_slam_launch = IncludeLaunchDescription(
@@ -65,6 +84,7 @@ def generate_launch_description():
         ]),
         launch_arguments={
             'localization': 'true' if map_exists else 'false',
+            'database_path': saved_map_path,
         }.items(),
         condition=IfCondition(LaunchConfiguration('slam')),
     )
@@ -131,9 +151,13 @@ def generate_launch_description():
         mission_timeout_arg,
         slam_arg,
         dashboard_arg,
+        nav_arg,
 
         # SLAM (optional, enabled by default)
         realsense_slam_launch,
+
+        # Nav2 (optional, enabled by default)
+        navigation_launch,
 
         # Autonomy nodes
         slam_monitor_node,

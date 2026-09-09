@@ -15,6 +15,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Twist, Pose, Vector3, TransformStamped
 from sensor_msgs.msg import Imu, JointState
 from nav_msgs.msg import Odometry
@@ -187,6 +188,8 @@ class HexapodController(Node):
 
         # Current servo angles (degrees)
         self.current_angles = [[90.0, 90.0, 90.0] for _ in range(6)]
+        # Head pan/tilt servo angles (degrees, 90 = centred)
+        self.head_angles = [90.0, 90.0]
 
         # ===== Hardware =====
         self.pwm_40 = None
@@ -226,12 +229,15 @@ class HexapodController(Node):
 
         # ===== ROS Interfaces =====
         # Subscribers
+        # See the timer block below for why state callbacks get their own group
+        self.state_cb_group = ReentrantCallbackGroup()
         self.cmd_vel_sub = self.create_subscription(
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         self.body_pose_sub = self.create_subscription(
             Pose, 'body_pose', self.body_pose_callback, 10)
         self.imu_sub = self.create_subscription(
-            Imu, 'imu/data', self.imu_callback, 10)
+            Imu, 'imu/data', self.imu_callback, 10,
+            callback_group=self.state_cb_group)
         self.pose_cmd_sub = self.create_subscription(
             String, 'pose_command', self.pose_command_callback, 10)
 
@@ -275,7 +281,18 @@ class HexapodController(Node):
         self.balance_timer = None
 
         # Odometry publish timer (20 Hz)
-        self.odom_timer = self.create_timer(0.05, self._publish_odometry)
+        # Gait callbacks (cmd_vel, pose commands) block for a full cycle. They
+        # stay in the default mutually exclusive group so steps never overlap,
+        # while state publishing and IMU updates run concurrently in this
+        # reentrant group under the MultiThreadedExecutor (see main()).
+        # Otherwise odom -> base_link stalls during every step and Nav2's
+        # collision monitor and costmaps reject the stale transform.
+        self.odom_timer = self.create_timer(
+            0.05, self._publish_odometry, callback_group=self.state_cb_group)
+        # Joint states at 50 Hz (not only while moving) so robot_state_publisher
+        # can always resolve base_link -> head -> camera frames.
+        self.joint_state_timer = self.create_timer(
+            0.02, self._publish_joint_states, callback_group=self.state_cb_group)
 
         self.get_logger().info('Hexapod controller started (NOT initialized)')
         self.get_logger().info('Call /hexapod/initialize service when robot is safe')
@@ -490,9 +507,8 @@ class HexapodController(Node):
         for i in range(6):
             for j in range(3):
                 data.append(float(self.current_angles[i][j]))
-        # Add head angles (default centered for now)
-        data.append(90.0)  # pan
-        data.append(90.0)  # tilt
+        data.append(float(self.head_angles[0]))  # pan
+        data.append(float(self.head_angles[1]))  # tilt
         msg.data = data
         self.joint_cmd_pub.publish(msg)
 
@@ -505,6 +521,12 @@ class HexapodController(Node):
             for j, joint in enumerate(['coxa', 'femur', 'tibia']):
                 msg.name.append(f'leg{i+1}_{joint}')
                 msg.position.append(math.radians(self.current_angles[i][j]))
+
+        # Head joints as defined in hexapod.urdf (0 rad = servo centred at 90 deg)
+        msg.name.append('head_pan_joint')
+        msg.position.append(math.radians(self.head_angles[0] - 90.0))
+        msg.name.append('head_tilt_joint')
+        msg.position.append(math.radians(self.head_angles[1] - 90.0))
 
         self.joint_state_pub.publish(msg)
 
@@ -1280,12 +1302,15 @@ class HexapodController(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = HexapodController()
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
 
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

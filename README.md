@@ -108,9 +108,36 @@ journalctl -u hexapod -f
 ```
 
 Boot sequence with `autonomy:=true`: hardware drivers, startup sequence (LED warning,
-home, stand), RealSense + RTAB-Map, autonomy nodes, and the web dashboard on port 8080.
-Without a saved map the robot waits `mission_timeout` seconds for an external mission,
-then explores.
+home, stand), RealSense + RTAB-Map, Nav2, autonomy nodes, and the web dashboard on
+port 8080. Without a saved map the robot goes straight to mapping and frontier
+exploration. With a saved map it localizes first, then waits `mission_timeout` seconds
+for an external mission before exploring.
+
+Note that the stack explores on its own after boot whenever the battery is in. Start it
+with `autonomy:=false` (or `sudo systemctl stop hexapod` and `scripts/launch.sh
+autonomy:=false`) when you only want the drivers and controller.
+
+### Maps
+
+RTAB-Map works in `~/.ros/rtabmap.db`, which is wiped at the start of every mapping
+run. To keep a map for localization:
+
+```bash
+sudo systemctl stop hexapod        # RTAB-Map flushes the database on shutdown
+scripts/save-map.sh                # copies it to ~/.hexapod/maps/rtabmap.db
+sudo systemctl start hexapod       # now starts in localization mode
+```
+
+Delete `~/.hexapod/maps/rtabmap.db` to map from scratch again. If localization fails
+after the look-around sweep, the autonomy manager switches RTAB-Map back to mapping.
+
+### Nav2 on Jazzy
+
+`hexapod_bringup/launch/navigation.launch.py` starts Nav2's navigation servers only;
+the map and `map -> odom` come from RTAB-Map. The params file carries the Jazzy-specific
+requirements: `pkg::Class` plugin names, no explicit BT plugin list, and
+`collision_monitor` / `docking_server` sections (both are lifecycle managed by the
+Jazzy launch). Costmaps use the depth-derived `/scan`.
 
 ## Remote missions
 
@@ -168,7 +195,7 @@ wk-hexapod/
 │   ├── hexapod_interfaces/   # custom msg/srv/action definitions
 │   └── hexapod_bringup/      # launch files, RealSense/RTAB-Map/Nav2 config, URDF
 ├── config/                   # servo calibration
-├── scripts/                  # ubuntu-setup.sh, launch.sh, mission.sh
+├── scripts/                  # ubuntu-setup.sh, launch.sh, mission.sh, save-map.sh
 ├── systemd/                  # hexapod.service, hexapod-buzzer-guard.service, install.sh
 └── docs/
 ```

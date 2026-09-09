@@ -4,15 +4,15 @@ autonomy_manager:
   ros__parameters:
     # Time to wait for external mission before auto-exploring
     mission_timeout_sec: 60.0
-    # Path to RTAB-Map database
-    map_db_path: "~/.ros/rtabmap.db"
+    # Saved map (scripts/save-map.sh). Presence selects localization mode.
+    map_db_path: "~/.hexapod/maps/rtabmap.db"
     # State publish rate
     state_publish_rate_hz: 2.0
 
 slam_monitor:
   ros__parameters:
-    # Path to RTAB-Map database
-    map_db_path: "~/.ros/rtabmap.db"
+    # Saved map (scripts/save-map.sh). Presence selects localization mode.
+    map_db_path: "~/.hexapod/maps/rtabmap.db"
     # Minimum consecutive loop closures to confirm localization
     min_loop_closures: 3
     # Timeout before declaring localization failed

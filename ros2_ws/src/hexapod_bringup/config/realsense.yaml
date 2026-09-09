@@ -39,8 +39,9 @@
     # Frame alignment
     align_depth.enable: true
 
-    # Pointcloud (enable for rtabmap)
-    pointcloud.enable: true
+    # Pointcloud: nothing subscribes (RTAB-Map uses RGB-D, Nav2 uses /scan) and
+    # it costs a lot of CPU on the Pi 5, so it stays off.
+    pointcloud.enable: false
     pointcloud.stream_filter: 0  # RS2_STREAM_ANY
     pointcloud.stream_index_filter: -1
 
@@ -54,9 +55,10 @@
     accel_frame_id: "camera_accel_frame"
     imu_optical_frame_id: "camera_imu_optical_frame"
 
-    # Publishing
-    publish_tf: true
-    tf_publish_rate: 0.0  # Static only
+    # Publishing. Camera frames come from hexapod.urdf via robot_state_publisher,
+    # so the driver must not publish a competing camera_link -> optical TF tree.
+    publish_tf: false
+    tf_publish_rate: 0.0
     publish_odom_tf: false
 
     # Diagnostics

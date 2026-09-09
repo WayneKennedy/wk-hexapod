@@ -43,7 +43,7 @@ class SlamMonitor(Node):
         self.callback_group = ReentrantCallbackGroup()
 
         # Parameters
-        self.declare_parameter('map_db_path', '~/.ros/rtabmap.db')
+        self.declare_parameter('map_db_path', '~/.hexapod/maps/rtabmap.db')
         self.declare_parameter('min_loop_closures', 3)
         self.declare_parameter('localization_timeout_sec', 15.0)
         self.declare_parameter('publish_rate_hz', 2.0)

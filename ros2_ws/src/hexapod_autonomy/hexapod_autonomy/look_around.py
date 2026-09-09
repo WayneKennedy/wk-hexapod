@@ -16,6 +16,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.task import Future
 from std_msgs.msg import Float64MultiArray
 from geometry_msgs.msg import Twist
 from hexapod_interfaces.action import LookAround
@@ -351,16 +352,27 @@ class LookAroundServer(Node):
 
         return False
 
-    async def _sleep(self, duration):
-        """Async-friendly sleep."""
-        end_time = time.time() + duration
-        while time.time() < end_time:
-            await self._yield()
+    def _sleep(self, duration):
+        """Awaitable sleep driven by the rclpy executor.
 
-    async def _yield(self):
-        """Yield to allow other callbacks."""
-        import asyncio
-        await asyncio.sleep(0.01)
+        asyncio.sleep() cannot be used inside rclpy coroutine callbacks: rclpy
+        drives the coroutine itself and there is no asyncio event loop running.
+        A one-shot timer completing an rclpy Future yields correctly instead.
+        """
+        future = Future()
+        timer = None
+
+        def _done():
+            timer.cancel()
+            try:
+                self.destroy_timer(timer)
+            except Exception:
+                pass
+            if not future.done():
+                future.set_result(None)
+
+        timer = self.create_timer(duration, _done, callback_group=self.callback_group)
+        return future
 
 
 def main(args=None):

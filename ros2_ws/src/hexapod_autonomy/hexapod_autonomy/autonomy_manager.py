@@ -20,6 +20,7 @@ State Machine:
 import os
 import rclpy
 from rclpy.node import Node
+from std_srvs.srv import Empty
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
@@ -81,9 +82,13 @@ class AutonomyManager(Node):
 
         self.callback_group = ReentrantCallbackGroup()
 
+        # RTAB-Map mode switch (localization -> mapping after a failed localization)
+        self.rtabmap_mapping_client = self.create_client(
+            Empty, '/rtabmap/set_mode_mapping', callback_group=self.callback_group)
+
         # Parameters
         self.declare_parameter('mission_timeout_sec', 60.0)
-        self.declare_parameter('map_db_path', '~/.ros/rtabmap.db')
+        self.declare_parameter('map_db_path', '~/.hexapod/maps/rtabmap.db')
         self.declare_parameter('state_publish_rate_hz', 2.0)
 
         self.mission_timeout = self.get_parameter('mission_timeout_sec').value
@@ -291,7 +296,19 @@ class AutonomyManager(Node):
         else:
             self.get_logger().info('Localization failed, switching to mapping mode')
             self.slam_mode = 'mapping'
+            self._set_rtabmap_mapping()
             self.transition_to(State.MAPPING_MODE)
+
+    def _set_rtabmap_mapping(self):
+        """Tell RTAB-Map to extend the map (it started in localization mode)."""
+        if not self.rtabmap_mapping_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().warn('/rtabmap/set_mode_mapping not available; map will not grow')
+            return
+        future = self.rtabmap_mapping_client.call_async(Empty.Request())
+        future.add_done_callback(
+            lambda f: self.get_logger().info('RTAB-Map switched to mapping mode')
+            if f.exception() is None else
+            self.get_logger().error(f'set_mode_mapping failed: {f.exception()}'))
 
     def _send_exploration_goal(self):
         """Send exploration goal and set up callbacks."""

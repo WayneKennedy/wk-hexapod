@@ -42,6 +42,14 @@ def generate_launch_description():
         description='Use simulation time'
     )
 
+    # Mapping works in ~/.ros/rtabmap.db (from rtabmap.yaml) and starts fresh
+    # each run. Localization loads a deliberately saved map (scripts/save-map.sh).
+    database_path_arg = DeclareLaunchArgument(
+        'database_path',
+        default_value=os.path.expanduser('~/.hexapod/maps/rtabmap.db'),
+        description='RTAB-Map database used in localization mode'
+    )
+
     # RealSense D435i camera node
     # realsense-ros prefixes topics with <namespace>/<node name>, so streams
     # appear as /camera/camera/color/image_raw etc.
@@ -106,6 +114,7 @@ def generate_launch_description():
             rtabmap_config,
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'database_path': LaunchConfiguration('database_path'),
                 'Mem/IncrementalMemory': 'false',
                 'Mem/InitWMWithAllNodes': 'true',
             },
@@ -135,6 +144,7 @@ def generate_launch_description():
     return LaunchDescription([
         localization_arg,
         use_sim_time_arg,
+        database_path_arg,
         realsense_node,
         depthimage_to_laserscan_node,
         rtabmap_slam_node,
