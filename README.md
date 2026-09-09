@@ -62,4 +62,4 @@ linked, never copied. The kit's vendor code lives in
 ## Licence
 
 Apache 2.0 ([`LICENSE`](LICENSE)). This repository contains software and documentation
-only; the hardware is Freenove's. See DEC-15 and OQ-08.
+only; the hardware is Freenove's. See DEC-15.

@@ -92,9 +92,12 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   machine, which need nothing more than `curl`. What "approved planner" means, and how it
   authenticates, is [OQ-04](open-questions.md).
 
-- **DEC-15 — Licence stays Apache 2.0.** (Owner, at repository creation.) The repository
-  is software and documentation only; the hardware is Freenove's and not relicensed here.
-  Whether to adopt the family tri-licence is [OQ-08](open-questions.md).
+- **DEC-15 — Licence stays Apache 2.0.** (Owner, at repository creation; reaffirmed
+  2026-09-09, closing OQ-08.) The repository is software and documentation only; the
+  hardware is Freenove's and not relicensed here. The family tri-licence exists for
+  projects with their own hardware design, and this one does none: any significant
+  deviation from Freenove's design would be a new, printed hexapod rather than a change
+  to this robot.
 
 - **DEC-16 — The repository is the memory, in the family's format.** (2026-09-09.)
   `AGENTS.md` is the single onboarding; `CLAUDE.md`/`GEMINI.md` point at it; facts true of

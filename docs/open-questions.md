@@ -68,6 +68,16 @@ owner deciding.
 
 ## Power and safety
 
+- **OQ-14 — Charging while the servos stay powered.** Today the two 18650 cells feed the
+  shield's LOAD (servo) and CTRL (Pi) rails and are charged by the kit's charger with the
+  robot idle; on USB-C the servo rail is dead ([`hardware.md`](hardware.md#power)). The
+  owner wants to look into a USB-C PD power path between the batteries and the electronics
+  so the robot can charge with servo control intact. **Constraint stated by the owner
+  (2026-09-09):** the kit's hardware design leaves little room for this, and a significant
+  deviation from Freenove's design would mean printing and building another hexapod rather
+  than modifying this one. Not examined; the shield's charge circuit and rail topology
+  would need reading from the vendor schematic first.
+
 - **OQ-11 — Low-voltage behaviour and a watchdog.** Nothing cuts the servo rail on a low
   pack, and if the Pi dies the servos hold their last pose under load until the battery
   sags. `battery_monitor` only publishes voltages. Battery-aware return-to-home is on the
@@ -82,10 +92,6 @@ owner deciding.
   is reachable from anywhere but the home network.
 
 ## Project
-
-- **OQ-08 — Licence.** Apache 2.0 today (DEC-15). The family standard for mixed projects is
-  the tri-licence; this repo has no hardware design of its own, so `MIT` + `CC-BY-SA-4.0`
-  would be the matching subset. Owner's call.
 
 - **OQ-10 — Tracking the vendor code.** `fn-hexapod` is a rewritten-history snapshot of
   Freenove's repository pinned at 2025-11-28, on branch `master`, with no shared commits
