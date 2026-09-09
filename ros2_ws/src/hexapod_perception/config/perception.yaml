@@ -1,27 +1,15 @@
 # Hexapod Perception Configuration
-# Camera and face recognition parameters
+# Face recognition parameters (RGB comes from the RealSense colour stream)
 
 hexapod_perception:
   ros__parameters:
-
-    # Camera Configuration
-    camera:
-      width: 640
-      height: 480
-      fps: 30.0
-      horizontal_flip: false
-      vertical_flip: false
-      # Backend: "picamera2" for Pi Camera (OV5647), "opencv" for USB cameras
-      backend: "picamera2"
-      # Device ID for OpenCV backend (usually 0 for /dev/video0)
-      device_id: 0
 
     # Face Recognition Configuration
     face_recognition:
       # Process every Nth frame (at 30fps, 10 = ~3fps recognition)
       process_every_n_frames: 10
 
-      # Detection model: "hog" (faster, CPU) or "cnn" (more accurate, GPU)
+      # Detection model: "hog" (fast) or "cnn" (more accurate, much slower on the Pi CPU)
       detection_model: "cnn"
 
       # Recognition tolerance (lower = stricter matching)

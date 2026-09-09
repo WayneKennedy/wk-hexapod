@@ -8,10 +8,10 @@
 #   scripts/mission.sh [-H host[:port]] stop [--return-home]
 #   scripts/mission.sh [-H host[:port]] status        # full dashboard status (battery, faces, ...)
 #
-# Host defaults to $HEXAPOD_HOST, then spid:8080.
+# Host defaults to $HEXAPOD_HOST, then localhost:8080.
 set -e
 
-HOST="${HEXAPOD_HOST:-spid:8080}"
+HOST="${HEXAPOD_HOST:-localhost:8080}"
 if [[ "${1:-}" == "-H" ]]; then
     HOST="$2"; shift 2
 fi

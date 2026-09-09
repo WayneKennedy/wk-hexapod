@@ -1,5 +1,5 @@
 # Nav2 Parameters for Hexapod Robot
-# Tuned for slow-moving hexapod with ultrasonic sensor
+# Tuned for a slow-moving hexapod; obstacles from the RealSense depth-derived /scan
 
 amcl:
   ros__parameters:

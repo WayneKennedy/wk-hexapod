@@ -17,14 +17,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Wayne',
-    maintainer_email='wayne@example.com',
-    description='Camera and face recognition nodes for Hexapod Robot',
+    maintainer='Wayne Kennedy',
+    maintainer_email='wayne@zappfyre.com',
+    description='Face recognition and web dashboard for the hexapod',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'camera_node = hexapod_perception.camera_node:main',
             'face_recognition_node = hexapod_perception.face_recognition_node:main',
             'web_dashboard = hexapod_perception.web_dashboard:main',
         ],

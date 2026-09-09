@@ -37,6 +37,16 @@ def generate_launch_description():
             output='screen',
         ),
 
+        # IMU orientation filter (raw gyro/accel -> imu/data with quaternion)
+        Node(
+            package='imu_filter_madgwick',
+            executable='imu_filter_madgwick_node',
+            name='imu_filter',
+            parameters=[{'use_mag': False, 'publish_tf': False,
+                         'world_frame': 'enu', 'fixed_frame': 'base_link'}],
+            output='screen',
+        ),
+
         # Servo Driver
         Node(
             package='hexapod_hardware',
@@ -64,14 +74,6 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # Range Finder Driver
-        Node(
-            package='hexapod_hardware',
-            executable='range_finder_driver',
-            name='range_finder_driver',
-            parameters=[config_file],
-            output='screen',
-        ),
 
         # Buzzer Controller
         Node(

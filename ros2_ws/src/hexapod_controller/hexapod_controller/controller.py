@@ -487,9 +487,15 @@ class HexapodController(Node):
     def _relax_servos(self):
         """Turn off all servo PWM"""
         if not self.direct_hardware:
-            msg = Bool()
-            msg.data = True
-            self.relax_pub.publish(msg)
+            # On shutdown the context may already be gone; servo_driver relaxes
+            # itself in that case, so a failed publish here is harmless.
+            if rclpy.ok():
+                try:
+                    msg = Bool()
+                    msg.data = True
+                    self.relax_pub.publish(msg)
+                except Exception:
+                    pass
         if self.pwm_40:
             for i in range(16):
                 self.pwm_40.set_pwm_off(i)

@@ -3,8 +3,8 @@
 <package format="3">
   <name>hexapod_perception</name>
   <version>0.1.0</version>
-  <description>Camera and face recognition nodes for Hexapod Robot</description>
-  <maintainer email="wayne@example.com">Wayne</maintainer>
+  <description>Face recognition and web dashboard for the hexapod</description>
+  <maintainer email="wayne@zappfyre.com">Wayne Kennedy</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_python</buildtool_depend>

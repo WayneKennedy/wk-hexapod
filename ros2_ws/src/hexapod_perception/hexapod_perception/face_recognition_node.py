@@ -157,7 +157,7 @@ class FaceRecognitionNode(Node):
 
         # Convert ROS Image to numpy array
         try:
-            # Assume rgb8 encoding from camera_node
+            # RealSense colour stream is rgb8
             frame = np.frombuffer(msg.data, dtype=np.uint8)
             frame = frame.reshape((msg.height, msg.width, 3))
             self.last_frame = msg

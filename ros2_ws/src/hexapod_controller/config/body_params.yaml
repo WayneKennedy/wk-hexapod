@@ -1,57 +1,34 @@
-# Hexapod Body Parameters
-# Based on Freenove Big Hexapod Kit geometry
+# Hexapod controller parameters (hexapod_controller/controller.py).
+# The only controller config file; robot.launch.py and controller.launch.py
+# both load it. Leg geometry (link lengths, foot positions, limits) is fixed
+# in the node from the Freenove kit dimensions.
 
 hexapod_controller:
   ros__parameters:
-    # Body geometry (mm) - leg attachment points relative to body center
-    # Legs numbered 1-6: RF, RM, RR, LR, LM, LF
-    body:
-      # Leg mounting angles (degrees from front, CCW positive)
-      leg_angles: [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]
-      # Distance from body center to leg coxa pivot (mm)
-      leg_offsets: [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]
-      # Default body height when standing (mm)
-      default_height: 30.0
-      # Body height offset from leg coordinate frame (mm)
-      height_offset: 14.0
+    # Body geometry (mm, degrees) - from fn-hexapod control.py
+    body.leg_angles: [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]
+    body.leg_offsets: [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]
+    body.default_height: 30.0
+    body.height_offset: 14.0
 
-    # Leg link lengths (mm) - from fn-hexapod control.py
-    leg:
-      coxa: 33.0    # L1
-      femur: 90.0   # L2
-      tibia: 110.0  # L3
+    # IMU balance (incremental PID on roll/pitch). Off by default.
+    balance.enabled: false
+    balance.kp: 0.5
+    balance.ki: 0.0
+    balance.kd: 0.0025
+    balance.update_rate: 50.0
 
-    # Default foot positions in world frame (mm from body center)
-    # These define the "neutral stance" footprint
-    foot_positions:
-      - [137.1, 189.4]   # Leg 1 (RF)
-      - [225.0, 0.0]     # Leg 2 (RM)
-      - [137.1, -189.4]  # Leg 3 (RR)
-      - [-137.1, -189.4] # Leg 4 (LR)
-      - [-225.0, 0.0]    # Leg 5 (LM)
-      - [-137.1, 189.4]  # Leg 6 (LF)
+    # Gait
+    gait.default: "tripod"     # tripod or wave
+    gait.step_height: 40.0     # mm
+    gait.cycle_time: 1.0       # seconds per full cycle
 
-    # Leg position limits (mm)
-    limits:
-      leg_length_min: 90.0
-      leg_length_max: 248.0
-      body_x_range: [-40.0, 40.0]
-      body_y_range: [-40.0, 40.0]
-      body_z_range: [-20.0, 20.0]
-      roll_range: [-15.0, 15.0]   # degrees
-      pitch_range: [-15.0, 15.0]  # degrees
-      yaw_range: [-15.0, 15.0]    # degrees
+    # Odometry: blend IMU yaw (imu/data) with gait-integrated yaw
+    odometry.imu_fusion: true
+    odometry.imu_yaw_weight: 0.98
 
-    # IMU balance PID gains (from fn-hexapod)
-    balance:
-      enabled: false  # Start with balance disabled
-      kp: 0.5
-      ki: 0.0
-      kd: 0.0025
-      update_rate: 50.0  # Hz
-
-    # Gait parameters
-    gait:
-      default: "tripod"  # tripod or wave
-      step_height: 40.0  # mm
-      cycle_time: 1.0    # seconds for full gait cycle
+    # Servo hardware ownership. false: publish /joint_commands for servo_driver
+    # (the robot stack). true: drive the PCA9685 chips and servo power GPIO
+    # directly (standalone controller, e.g. test_ros.sh).
+    hardware.direct: false
+    hardware.calibration_file: ""

@@ -3,15 +3,13 @@ Main launch file for Hexapod Robot
 
 Starts all robot components:
 - Robot state publisher (URDF/TF)
-- Hardware drivers (servo, IMU, battery, LED, buzzer)
+- Hardware drivers (servo, IMU + orientation filter, battery, LED, buzzer)
 - Power indicator and startup sequence
 - Locomotion controller
-- Optionally: Camera for perception
-- Optionally: Autonomous behavior system
+- Optionally: Autonomous behavior system (SLAM, Nav2, exploration, dashboard)
 
 Usage:
   ros2 launch hexapod_bringup robot.launch.py
-  ros2 launch hexapod_bringup robot.launch.py use_camera:=true
   ros2 launch hexapod_bringup robot.launch.py autonomy:=true
 """
 
@@ -32,7 +30,8 @@ def generate_launch_description():
 
     # Config file paths
     hardware_config = os.path.join(hardware_pkg, 'config', 'hardware.yaml')
-    robot_config = os.path.join(bringup_pkg, 'config', 'robot.yaml')
+    controller_config = os.path.join(
+        get_package_share_directory('hexapod_controller'), 'config', 'body_params.yaml')
     urdf_file = os.path.join(bringup_pkg, 'urdf', 'hexapod.urdf')
 
     # Read URDF file
@@ -40,12 +39,6 @@ def generate_launch_description():
         robot_description = f.read()
 
     # Launch arguments
-    use_camera_arg = DeclareLaunchArgument(
-        'use_camera',
-        default_value='false',
-        description='Launch camera node for perception'
-    )
-
     use_sim_arg = DeclareLaunchArgument(
         'use_sim',
         default_value='false',
@@ -65,7 +58,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        use_camera_arg,
         use_sim_arg,
         autonomy_arg,
         mission_timeout_arg,
@@ -94,6 +86,21 @@ def generate_launch_description():
             output='screen',
         ),
 
+        # IMU orientation filter: imu_driver publishes raw gyro/accel on
+        # imu/data_raw; the controller's yaw fusion needs a quaternion on imu/data.
+        Node(
+            package='imu_filter_madgwick',
+            executable='imu_filter_madgwick_node',
+            name='imu_filter',
+            parameters=[{
+                'use_mag': False,
+                'publish_tf': False,
+                'world_frame': 'enu',
+                'fixed_frame': 'base_link',
+            }],
+            output='screen',
+        ),
+
         # Battery Monitor
         Node(
             package='hexapod_hardware',
@@ -103,14 +110,6 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # Range Finder Driver (disabled - no ultrasonic mounted)
-        # Node(
-        #     package='hexapod_hardware',
-        #     executable='range_finder_driver',
-        #     name='range_finder_driver',
-        #     parameters=[hardware_config],
-        #     output='screen',
-        # ),
 
         # Servo Driver
         Node(
@@ -163,20 +162,10 @@ def generate_launch_description():
             package='hexapod_controller',
             executable='controller',
             name='hexapod_controller',
-            parameters=[robot_config] if os.path.exists(robot_config) else [],
+            parameters=[controller_config],
             output='screen',
         ),
 
-        # ===== Optional: Camera =====
-
-        # Camera node (only if use_camera:=true)
-        # Node(
-        #     package='hexapod_perception',
-        #     executable='camera_node',
-        #     name='camera_node',
-        #     condition=IfCondition(LaunchConfiguration('use_camera')),
-        #     output='screen',
-        # ),
 
         # ===== Optional: Autonomous Behavior =====
 

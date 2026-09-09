@@ -1,7 +1,8 @@
 """
 Launch file for Hexapod Controller
 
-Starts the body-centric controller with IK, gait generation, and IMU stabilization.
+Starts the body-centric controller standalone (no servo_driver): it drives the
+servos directly. The full robot uses robot.launch.py instead.
 """
 
 from launch import LaunchDescription
@@ -32,9 +33,16 @@ def generate_launch_description():
         description='Default gait type (tripod or wave)'
     )
 
+    direct_hardware = DeclareLaunchArgument(
+        'direct_hardware',
+        default_value='true',
+        description='Controller drives the PCA9685 itself (standalone, no servo_driver)'
+    )
+
     return LaunchDescription([
         balance_enabled,
         gait_type,
+        direct_hardware,
 
         # Hexapod Controller
         Node(
@@ -46,6 +54,7 @@ def generate_launch_description():
                 {
                     'balance.enabled': LaunchConfiguration('balance_enabled'),
                     'gait.default': LaunchConfiguration('gait_type'),
+                    'hardware.direct': LaunchConfiguration('direct_hardware'),
                 }
             ],
             output='screen',

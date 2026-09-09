@@ -83,7 +83,7 @@
   <!--
     Intel RealSense D435i mounted on head
     Dimensions: 90mm x 25mm x 25mm
-    Replaces: Pi Camera, Ultrasonic sensor
+    Replaces the kit's Pi Camera and ultrasonic sensor
   -->
 
   <!-- D435i camera body link -->
@@ -148,13 +148,6 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
-  <!-- Legacy: ultrasonic_link for backwards compatibility (points to depth) -->
-  <link name="ultrasonic_link"/>
-  <joint name="ultrasonic_joint" type="fixed">
-    <parent link="camera_depth_frame"/>
-    <child link="ultrasonic_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
 
   <!-- Laser frame (for future lidar or virtual scan) -->
   <link name="laser_frame"/>

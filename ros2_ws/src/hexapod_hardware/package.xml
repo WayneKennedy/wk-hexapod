@@ -4,7 +4,7 @@
   <name>hexapod_hardware</name>
   <version>0.1.0</version>
   <description>Hardware interface for Freenove Big Hexapod Robot</description>
-  <maintainer email="wayne@example.com">Wayne</maintainer>
+  <maintainer email="wayne@zappfyre.com">Wayne Kennedy</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_python</buildtool_depend>

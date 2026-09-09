@@ -74,12 +74,12 @@ fi
 log "Step 3: apt packages (ROS 2 Jazzy, Nav2, RTAB-Map, RealSense, Python libs)"
 if dpkg-query -W -f='${Version}\n' '*' 2>/dev/null | grep -q -E 'rpt|deb12'; then
     warn "  Raspberry Pi OS (bookworm) packages are installed on this host."
-    warn "  They conflict with ROS packages. See docs/ubuntu-hardware-setup.md, 'Foreign packages'."
+    warn "  They conflict with ROS packages. See docs/operations.md, 'Foreign packages'."
 fi
 APT_PACKAGES=(
     ros-jazzy-ros-base ros-dev-tools python3-colcon-common-extensions python3-rosdep python3-vcstool
-    ros-jazzy-robot-state-publisher ros-jazzy-rmw-fastrtps-cpp
-    ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-slam-toolbox
+    ros-jazzy-robot-state-publisher ros-jazzy-rmw-fastrtps-cpp ros-jazzy-imu-filter-madgwick
+    ros-jazzy-navigation2 ros-jazzy-nav2-bringup
     ros-jazzy-rtabmap-ros ros-jazzy-realsense2-camera ros-jazzy-depthimage-to-laserscan
     ros-jazzy-cv-bridge ros-jazzy-image-transport ros-jazzy-diagnostic-updater
     ros-jazzy-foxglove-bridge ros-jazzy-pcl-ros ros-jazzy-laser-geometry

@@ -4,7 +4,7 @@
   <name>hexapod_bringup</name>
   <version>0.1.0</version>
   <description>Launch files and configuration for Hexapod Robot</description>
-  <maintainer email="wayne@example.com">Wayne</maintainer>
+  <maintainer email="wayne@zappfyre.com">Wayne Kennedy</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -14,11 +14,11 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>imu_filter_madgwick</exec_depend>
   <exec_depend>depthimage_to_laserscan</exec_depend>
   <!-- Built from source in container, not available via apt on arm64:
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
-  <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>rtabmap_slam</exec_depend>
   -->
 

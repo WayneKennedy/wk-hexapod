@@ -17,12 +17,9 @@ ros2_ws/log/
 *.swp
 *.swo
 
-# Docker volumes (managed by compose)
-# Keep Dockerfile and docker-compose.yml
-
 # OS
 .DS_Store
 Thumbs.db
 
-# Large PDF (can be downloaded from Freenove repo)
-docs/Tutorial.pdf
+# Freenove vendor PDFs are not tracked here; they live in the Freenove repo
+docs/*.pdf

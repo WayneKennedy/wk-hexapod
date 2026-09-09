@@ -3,8 +3,8 @@
 <package format="3">
   <name>hexapod_interfaces</name>
   <version>0.1.0</version>
-  <description>Message and service definitions for Hexapod Robot perception</description>
-  <maintainer email="wayne@example.com">Wayne</maintainer>
+  <description>Message, service and action definitions for the hexapod (autonomy, missions, locomotion, faces)</description>
+  <maintainer email="wayne@zappfyre.com">Wayne Kennedy</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
