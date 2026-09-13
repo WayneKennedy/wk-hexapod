@@ -120,3 +120,12 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   fusion consumed `/imu/data` with a quaternion that nothing published, so IMU fusion had
   never received data. The stock Madgwick filter (no magnetometer, no TF) closes the gap.
   Sign and frame conventions against the controller are unverified ([OQ-13](open-questions.md)).
+
+- **DEC-20 — The vendor reference is Freenove's upstream, cloned sparse; the
+  `fn-hexapod` snapshot is deleted.** (2026-09-13, owner.) The snapshot existed because
+  upstream is 477 MB and the robot's Pi needed ten files; its rewritten history meant it
+  could never track upstream (OQ-10). A blobless, sparse clone of `Code/Server/` solves
+  the size problem without a second repository, and pinning the upstream commit in
+  `references.md` replaces the snapshot as the drift baseline. A second reason not to
+  vendor the files here instead: the vendor code is CC BY-NC-SA 3.0 and this repo is
+  Apache-2.0 ([OQ-14](open-questions.md)). Resolves OQ-10.

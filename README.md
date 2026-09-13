@@ -56,8 +56,9 @@ Details, including what runs at boot and how to save a map, are in
 This robot is one of several. The index, and everything true of more than one of them —
 the compute tiers, the topic contract, perception placement, power integrity — is in
 [wk-robotics](https://github.com/WayneKennedy/wk-robotics). Facts that belong there are
-linked, never copied. The kit's vendor code lives in
-[fn-hexapod](https://github.com/WayneKennedy/fn-hexapod).
+linked, never copied. The kit's vendor code is read from
+[Freenove's upstream repository](https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi)
+directly ([`docs/references.md`](docs/references.md)).
 
 ## Licence
 

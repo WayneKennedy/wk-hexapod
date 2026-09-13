@@ -56,11 +56,13 @@ topic contract, perception placement, power integrity, the GPU workstation, lice
 conventions. **Link to them; never copy them.** Facts true of *this* robot alone live here
 and nowhere else.
 
-The kit's vendor code is a separate repository,
-[fn-hexapod](https://github.com/WayneKennedy/fn-hexapod), expected as a sibling checkout
-at `../fn-hexapod`. Its `Code/Server/` files are the confirmed-working reference for
-servo, home, stand and gait behaviour ([`docs/references.md`](docs/references.md)). When
-touching a hardware driver, read the reference first and port; do not reinvent.
+The kit's vendor code is Freenove's upstream repository, expected as a sparse sibling
+checkout at `../freenove-hexapod` (the clone recipe and pinned commit are in
+[`docs/references.md`](docs/references.md)). Its `Code/Server/` files are the
+confirmed-working reference for servo, home, stand and gait behaviour. When touching a
+hardware driver, read the reference first; do not reinvent. The vendor code is
+CC BY-NC-SA 3.0 and this repo is Apache-2.0, so **read and re-derive, do not copy**
+([OQ-14](docs/open-questions.md)).
 
 ## Hazard: the buzzer
 

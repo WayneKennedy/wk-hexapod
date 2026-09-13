@@ -8,9 +8,12 @@ versions verified on the robot on 2026-09-09.
 - **Freenove Big Hexapod Robot Kit for Raspberry Pi** —
   [Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi](https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi).
   Tutorial, calibration graph, and datasheets for PCA9685, MPU6050 and ADS7830.
-- **[fn-hexapod](https://github.com/WayneKennedy/fn-hexapod)** — the owner's snapshot of
-  the above with the vendor's desktop-client binaries stripped from history. Expected at
-  `../fn-hexapod`. Confirmed-working files in `Code/Server/`:
+- **Local checkout: `../freenove-hexapod`**, a sparse clone of the above holding only
+  `Code/Server/` (the recipe is in [`operations.md`](operations.md)). The full upstream is
+  477 MB of tutorial PDFs and desktop-client binaries; the ten files that matter total
+  about 70 KB. Upstream `master` was at commit `b7d228cc870b` (2026-03-07) when this was
+  written; re-check the drift table below when it moves ([DEC-20](decisions.md)).
+  Confirmed-working files in `Code/Server/`:
 
   | File | What it proves |
   |---|---|
@@ -19,9 +22,13 @@ versions verified on the robot on 2026-09-09.
   | `control.py` | Body-centric IK, tripod and wave gaits, balance PID, calibration maths |
   | `imu.py`, `adc.py`, `buzzer.py`, `spi_ledpixel.py`, `ultrasonic.py` | Bus and pin usage for every shield peripheral |
 
-  Pinned at upstream 2025-11-28. Drift check on 2026-09-09: only `control.py` differs
-  upstream, by `np.mat` → `np.asmatrix`; the rest is byte-identical ([OQ-10](open-questions.md)).
-  This repo's controller does not use `np.mat`.
+  Drift check on 2026-09-09, against the 2025-11-28 state the robot was ported from:
+  only `control.py` had changed, by `np.mat` → `np.asmatrix` (numpy 2); the rest was
+  byte-identical. This repo's controller does not use `np.mat`.
+
+  **Licence:** upstream is CC BY-NC-SA 3.0 (`LICENSE.txt` there). This repo is Apache-2.0.
+  The reference is read, not vendored, for that reason ([DEC-20](decisions.md),
+  [OQ-14](open-questions.md)).
 
 ## ROS 2 packages (apt, Jazzy, arm64) — versions installed 2026-09-09
 

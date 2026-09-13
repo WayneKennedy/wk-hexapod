@@ -7,7 +7,12 @@ for the robot's own Pi 5 on Ubuntu Server 24.04.
 
 ```bash
 git clone git@github.com:WayneKennedy/wk-hexapod.git ~/Code/wk-hexapod
-git clone git@github.com:WayneKennedy/fn-hexapod.git ~/Code/fn-hexapod   # vendor reference
+# Vendor reference: sparse clone of Freenove's upstream, Code/Server only (~70 KB, not 477 MB).
+# Pinned commit and drift check: docs/references.md.
+git clone --filter=blob:none --no-checkout --depth 1 \
+  https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi.git ~/Code/freenove-hexapod
+git -C ~/Code/freenove-hexapod sparse-checkout set Code/Server
+git -C ~/Code/freenove-hexapod checkout master
 cd ~/Code/wk-hexapod
 sudo ./scripts/ubuntu-setup.sh        # idempotent; --dry-run previews
 sudo reboot                           # config.txt and group changes

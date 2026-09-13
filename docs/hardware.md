@@ -9,9 +9,8 @@ given where a value was measured.
 Freenove Big Hexapod Robot Kit for Raspberry Pi, FNK0052, with the **V2.0 shield** (SPI
 LED connector; the V1.0 PWM-on-GPIO18 variant does not work on a Pi 5). Vendor
 documentation and datasheets for the shield's three chips (PCA9685, MPU6050, ADS7830) are
-in the [Freenove repository](https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi)
-and the [fn-hexapod](https://github.com/WayneKennedy/fn-hexapod) snapshot. They are not
-copied here.
+in the [Freenove repository](https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi).
+They are not copied here.
 
 Compute: **Raspberry Pi 5, 8 GB, NVMe**, Ubuntu Server 24.04, ROS 2 Jazzy.
 

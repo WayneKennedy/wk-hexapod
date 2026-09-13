@@ -93,9 +93,17 @@ owner deciding.
 
 ## Project
 
-- **OQ-10 — Tracking the vendor code.** `fn-hexapod` is a rewritten-history snapshot of
-  Freenove's repository pinned at 2025-11-28, on branch `master`, with no shared commits
-  upstream, so it cannot fast-forward. Checked 2026-09-09: upstream has since changed only
-  `control.py`, and only `np.mat` → `np.asmatrix` (numpy 2 compatibility); every other
-  `Code/Server` file is byte-identical. Nothing to port now. Whether to re-import as a true
-  fork, and whether the branch becomes `main`, is undecided.
+- **OQ-10 — Tracking the vendor code.** Resolved 2026-09-13 by [DEC-20](decisions.md):
+  the snapshot is deleted and upstream is cloned sparse.
+
+- **OQ-14 — Is any of this repo's code a derived work of the vendor code?** (2026-09-13.)
+  Freenove's code is CC BY-NC-SA 3.0; this repo is Apache-2.0, and the two are
+  incompatible for derived works (ShareAlike and NonCommercial cannot be relicensed under
+  Apache). The hardware drivers were written with the vendor files open as the reference
+  (`AGENTS.md`: "read the reference first"). The only mentions of Freenove in the source
+  tree are description strings in `hexapod_hardware`'s `setup.py` and `package.xml` and a
+  comment in `body_params.yaml`; no file carries a vendor attribution or copyright line.
+  Whether any function is a copy or close translation rather than a re-derivation from
+  the datasheets has not been checked. Needed: a file-by-file comparison of
+  `hexapod_hardware` against `Code/Server/`, then either a clean re-derivation or a
+  licence note. Blocks the tri-licence adoption question until answered.
