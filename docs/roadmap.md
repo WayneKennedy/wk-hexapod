@@ -47,7 +47,7 @@ The first battery run of the native stack.
 ## Milestone 4 — A fleet node
 
 The family's [hive-mind direction](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/ideas.md#physical-ai-and-the-hive-mind):
-this robot and [wk-devastator](https://github.com/WayneKennedy/wk-devastator) on one
+this robot and [wk-devastator](https://github.com/WayneKennedy/wk-robotics/tree/main/projects/devastator) on one
 topic contract, reporting to an off-robot planner, and both still useful when it is
 unreachable. Depends on that robot existing, and on the transport question the family has
 not decided (Zenoh or DDS).

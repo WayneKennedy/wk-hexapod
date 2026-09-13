@@ -61,6 +61,6 @@ pip into the system interpreter: `rpi-ws281x` 5.0.0, `mpu6050-raspberrypi` 1.2,
 
 - [wk-robotics](https://github.com/WayneKennedy/wk-robotics) — index, compute tiers,
   topic contract, perception placement, power integrity, conventions.
-- [wk-devastator](https://github.com/WayneKennedy/wk-devastator) — intended second
+- [wk-devastator](https://github.com/WayneKennedy/wk-robotics/tree/main/projects/devastator) — intended second
   consumer of this robot's SLAM and Nav2 configuration; its `docs/` are the format this
   repository's documentation follows.

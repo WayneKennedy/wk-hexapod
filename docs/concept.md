@@ -29,7 +29,7 @@ There is no microcontroller and therefore no reflex tier
 Within the family it is the **intent-tier reference**: the only robot with a working SLAM,
 navigation and mission stack, and the first candidate node for the fleet direction recorded
 in [wk-robotics](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/ideas.md#physical-ai-and-the-hive-mind).
-[wk-devastator](https://github.com/WayneKennedy/wk-devastator) is the intended second
+[wk-devastator](https://github.com/WayneKennedy/wk-robotics/tree/main/projects/devastator) is the intended second
 consumer of its navigation configuration.
 
 ## History
