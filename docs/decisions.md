@@ -128,4 +128,4 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   the size problem without a second repository, and pinning the upstream commit in
   `references.md` replaces the snapshot as the drift baseline. A second reason not to
   vendor the files here instead: the vendor code is CC BY-NC-SA 3.0 and this repo is
-  Apache-2.0 ([OQ-14](open-questions.md)). Resolves OQ-10.
+  Apache-2.0 ([OQ-15](open-questions.md)). Resolves OQ-10.

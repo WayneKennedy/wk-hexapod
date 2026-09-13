@@ -96,7 +96,7 @@ owner deciding.
 - **OQ-10 — Tracking the vendor code.** Resolved 2026-09-13 by [DEC-20](decisions.md):
   the snapshot is deleted and upstream is cloned sparse.
 
-- **OQ-14 — Is any of this repo's code a derived work of the vendor code?** (2026-09-13.)
+- **OQ-15 — Is any of this repo's code a derived work of the vendor code?** (2026-09-13.)
   Freenove's code is CC BY-NC-SA 3.0; this repo is Apache-2.0, and the two are
   incompatible for derived works (ShareAlike and NonCommercial cannot be relicensed under
   Apache). The hardware drivers were written with the vendor files open as the reference

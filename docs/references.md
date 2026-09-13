@@ -28,7 +28,7 @@ versions verified on the robot on 2026-09-09.
 
   **Licence:** upstream is CC BY-NC-SA 3.0 (`LICENSE.txt` there). This repo is Apache-2.0.
   The reference is read, not vendored, for that reason ([DEC-20](decisions.md),
-  [OQ-14](open-questions.md)).
+  [OQ-15](open-questions.md)).
 
 ## ROS 2 packages (apt, Jazzy, arm64) — versions installed 2026-09-09
 

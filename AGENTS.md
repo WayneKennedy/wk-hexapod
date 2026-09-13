@@ -62,7 +62,7 @@ checkout at `../freenove-hexapod` (the clone recipe and pinned commit are in
 confirmed-working reference for servo, home, stand and gait behaviour. When touching a
 hardware driver, read the reference first; do not reinvent. The vendor code is
 CC BY-NC-SA 3.0 and this repo is Apache-2.0, so **read and re-derive, do not copy**
-([OQ-14](docs/open-questions.md)).
+([OQ-15](docs/open-questions.md)).
 
 ## Hazard: the buzzer
 
