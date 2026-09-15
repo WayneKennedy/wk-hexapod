@@ -19,8 +19,8 @@ paths to frontiers. Not met on purpose: nothing walked.
 
 The first battery run of the native stack.
 
-1. Fix the velocity semantics between Nav2 and the controller (OQ-01) and measure the real
-   walking speed.
+1. Run the movement calibration of `operations.md` (DEC-22): directions, yaw sign, the
+   two slip factors, the real walking speed.
 2. Tune the collision monitor and costmaps against real obstacles (OQ-03).
 3. Verify the IMU filter conventions with the robot turning (OQ-13) and the head-servo
    conflict during look-around (OQ-12).

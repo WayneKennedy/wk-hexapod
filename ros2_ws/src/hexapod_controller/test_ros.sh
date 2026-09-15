@@ -46,12 +46,11 @@ ros2 service call /hexapod/initialize std_srvs/srv/Trigger
 
 sleep 2
 
-# Walk forward ~150mm continuously
-# At 25mm/cycle and ~0.5s cycle time, need ~3s of continuous commands
+# Walk forward ~150mm: 0.05 m/s for 3 s (cmd_vel is m/s, DEC-22)
 echo ""
 echo ">>> Walking FORWARD (~150mm continuous)..."
 timeout 3.5s ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
-    "{linear: {x: 1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}" \
+    "{linear: {x: 0.05, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}" \
     --rate 10 || true
 
 sleep 1
@@ -60,7 +59,7 @@ sleep 1
 echo ""
 echo ">>> Walking BACKWARD (~150mm continuous)..."
 timeout 3.5s ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
-    "{linear: {x: -1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}" \
+    "{linear: {x: -0.05, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}" \
     --rate 10 || true
 
 sleep 1

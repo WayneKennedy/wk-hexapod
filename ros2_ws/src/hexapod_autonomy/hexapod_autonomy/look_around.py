@@ -132,7 +132,7 @@ class LookAroundServer(Node):
         feedback = LookAround.Feedback()
         result = LookAround.Result()
 
-        start_time = time.time()
+        start_time = time.monotonic()
 
         try:
             # Phase 1: Head sweep
@@ -159,7 +159,7 @@ class LookAroundServer(Node):
                 return result
 
             # Check timeout
-            if time.time() - start_time > timeout:
+            if time.monotonic() - start_time > timeout:
                 result.success = True
                 result.localized = False
                 result.message = 'Timeout reached'
@@ -189,7 +189,7 @@ class LookAroundServer(Node):
                 return result
 
             # Check timeout
-            if time.time() - start_time > timeout:
+            if time.monotonic() - start_time > timeout:
                 result.success = True
                 result.localized = False
                 result.message = 'Timeout reached'

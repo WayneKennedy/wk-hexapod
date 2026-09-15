@@ -18,6 +18,13 @@ sudo cp "$SCRIPT_DIR/hexapod-buzzer-guard.service" /etc/systemd/system/hexapod-b
 sudo systemctl daemon-reload
 sudo systemctl enable --now hexapod-buzzer-guard.service
 
+echo "Enabling systemd-time-wait-sync (bounded to 90 s so an offline boot still starts)"
+sudo mkdir -p /etc/systemd/system/systemd-time-wait-sync.service.d
+sudo cp "$SCRIPT_DIR/time-wait-sync-timeout.conf" \
+    /etc/systemd/system/systemd-time-wait-sync.service.d/timeout.conf
+sudo systemctl daemon-reload
+sudo systemctl enable systemd-time-wait-sync.service
+
 echo "Installing hexapod.service (user=$RUN_USER, repo=$REPO_DIR)"
 sed -e "s|__USER__|$RUN_USER|g" \
     -e "s|__REPO_DIR__|$REPO_DIR|g" \

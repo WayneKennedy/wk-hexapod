@@ -249,12 +249,12 @@ class MissionServer(Node):
         if not waypoints:
             return False, 'No waypoints provided'
 
-        start_time = time.time()
+        start_time = time.monotonic()
         loops = 0
 
         while self.is_executing:
             # Check timeout
-            if timeout_sec > 0 and (time.time() - start_time) > timeout_sec:
+            if timeout_sec > 0 and (time.monotonic() - start_time) > timeout_sec:
                 return True, f'Patrol timeout after {loops} loops'
 
             for waypoint in waypoints:

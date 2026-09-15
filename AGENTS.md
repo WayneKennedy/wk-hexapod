@@ -28,7 +28,9 @@ priority over exploration. Full intent: [`docs/concept.md`](docs/concept.md).
 
 **It is a working robot, not a design.** Locomotion, odometry, SLAM, Nav2 and frontier
 exploration all run end to end on the bench ([`docs/test-log.md`](docs/test-log.md)).
-The first battery-powered run of the native stack has not happened yet.
+On 2026-09-15, after a day of floor fixes (DEC-21, DEC-22), **the robot reached a
+frontier goal autonomously on the battery for the first time**
+([`docs/test-log.md`](docs/test-log.md)).
 
 ## Where things live
 
@@ -111,10 +113,11 @@ distressed people in the house. Rules, all of which are enforced by the setup
 **Native stack verified on the bench, 2026-09-09, USB power.** All 36 nodes run under the
 service: drivers, startup sequence, RealSense, RTAB-Map in mapping mode producing an
 occupancy grid, Nav2 active, frontier exploration sending goals, dashboard mission API
-answering. Nav2 reports "failed to make progress" because the servos are unpowered and
-because the controller's velocity scaling does not match Nav2's commands
-([OQ-01](docs/open-questions.md)). The Pi runs at a load average around 10 with
-everything up ([OQ-02](docs/open-questions.md)).
+answering. Nav2 reported "failed to make progress" because the servos were unpowered and
+because the controller's velocity scaling did not match Nav2's commands (fixed by DEC-22,
+untested). The Pi runs at a load average around 10 with everything up
+([OQ-02](docs/open-questions.md)).
 
-**Frontier:** the first battery run of the native stack — velocity scaling, collision
-monitor and costmap tuning on the floor ([`docs/roadmap.md`](docs/roadmap.md)).
+**Frontier:** the movement calibration in `docs/operations.md`, then a full-stack battery
+run to see Nav2 reach a frontier, then collision monitor and costmap tuning on the floor
+([`docs/roadmap.md`](docs/roadmap.md)).

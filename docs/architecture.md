@@ -68,10 +68,13 @@ writes them.
 | Services | `hexapod/initialize` (home then stand), `hexapod/enable_balance`, `hexapod/reset_odometry` |
 | Action | `hexapod/move_distance` (`hexapod_interfaces/MoveDistance`) |
 
-Gait: tripod (legs 0,2,4 alternate with 1,3,5), one cycle per second by default, 40 mm
-step height. Odometry integrates commanded displacement per cycle and blends IMU yaw with
-a complementary filter (weight 0.98). **Velocity semantics are not SI**
-([OQ-01](open-questions.md)): `linear.x = 1.0` means 25 mm per cycle.
+Gait: the vendor's tripod gait (legs 0,2,4 alternate with 1,3,5), one cycle per second by
+default, 40 mm step height. `/cmd_vel` is SI: a gait worker runs one cycle per tick on the
+latest command while it is fresh (0.5 s) and non-zero, moving the body `v × cycle_time`
+per cycle up to the gait's limits — 140 mm and 40° per cycle, so 0.14 m/s and 0.7 rad/s
+at the default cycle time (DEC-22). Odometry integrates the displacement the gait
+geometry commands, scaled by measured stride and turn factors, and blends IMU yaw with a
+complementary filter (weight 0.98).
 
 The node runs on a multithreaded executor. Gait callbacks are mutually exclusive so steps
 never overlap; odometry, joint-state and IMU callbacks run in a reentrant group so TF keeps

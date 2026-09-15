@@ -73,7 +73,10 @@ boot.** Start with `autonomy:=false`, or stop the service, when that is not want
 
 Services: `hexapod-buzzer-guard.service` (holds GPIO 17 low; leave it enabled) and
 `hexapod.service` (runs `scripts/launch.sh autonomy:=true` as the owning user, stops the
-nodes with SIGINT so servos relax, and leaves servo power disabled afterwards).
+nodes with SIGINT so servos relax, and leaves servo power disabled afterwards). It starts
+only after `time-sync.target`: `systemd-time-wait-sync.service` is enabled with a 90 s
+bound, so a boot with no network starts the stack 90 s late on the restored clock
+(DEC-21).
 
 ## Maps
 
@@ -121,6 +124,38 @@ python3 ros2_ws/src/hexapod_controller/test_walk.py    # walk forward and back, 
 ros2_ws/src/hexapod_controller/test_ros.sh             # controller alone with direct servo access: init, walk, home, relax
 ```
 
+### Movement calibration
+
+Battery, a floor with 1.5 m clear, owner present, service stopped. `/cmd_vel` is SI
+(DEC-22); odometry integrates what the gait commands, so the actual/commanded ratio is
+measured against `/odom`, not against a cycle count.
+
+```bash
+sudo systemctl stop hexapod
+scripts/launch.sh autonomy:=false &      # homes, then stands about 15 s later
+source /opt/ros/jazzy/setup.bash && source ros2_ws/install/setup.bash
+ODOM='ros2 topic echo /odom --once --field pose.pose'
+# 1. Yaw sign (OQ-13): lift the robot, turn it 90° anticlockwise, set it down.
+#    /imu/data orientation.z must be about +0.7 (odometry only takes the IMU
+#    yaw while walking). Negative means the IMU yaw is inverted.
+ros2 topic echo /imu/data --once --field orientation
+# Odometry yaw follows the IMU while walking, so for the two runs below turn
+# the fusion off: odom then reports exactly what the gait commanded.
+ros2 param set /hexapod_controller odometry.imu_fusion false
+# 2. Forward 1 m: mark a foot tip, then
+$ODOM; timeout 20 ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.05}}"; $ODOM
+#    stride_scale = tape distance / odom distance. The robot must go forward.
+# 3. Turn: mark the heading, then
+$ODOM; timeout 10 ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{angular: {z: 0.3}}"; $ODOM
+#    turn_scale = measured angle / odom yaw change (the IMU yaw change is a
+#    fair measure of the angle). Positive z must turn left.
+ros2 param set /hexapod_controller odometry.imu_fusion true
+```
+
+Put the two factors in `hexapod_controller/config/body_params.yaml`, record the run in
+[`test-log.md`](test-log.md), restart the service. A wrong direction in step 2 or 3 is a
+sign error in the controller's `_walk_cycle`, not a calibration value.
+
 Sensor checks that need no battery:
 
 ```bash
@@ -147,7 +182,7 @@ changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (th
 - **`ros2 topic list` is empty right after launch.** DDS discovery takes about 10 s here.
   Use `ros2 daemon start` and query again; `--no-daemon` gives partial lists.
 - **Nav2 "Failed to make progress".** Expected on USB power (servos dead). On battery,
-  see [OQ-01](open-questions.md).
+  run the movement calibration above; before DEC-22 this was the velocity mismatch.
 - **Collision monitor flaps "stop / continue".** Transform lag between `/scan` and
   `odom → base_link`; fixed by DEC-09 on 2026-09-09. If it recurs, check load
   ([OQ-02](open-questions.md)).

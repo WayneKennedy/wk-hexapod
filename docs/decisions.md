@@ -129,3 +129,39 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   `references.md` replaces the snapshot as the drift baseline. A second reason not to
   vendor the files here instead: the vendor code is CC BY-NC-SA 3.0 and this repo is
   Apache-2.0 ([OQ-15](open-questions.md)). Resolves OQ-10.
+
+- **DEC-21 — The stack waits for a synchronised clock, and elapsed time is measured on
+  the monotonic clock.** (2026-09-15.) The Pi 5 RTC has no backup cell; on a cold boot
+  `systemd-timesyncd` restores the last recorded time and steps to NTP time when the
+  network answers — +24 min, 45 s after boot, on the first battery run
+  ([`test-log.md`](test-log.md)). The step ended the exploration action, stopped the
+  collision monitor and broke RTAB-Map's TF lookups. Two changes: `hexapod.service` is
+  ordered after `time-sync.target` with `systemd-time-wait-sync.service` enabled and
+  bounded to 90 s (`systemd/time-wait-sync-timeout.conf`), so an offline boot still
+  starts on the restored clock; and every node that measures a duration
+  (`frontier_explorer`, `autonomy_manager`, `look_around`, `mission_server`, the
+  controller's cycle and feedback timing) uses `time.monotonic()`. Message stamps stay on
+  ROS time. Also that day: `bt_navigator.default_server_timeout` raised from 20 ms to
+  1000 ms, since at boot load the planner missed the acknowledge window on every replan
+  ([OQ-02](open-questions.md)).
+
+- **DEC-22 — `/cmd_vel` is SI and drives the vendor's gait.** (2026-09-15.) The
+  controller had read `linear.x = 1.0` as 25 mm per cycle and ran one cycle per message
+  through a home-grown gait that, simulated from its own foot maths, moved the body 43 mm
+  for a commanded 25 and dragged feet at each half-cycle transition; Nav2's 0.05 m/s
+  became 1.25 mm per cycle and the robot stepped in place (OQ-01, closed). Now: a gait
+  worker runs one cycle per tick on the latest command while it is fresh (0.5 s) and
+  non-zero; each cycle moves the body `v × cycle_time`, converted to the vendor gait's
+  per-cycle units (`_tripod_gait_step`, the port of `run_gait`) by the simulated factor
+  of 4 for tripod (35 mm → 140.0 mm, 1° → 4.00° clockwise per cycle; wave is 2 from the
+  maths, unsimulated) and clamped to the vendor's limits (35 mm, 10°); odometry
+  integrates the commanded geometry times measured scale factors
+  (`odometry.stride_scale` 0.82, `odometry.turn_scale` 0.72, measured the same day by
+  the calibration in [`operations.md`](operations.md#movement-calibration)). The
+  home-grown cycle is deleted and `MoveDistance` walks at a speed instead of a fixed
+  step. Verified on the floor: +x walks forward, +z turns left. Three defects found and
+  fixed on the way ([`test-log.md`](test-log.md)): frame loops now sleep to absolute
+  deadlines with a 1 ms interpreter switch interval (cycles had run 2–4× long); the floor
+  is one explicit reference (`GROUND_Z = 0`) for the initial feet, the stand reset and
+  the gait lift; +y strafe is unverified (Nav2 does not use it).
+

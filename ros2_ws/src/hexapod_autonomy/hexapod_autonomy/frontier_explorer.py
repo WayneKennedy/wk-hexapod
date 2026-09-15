@@ -401,7 +401,7 @@ class FrontierExplorer(Node):
         feedback = ExploreFrontiers.Feedback()
         result = ExploreFrontiers.Result()
 
-        start_time = time.time()
+        start_time = time.monotonic()
 
         self.get_logger().info('Starting frontier exploration')
 
@@ -416,7 +416,7 @@ class FrontierExplorer(Node):
                     return result
 
                 # Check timeout
-                elapsed = time.time() - start_time
+                elapsed = time.monotonic() - start_time
                 if max_duration > 0 and elapsed >= max_duration:
                     result.success = True
                     result.message = 'Timeout reached'

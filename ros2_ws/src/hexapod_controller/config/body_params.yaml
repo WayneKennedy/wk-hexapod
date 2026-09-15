@@ -18,14 +18,25 @@ hexapod_controller:
     balance.kd: 0.0025
     balance.update_rate: 50.0
 
-    # Gait
+    # Gait. cmd_vel is SI (m/s, rad/s); one cycle moves the body
+    # linear * cycle_time, up to the vendor gait's per-cycle limits:
+    # tripod 4 * max_step_mm (140 mm) and 4 * max_turn_deg (40 deg) per cycle,
+    # so 0.14 m/s and 0.7 rad/s at cycle_time 1.0 (DEC-22).
     gait.default: "tripod"     # tripod or wave
     gait.step_height: 40.0     # mm
     gait.cycle_time: 1.0       # seconds per full cycle
+    gait.max_step_mm: 35.0     # fn-hexapod run_gait clamp
+    gait.max_turn_deg: 10.0
+    gait.cmd_vel_timeout: 0.5  # stop when cmd_vel goes quiet for this long
 
     # Odometry: blend IMU yaw (imu/data) with gait-integrated yaw
     odometry.imu_fusion: true
     odometry.imu_yaw_weight: 0.98
+    # Measured actual / commanded displacement, whatever the cause; the
+    # movement calibration in docs/operations.md sets these. Measured
+    # 2026-09-15 on a rubber mat at 0.05 m/s and 0.3 rad/s (test-log.md).
+    odometry.stride_scale: 0.82
+    odometry.turn_scale: 0.72
 
     # Servo hardware ownership. false: publish /joint_commands for servo_driver
     # (the robot stack). true: drive the PCA9685 chips and servo power GPIO

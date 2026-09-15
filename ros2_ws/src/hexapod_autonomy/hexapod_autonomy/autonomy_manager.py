@@ -412,12 +412,12 @@ class AutonomyManager(Node):
 
         elif self.current_state == State.LOCALIZATION_MODE:
             # Successfully localized, wait for mission
-            self.waiting_start_time = time.time()
+            self.waiting_start_time = time.monotonic()
             self.transition_to(State.WAITING_FOR_MISSION)
 
         elif self.current_state == State.WAITING_FOR_MISSION:
             if self.waiting_start_time:
-                elapsed = time.time() - self.waiting_start_time
+                elapsed = time.monotonic() - self.waiting_start_time
                 self.mission_timeout_remaining = max(0, self.mission_timeout - elapsed)
 
                 if elapsed >= self.mission_timeout:
@@ -430,7 +430,7 @@ class AutonomyManager(Node):
             # Just wait for completion
             if not self.mission_active:
                 self.transition_to(State.WAITING_FOR_MISSION)
-                self.waiting_start_time = time.time()
+                self.waiting_start_time = time.monotonic()
 
         elif self.current_state == State.EXPLORING:
             # Exploration is async - triggered once when entering this state

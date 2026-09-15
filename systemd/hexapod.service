@@ -1,7 +1,9 @@
 [Unit]
 Description=Hexapod Robot ROS 2 stack
-After=network-online.target
-Wants=network-online.target
+# time-sync.target: the Pi 5 RTC is unbacked, so without this the stack starts on the
+# restored shutdown time and the clock steps forward when NTP answers (DEC-21).
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
 
 [Service]
 Type=simple

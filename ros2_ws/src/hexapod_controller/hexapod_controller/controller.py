@@ -28,6 +28,7 @@ import math
 import os
 import numpy as np
 from ament_index_python.packages import get_package_share_directory
+import sys
 import time
 import threading
 
@@ -143,8 +144,19 @@ class HexapodController(Node):
             ('gait.default', 'tripod'),
             ('gait.step_height', 40.0),
             ('gait.cycle_time', 1.0),
+            # Per-cycle limits of the vendor gait maths (fn-hexapod control.py
+            # run_gait clamps x and y to +-35). The body travels
+            # BODY_TRAVEL_PER_UNIT times these per cycle.
+            ('gait.max_step_mm', 35.0),
+            ('gait.max_turn_deg', 10.0),
+            # Walking stops when no cmd_vel arrives within this time.
+            ('gait.cmd_vel_timeout', 0.5),
             ('odometry.imu_fusion', True),
             ('odometry.imu_yaw_weight', 0.98),
+            # Measured ratio of actual to commanded displacement on the floor
+            # (whatever the cause). 1.0 until calibrated; see docs/operations.md.
+            ('odometry.stride_scale', 1.0),
+            ('odometry.turn_scale', 1.0),
             # Servo hardware ownership. Default: this node publishes joint
             # angles on /joint_commands and hexapod_hardware/servo_driver owns
             # the PCA9685 chips and the servo power GPIO. Set true only when
@@ -170,12 +182,12 @@ class HexapodController(Node):
 
         # Default foot positions in world frame (mm)
         self.foot_positions = np.array([
-            [137.1, 189.4, self.body_position[2]],
-            [225.0, 0.0, self.body_position[2]],
-            [137.1, -189.4, self.body_position[2]],
-            [-137.1, -189.4, self.body_position[2]],
-            [-225.0, 0.0, self.body_position[2]],
-            [-137.1, 189.4, self.body_position[2]],
+            [137.1, 189.4, self.GROUND_Z],
+            [225.0, 0.0, self.GROUND_Z],
+            [137.1, -189.4, self.GROUND_Z],
+            [-137.1, -189.4, self.GROUND_Z],
+            [-225.0, 0.0, self.GROUND_Z],
+            [-137.1, 189.4, self.GROUND_Z],
         ])
 
         # Leg positions in leg-local frame (mm)
@@ -226,13 +238,19 @@ class HexapodController(Node):
         self.is_initialized = False
         self.is_walking = False
         self.is_relaxed = True
+        # Latest velocity command (m/s, m/s, rad/s) and when it arrived
+        self.cmd_vel = (0.0, 0.0, 0.0)
+        self.cmd_vel_time = None
+        self._slow_cycle_warned = False
 
         # ===== ROS Interfaces =====
         # Subscribers
         # See the timer block below for why state callbacks get their own group
         self.state_cb_group = ReentrantCallbackGroup()
+        # cmd_vel only records the latest command; _gait_tick walks on it
         self.cmd_vel_sub = self.create_subscription(
-            Twist, 'cmd_vel', self.cmd_vel_callback, 10)
+            Twist, 'cmd_vel', self.cmd_vel_callback, 10,
+            callback_group=self.state_cb_group)
         self.body_pose_sub = self.create_subscription(
             Pose, 'body_pose', self.body_pose_callback, 10)
         self.imu_sub = self.create_subscription(
@@ -293,6 +311,10 @@ class HexapodController(Node):
         # can always resolve base_link -> head -> camera frames.
         self.joint_state_timer = self.create_timer(
             0.02, self._publish_joint_states, callback_group=self.state_cb_group)
+        # Gait worker: runs one blocking gait cycle per tick while a fresh,
+        # non-zero cmd_vel is held. Default (mutually exclusive) group, so it
+        # never overlaps a pose command or the MoveDistance action.
+        self.gait_timer = self.create_timer(0.05, self._gait_tick)
 
         self.get_logger().info('Hexapod controller started (NOT initialized)')
         self.get_logger().info('Call /hexapod/initialize service when robot is safe')
@@ -738,105 +760,92 @@ class HexapodController(Node):
 
     # ===== Gait Generation =====
 
+    # Feet on the floor sit at world z = GROUND_Z; the body pose carries the
+    # height (home puts the body at 0, stand raises it to -default_height and
+    # the legs reach down by that much). The vendor keeps the height on the
+    # feet instead (body_height); mixing the two put the feet 30 mm below the
+    # floor after every walk and lifted the two tripods from different
+    # references (floor, 2026-09-15).
+    GROUND_Z = 0.0
+
     def _reset_to_stand(self):
-        """Reset foot positions to neutral standing stance"""
+        """Reset foot positions to the neutral standing stance"""
         self.foot_positions = np.array([
-            [137.1, 189.4, self.body_position[2]],
-            [225.0, 0.0, self.body_position[2]],
-            [137.1, -189.4, self.body_position[2]],
-            [-137.1, -189.4, self.body_position[2]],
-            [-225.0, 0.0, self.body_position[2]],
-            [-137.1, 189.4, self.body_position[2]],
+            [137.1, 189.4, self.GROUND_Z],
+            [225.0, 0.0, self.GROUND_Z],
+            [137.1, -189.4, self.GROUND_Z],
+            [-137.1, -189.4, self.GROUND_Z],
+            [-225.0, 0.0, self.GROUND_Z],
+            [-137.1, 189.4, self.GROUND_Z],
         ])
         self._update_servos()
 
-    # Neutral foot positions (X, Y) for rotation calculations
-    # These define where each foot sits relative to body center
-    NEUTRAL_FEET = [
-        [137.1, 189.4],    # leg 0 - right front
-        [225.0, 0.0],      # leg 1 - right middle
-        [137.1, -189.4],   # leg 2 - right rear
-        [-137.1, -189.4],  # leg 3 - left rear
-        [-225.0, 0.0],     # leg 4 - left middle
-        [-137.1, 189.4],   # leg 5 - left front
-    ]
+    # Body displacement per gait cycle, per unit of the (x, y, angle) the
+    # vendor gait maths takes. Tripod: each tripod's stance stroke is twice
+    # the unit and both tripods stroke once per cycle, so 4 (simulated from
+    # the foot maths, 2026-09-15: 35 mm -> 140.0 mm, 1 deg -> 4.00 deg).
+    # Wave: stance legs move 2 units per frame over the cycle, so 2 (from the
+    # maths, not simulated).
+    BODY_TRAVEL_PER_UNIT = {'tripod': 4.0, 'wave': 2.0}
 
-    def _tripod_gait_cycle(self, y_move, x_move, turn):
-        """
-        One tripod gait cycle with full omni-directional movement.
-        Based on fn-hexapod control.py rotation math.
+    def _gait_tick(self):
+        """Walk one cycle on the latest cmd_vel, or stand when it is stale or zero."""
+        if not self.is_initialized or self.is_relaxed or self.action_in_progress:
+            return
+        vx, vy, wz = self.cmd_vel
+        timeout = self.get_parameter('gait.cmd_vel_timeout').value
+        fresh = (self.cmd_vel_time is not None
+                 and time.monotonic() - self.cmd_vel_time < timeout)
+        moving = abs(vx) > 1e-3 or abs(vy) > 1e-3 or abs(wz) > 1e-3
+        if not (fresh and moving):
+            if self.is_walking:
+                self.is_walking = False
+                self._reset_to_stand()
+            return
+        self.is_walking = True
+        self._walk_cycle(vx, vy, wz)
 
-        y_move: forward/back (mm per cycle)
-        x_move: strafe left/right (mm per cycle)
-        turn: rotation in degrees per cycle
+    def _walk_cycle(self, vx, vy, wz):
         """
-        step_height = self.get_parameter('gait.step_height').value
+        One gait cycle at the requested body velocity.
+
+        vx: forward m/s, vy: left m/s, wz: yaw rad/s (CCW positive), i.e. a
+        ROS Twist. Converted to the vendor gait's per-cycle units: +x is the
+        robot's right, +y forward, +angle clockwise (simulated 2026-09-15).
+        Clamped to the gait's limits, so a request beyond them walks at the
+        limit. Odometry integrates what the gait geometry commands, scaled by
+        the measured stride and turn factors.
+        """
         cycle_time = self.get_parameter('gait.cycle_time').value
+        gait = self.get_parameter('gait.default').value
+        k = self.BODY_TRAVEL_PER_UNIT.get(gait, self.BODY_TRAVEL_PER_UNIT['tripod'])
+        max_step = self.get_parameter('gait.max_step_mm').value
+        max_turn = self.get_parameter('gait.max_turn_deg').value
 
-        frames = 64
-        delay = cycle_time / frames
+        y = self._clamp(vx * cycle_time * 1000.0 / k, -max_step, max_step)
+        x = self._clamp(-vy * cycle_time * 1000.0 / k, -max_step, max_step)
+        turn = self._clamp(-math.degrees(wz * cycle_time) / k, -max_turn, max_turn)
 
-        # Calculate per-leg movement including rotation
-        # Rotation: each foot moves based on rotating around body center
-        # Negate turn: positive angular.z = CCW, but our math gives CCW for positive angle
-        angle_rad = math.radians(-turn)
-        cos_a = math.cos(angle_rad)
-        sin_a = math.sin(angle_rad)
+        t0 = time.monotonic()
+        self._run_gait_step(x, y, turn)
+        dt = time.monotonic() - t0
 
-        leg_moves = []
-        for i in range(6):
-            nx, ny = self.NEUTRAL_FEET[i]
-            # Rotation contribution: delta from rotating foot position around origin
-            rot_x = nx * cos_a + ny * sin_a - nx
-            rot_y = -nx * sin_a + ny * cos_a - ny
-            # Total movement = rotation + translation
-            leg_moves.append([rot_x + x_move, rot_y + y_move])
+        lin = self.get_parameter('odometry.stride_scale').value
+        ang = self.get_parameter('odometry.turn_scale').value
+        self._update_odometry(k * y * lin, -k * x * lin, -k * turn * ang, dt)
 
-        # Store starting positions
-        start_feet = [list(f) for f in self.foot_positions]
-        cycle_start_time = time.time()
+        if dt > 1.2 * cycle_time and not self._slow_cycle_warned:
+            self._slow_cycle_warned = True
+            self.get_logger().warn(
+                f'Gait cycle took {dt:.2f}s against a nominal {cycle_time:.2f}s; '
+                'commanded speeds are not being achieved (logged once)')
 
-        for frame in range(frames):
-            phase = frame / frames
-
-            for i in range(6):
-                is_odd = (i % 2 == 1)
-                move_x, move_y = leg_moves[i]
-
-                # Odd legs move first half, even legs move second half
-                if is_odd:
-                    leg_phase = phase * 2 if phase < 0.5 else 1.0
-                else:
-                    leg_phase = 0.0 if phase < 0.5 else (phase - 0.5) * 2
-
-                # Calculate foot position
-                if leg_phase < 1.0:
-                    # Swing phase - leg in air moving forward
-                    swing = math.sin(leg_phase * math.pi)
-                    self.foot_positions[i][0] = start_feet[i][0] + move_x * (leg_phase - 0.5)
-                    self.foot_positions[i][1] = start_feet[i][1] + move_y * (leg_phase - 0.5)
-                    self.foot_positions[i][2] = self.body_position[2] + step_height * swing
-                else:
-                    # Stance complete
-                    self.foot_positions[i][0] = start_feet[i][0] + move_x * 0.5
-                    self.foot_positions[i][1] = start_feet[i][1] + move_y * 0.5
-                    self.foot_positions[i][2] = self.body_position[2]
-
-                # Push phase for grounded legs
-                if (is_odd and phase >= 0.5) or (not is_odd and phase < 0.5):
-                    push_phase = (phase - 0.5) if is_odd else phase
-                    self.foot_positions[i][0] = start_feet[i][0] - move_x * push_phase * 2
-                    self.foot_positions[i][1] = start_feet[i][1] - move_y * push_phase * 2
-
-            self._update_servos()
-            time.sleep(delay)
-
-        # Update odometry after cycle completes
-        cycle_time_actual = time.time() - cycle_start_time
-        self._update_odometry(y_move, x_move, turn, cycle_time_actual)
-
-        # Reset to neutral for next cycle
-        self._reset_to_stand()
+    def max_linear_speed(self):
+        """Fastest forward speed the gait can walk, m/s."""
+        cycle_time = self.get_parameter('gait.cycle_time').value
+        gait = self.get_parameter('gait.default').value
+        k = self.BODY_TRAVEL_PER_UNIT.get(gait, self.BODY_TRAVEL_PER_UNIT['tripod'])
+        return k * self.get_parameter('gait.max_step_mm').value / 1000.0 / cycle_time
 
     def _run_gait_step(self, x, y, turn):
         """
@@ -846,10 +855,11 @@ class HexapodController(Node):
         Phase 0-49: Even legs swing forward while odd legs push back
         Phase 50-99: Odd legs swing forward while even legs push back
 
-        Args:
-            x: Forward/back motion (mm per step)
-            y: Left/right motion (mm per step)
-            turn: Rotation (degrees per step)
+        Args (vendor units, see _walk_cycle):
+            x: body X, +right (per-cycle unit, mm)
+            y: body Y, +forward (per-cycle unit, mm)
+            turn: rotation, +clockwise (per-cycle unit, degrees)
+        The body travels BODY_TRAVEL_PER_UNIT times each of these per cycle.
         """
         gait_type = self.get_parameter('gait.default').value
         step_height = self.get_parameter('gait.step_height').value
@@ -882,6 +892,7 @@ class HexapodController(Node):
         frames = 64  # Number of sub-steps per cycle
         z_delta = step_height / frames
         delay = cycle_time / frames
+        t_start = time.monotonic()
 
         for j in range(frames):
             for i in range(3):  # For each tripod pair
@@ -894,7 +905,9 @@ class HexapodController(Node):
                     base_points[even][1] -= 4 * xy_delta[even][1] / frames
                     base_points[odd][0] += 8 * xy_delta[odd][0] / frames
                     base_points[odd][1] += 8 * xy_delta[odd][1] / frames
-                    base_points[odd][2] = self.body_position[2] + step_height
+                    # Absolute, as the vendor does (Z + body_height): the odd
+                    # legs enter the cycle already lifted from the last one.
+                    base_points[odd][2] = self.GROUND_Z + step_height
 
                 elif j < frames // 4:
                     # Even push, odd lower
@@ -964,8 +977,18 @@ class HexapodController(Node):
                 for k in range(3):
                     self._set_servo_angle(channels[k], self.current_angles[leg_idx][k])
             self._publish_joint_commands()
+            self._sleep_until(t_start + (j + 1) * delay)
 
-            time.sleep(delay)
+    def _sleep_until(self, deadline):
+        """
+        Sleep to an absolute monotonic deadline. Frame loops use this rather
+        than a fixed sleep so a late wake (GIL handoff under the executor's
+        threads, measured 2-4x cycle time on 2026-09-15) shortens the next
+        sleep instead of accumulating into the cycle time.
+        """
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(remaining)
 
     def _wave_gait_step(self, x, y, turn, step_height, cycle_time):
         """
@@ -986,6 +1009,8 @@ class HexapodController(Node):
         frames = 171
         z_delta = step_height / frames * 18
         delay = cycle_time / frames
+        t_start = time.monotonic()
+        frame_no = 0
 
         # Leg sequence for wave gait
         leg_order = [5, 2, 1, 0, 3, 4]
@@ -1041,33 +1066,15 @@ class HexapodController(Node):
 
                 self._publish_joint_commands()
 
-                time.sleep(delay)
+                frame_no += 1
+                self._sleep_until(t_start + frame_no * delay)
 
     # ===== ROS Callbacks =====
 
     def cmd_vel_callback(self, msg):
-        """Handle velocity commands for walking"""
-        if not self.is_initialized or self.is_relaxed:
-            return
-
-        # Map Twist to gait parameters
-        # ROS linear.x (forward) -> world Y axis
-        # ROS linear.y (left) -> world X axis
-        # angular.z = rotation
-
-        forward = self._clamp(msg.linear.x * 25, -25, 25)  # mm per step
-        strafe = self._clamp(-msg.linear.y * 25, -25, 25)  # negate for correct direction
-        turn = self._clamp(msg.angular.z * 12, -15, 15)  # degrees per step
-
-        if abs(forward) < 1 and abs(strafe) < 1 and abs(turn) < 1:
-            # Stop moving - return to neutral
-            if self.is_walking:
-                self.is_walking = False
-                self._reset_to_stand()
-            return
-
-        self.is_walking = True
-        self._tripod_gait_cycle(forward, strafe, turn)
+        """Record the latest velocity command (m/s, rad/s); _gait_tick walks on it."""
+        self.cmd_vel = (msg.linear.x, msg.linear.y, msg.angular.z)
+        self.cmd_vel_time = time.monotonic()
 
     def body_pose_callback(self, msg):
         """Handle body pose commands"""
@@ -1244,12 +1251,10 @@ class HexapodController(Node):
         feedback = MoveDistance.Feedback()
         result = MoveDistance.Result()
 
-        # Gait parameters
-        step_size = 0.025  # 25mm per cycle
-        cycle_time = self.get_parameter('gait.cycle_time').value
+        speed = min(max_speed, self.max_linear_speed())
 
         traveled = 0.0
-        last_feedback_time = time.time()
+        last_feedback_time = time.monotonic()
 
         try:
             while traveled < target_distance:
@@ -1264,8 +1269,8 @@ class HexapodController(Node):
                     return result
 
                 # Execute one gait cycle
-                y_move = step_size * 1000 * direction  # Convert to mm
-                self._tripod_gait_cycle(y_move, 0.0, 0.0)
+                self.is_walking = True
+                self._walk_cycle(speed * direction, 0.0, 0.0)
 
                 # Calculate distance traveled from odometry
                 dx = self.odom_x - start_x
@@ -1273,10 +1278,10 @@ class HexapodController(Node):
                 traveled = math.sqrt(dx*dx + dy*dy)
 
                 # Publish feedback (max 10Hz)
-                now = time.time()
+                now = time.monotonic()
                 if now - last_feedback_time >= 0.1:
                     feedback.distance_remaining = max(0.0, target_distance - traveled)
-                    feedback.current_speed = step_size / cycle_time
+                    feedback.current_speed = abs(self.odom_vx)
                     goal_handle.publish_feedback(feedback)
                     last_feedback_time = now
 
@@ -1296,6 +1301,7 @@ class HexapodController(Node):
 
         finally:
             self.action_in_progress = False
+            self.is_walking = False
             self._reset_to_stand()
 
         return result
@@ -1308,6 +1314,10 @@ class HexapodController(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = HexapodController()
+    # The gait frame loop sleeps ~16 ms per frame and must get the GIL back
+    # promptly from the executor threads; the default 5 ms handoff stretched
+    # cycles 2-4x (2026-09-15).
+    sys.setswitchinterval(0.001)
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
 
