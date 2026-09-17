@@ -91,6 +91,11 @@ distressed people in the house. Rules, all of which are enforced by the setup
   overlay-network identifiers. The robot is "the robot"; reach it through the
   `HEXAPOD_HOST` variable described in `docs/operations.md`.
 - **The repository is the memory.** Per-harness memory holds pointers only.
+- **Check what is owned before suggesting a purchase.** Read the private
+  [wk-inventory `docs/stock.md`](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md)
+  and search the owner's invoices, and say what was found. Full rule and the owner's goal
+  (fewer unused parts, more finished projects):
+  [wk-inventory `AGENTS.md`](https://github.com/WayneKennedy/wk-inventory/blob/main/AGENTS.md#before-anything-is-bought).
 
 ## Working on the robot itself
 
