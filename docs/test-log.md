@@ -225,6 +225,55 @@ odometry's IMU yaw fusion (DEC-04) had never received a message since it was wri
 **What changed:** DEC-19 — `imu_filter_madgwick` added to the hardware launches.
 **Untested on the robot**: OQ-13.
 
+### 2026-09-16 · Explore start, dashboard crash, LOAD rail reading 2.5 V
+
+**Conditions:** boot stack under `hexapod.service`, robot on the floor, cells charged
+overnight, LOAD indicator LED red.
+
+**Result:** with no saved map the state machine entered `exploring` on its own about 30 s
+after boot and the explorer sent a frontier goal. `scripts/mission.sh start explore 600`
+then **killed the dashboard**: the JSON integer `600` was assigned unchanged to the
+`float32 timeout_sec` request field and the generated C conversion aborted
+(`Assertion PyFloat_Check(field) failed`, exit -6). The launch does not respawn the
+dashboard, so the mission API was gone until it was restarted by hand.
+
+`/battery/voltages` over three samples: LOAD 2.47–2.53 V, CTRL 7.88 V. Two charged
+18650s cannot read 2.5 V, so the LOAD rail is not seeing its cells (switch, cell
+seating or contact; unverified which). Nav2 was commanding 0.3 rad/s, the IMU gyro
+read about 0 and odometry had dead-reckoned to (3.0, −2.2) m: **the robot was
+stationary while the map filled with commanded motion.**
+
+**What changed:** the dashboard coerces `mission_type`, `timeout_sec` and
+`return_home` to the service field types and returns 400 for a non-numeric timeout.
+A second `start explore` with an integer timeout then answered
+`accepted: true, message: Exploration goal rejected` because the explorer was already
+active; `mission_active` stayed false. Untested: the same call with the explorer idle.
+
+### 2026-09-18 · SSD moved to a USB 3 enclosure; forced TRIM hung the disk
+
+**Conditions:** bench, USB power, `hexapod.service` running, AI HAT+ 2 not fitted.
+
+**Result:** the 128 GB NVMe SSD, moved from its M.2 HAT to a USB 3 enclosure (Realtek
+RTL9210B, UAS, 5 Gbps, `mq-deadline`), booted first time: root and boot mount by label.
+No USB resets or I/O errors in the log. `BOOT_ORDER` changed `0xf146` → `0xf14`;
+bootloader updated 2025-11-05 → 2025-12-08. `fstrim` failed with "discard operation is
+not supported": the bridge reports UNMAP supported (LBPU=1, 20971520 blocks max) but
+LBPME=0 in READ CAPACITY, so the kernel set `provisioning_mode=full`.
+
+**Negative result:** with `provisioning_mode` forced to `unmap`, `fstrim -v /` **stopped
+the disk responding**; the host accepted no new SSH sessions and was power-cycled by
+hand. The exact command sequence was lost with the session. After the reboot: ext4 root
+"clean", no journal replay logged; the FAT boot partition's dirty bit set and cleared
+with `fsck.vfat -a` after a live unmount; the udev rule written seconds before the hang
+was on disk as a zero-byte file and was removed; journald renamed one corrupt journal
+file. No kernel message from the hang survived.
+
+**What changed:** DEC-23, then DEC-24 the same day: the AI HAT+ 2 cannot be fitted
+alongside the Freenove shield (it is powered through the GPIO header and cannot be
+stacked on), so it goes to the tank bot and the SSD returns to the M.2 HAT. `BOOT_ORDER`
+flashed back to `0xf146` before the move. **Untested:** the boot after the SSD returns
+to PCIe, and `fstrim -v /` on it.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery:

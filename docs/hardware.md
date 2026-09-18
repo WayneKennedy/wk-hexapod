@@ -12,7 +12,11 @@ documentation and datasheets for the shield's three chips (PCA9685, MPU6050, ADS
 in the [Freenove repository](https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi).
 They are not copied here.
 
-Compute: **Raspberry Pi 5, 8 GB, NVMe**, Ubuntu Server 24.04, ROS 2 Jazzy.
+Compute: **Raspberry Pi 5, 8 GB**, Ubuntu Server 24.04, ROS 2 Jazzy. Storage: a 128 GB
+NVMe SSD on an M.2 HAT on the PCIe connector; root and boot mount by label. Bootloader
+`BOOT_ORDER=0xf146` (NVMe, USB, SD; read right to left), release 2025-12-08. The SSD
+spent 2026-09-18 in a USB 3 enclosure to free the PCIe connector for an AI HAT+ 2; the
+HAT went to the tank bot instead (DEC-24, [`test-log.md`](test-log.md)).
 
 The shield is a breakout, not a controller: it carries no microcontroller. Every device
 below is a direct peripheral of the Pi ([`architecture.md`](architecture.md#buses)).

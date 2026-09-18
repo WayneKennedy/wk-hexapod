@@ -192,3 +192,13 @@ changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (th
   and [`hardware.md`](hardware.md#the-buzzer-hazard).
 - **A tool loops or hangs under load.** `ros2 topic hz` has been seen to hang at load
   averages above 8; read the journal instead.
+- **After an unclean power-off.** Root is ext4 and journals; check
+  `tune2fs -l /dev/nvme0n1p2 | grep state`. The FAT boot partition sets a dirty bit:
+  confirm with `fsck.vfat -n /dev/nvme0n1p1`, then `umount /boot/firmware`,
+  `fsck.vfat -a /dev/nvme0n1p1`, `mount /boot/firmware`.
+- **Boot order.** `rpi-eeprom-config` shows `BOOT_ORDER=0xf146`: NVMe, then USB mass
+  storage, then SD, read right to left (DEC-24). Root and boot mount by label, so the
+  SSD boots from either bus without edits.
+- **The SSD is ever put in a USB enclosure again.** Do not force
+  `provisioning_mode=unmap` on a Realtek RTL9210 bridge; that hung the disk and the host
+  on 2026-09-18 ([`test-log.md`](test-log.md)).

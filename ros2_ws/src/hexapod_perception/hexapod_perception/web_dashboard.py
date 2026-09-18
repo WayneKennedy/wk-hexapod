@@ -242,9 +242,11 @@ class WebDashboard(Node):
         if not self.start_mission_client.wait_for_service(timeout_sec=2.0):
             return {'accepted': False, 'message': 'Mission service not available'}
 
+        # The generated message setters do not type-check by default; a non-float
+        # (a JSON integer, say) aborts the process in the C conversion layer.
         request = StartMission.Request()
-        request.mission_type = mission_type
-        request.timeout_sec = timeout
+        request.mission_type = str(mission_type)
+        request.timeout_sec = float(timeout)
 
         future = self.start_mission_client.call_async(request)
 
@@ -272,7 +274,7 @@ class WebDashboard(Node):
             return {'success': False, 'message': 'Mission service not available'}
 
         request = StopMission.Request()
-        request.return_home = return_home
+        request.return_home = bool(return_home)
 
         future = self.stop_mission_client.call_async(request)
 
@@ -779,9 +781,13 @@ def status():
 @app.route('/api/mission/start', methods=['POST'])
 def api_start_mission():
     """Start a mission via API"""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     mission_type = data.get('mission_type', 'explore')
-    timeout = data.get('timeout_sec', 0.0)
+    try:
+        timeout = float(data.get('timeout_sec', 0.0))
+    except (TypeError, ValueError):
+        return json.dumps({'accepted': False,
+                           'message': 'timeout_sec must be a number'}), 400
 
     result = dashboard_node.call_start_mission(mission_type, timeout)
     return json.dumps(result)

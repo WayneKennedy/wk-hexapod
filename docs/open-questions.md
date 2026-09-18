@@ -68,6 +68,16 @@ owner deciding.
   I2C and GPIO, and firmware. Not planned; recorded because the family direction argues
   for it.
 
+- **OQ-17 — TRIM on the USB-attached SSD.** Resolved 2026-09-18 by [DEC-24](decisions.md):
+  the SSD is back on PCIe and TRIM works natively. Kept for the record. The RTL9210B bridge does not
+  expose discard to the kernel, and forcing it hung the disk and the host (DEC-23). The
+  drive runs without TRIM. Options, none examined: a bridge firmware update (Realtek's
+  tool is reported to be Windows-only; unverified), an enclosure with a bridge that
+  passes UNMAP cleanly (unverified which), or accept no TRIM on a 128 GB drive and watch
+  wear. `smartmontools` is not installed; the bridge's NVMe SMART passthrough
+  (`smartctl -d sntrealtek`) is untested. `fstrim.timer` stays enabled: it fails
+  harmlessly while `provisioning_mode` is `full`.
+
 ## Perception and sensing
 
 - **OQ-06 — Face recognition scope and cost.** `face_recognition_node` is configured for
@@ -95,6 +105,26 @@ owner deciding.
   pack, and if the Pi dies the servos hold their last pose under load until the battery
   sags. `battery_monitor` only publishes voltages. Battery-aware return-to-home is on the
   roadmap; a hardware cutoff is not designed.
+
+- **OQ-18 — 5 V budget with the SSD enclosure and the AI HAT+ 2.** Resolved 2026-09-18 by
+  [DEC-24](decisions.md): neither goes on this robot. Kept for the record. Both
+  were new loads on the CTRL rail on battery; neither is measured. `usb_max_current_enable=1`
+  is set in `config.txt`. The Pi 5 PCIe connector supplies 5 V at 500 mA per pin, 1 A
+  total, per Raspberry Pi's connector standard, and a HAT+ pulls the connector's detect
+  pin high so the bootloader probes PCIe without an ID EEPROM. The shield occupies the
+  GPIO header. Forum users report the original AI HAT+ (Hailo-8L, about 1.5 W) working
+  on the ribbon alone, but the AI HAT+ 2 is a different case: a third-party review
+  (faceofit.com, not Raspberry Pi) states it draws its power from the GPIO header and
+  gives 1.2 W idle, 3.5–4.5 W vision inference, 8 W peak on LLM loads. 8 W exceeds the
+  ribbon's 1 A rating, so **ribbon-only power is not a safe assumption for the HAT+ 2**.
+  Its socket carries pins that do not protrude, so the shield cannot stack on it as
+  supplied, and the Freenove riser has no height flexibility (owner, 2026-09-18), so
+  stacking is out. Wiring 5 V and ground into the HAT's socket would only work if those
+  and the ID EEPROM pins (27/28) are all the HAT uses; that is documented for the M.2
+  HAT+ and claimed for the original AI HAT+ from its EEPROM overlay string, but **no
+  schematic or pin list for the AI HAT+ 2 is published**, so it is unverified. The
+  shield's 5 V regulator rating is also unknown. Decided the same day: the HAT goes on
+  the tank bot and the SSD returns to the M.2 HAT (DEC-24).
 
 ## Mission planning
 

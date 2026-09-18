@@ -165,3 +165,27 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   is one explicit reference (`GROUND_Z = 0`) for the initial feet, the stand reset and
   the gait lift; +y strafe is unverified (Nav2 does not use it).
 
+- **DEC-23 — The SSD is on USB 3; the PCIe connector is reserved for the AI HAT+ 2.**
+  (Owner, 2026-09-18; **superseded by DEC-24 the same day**.) The Pi 5 exposes one PCIe lane on one FPC connector and the owner
+  wants it for a Raspberry Pi AI HAT+ 2 (Hailo-10H), so the 128 GB NVMe SSD moved from
+  its M.2 HAT to an external USB 3 enclosure (Realtek RTL9210B bridge, UAS, 5 Gbps).
+  Nothing in the image changed: root and boot are found by label. Bootloader
+  `BOOT_ORDER` went from `0xf146` to `0xf14` (USB, then SD; the NVMe probe dropped) on
+  the 2025-12-08 bootloader release. **TRIM stays off.** The bridge advertises UNMAP in
+  its VPD pages but clears LBPME, so the kernel leaves `provisioning_mode` at `full` and
+  `fstrim` reports "not supported"; forcing `unmap` and running `fstrim` hung the disk
+  and the host on 2026-09-18 ([`test-log.md`](test-log.md)). No udev rule may set
+  `unmap` on this bridge. Follow-ups: [OQ-17](open-questions.md) (TRIM),
+  [OQ-18](open-questions.md) (5 V budget with the enclosure and the HAT).
+
+- **DEC-24 — The SSD stays on PCIe; the AI HAT+ 2 goes to the Devastator tank, not the
+  hexapod.** (Owner, 2026-09-18.) Supersedes DEC-23. The AI HAT+ 2 is powered through
+  the GPIO header (third-party review; no schematic is published), its header socket
+  cannot be stacked on as supplied, and the Freenove riser has no height flexibility, so
+  there is no supported way to fit it to this robot ([OQ-18](open-questions.md), closed).
+  The NVMe SSD returns to its M.2 HAT on the PCIe connector; `BOOT_ORDER` is `0xf146`
+  again (flashed 2026-09-18 before the move, so the swap needs no software step) and
+  TRIM works natively. The USB 3 enclosure is retired from this robot; its TRIM hang is
+  kept in [`test-log.md`](test-log.md) as a negative result. The HAT's home is a
+  Devastator fact and belongs in
+  [wk-robotics](https://github.com/WayneKennedy/wk-robotics), not here.
