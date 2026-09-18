@@ -21,13 +21,16 @@ and none of the other three count if the content is wrong.
 ## What this project is
 
 **A ROS 2 Jazzy autonomous hexapod on Freenove Big Hexapod (FNK0052) hardware**, running
-natively on the robot's Raspberry Pi 5 under Ubuntu Server 24.04. The kit's Pi camera and
-ultrasonic sensor are replaced by an Intel RealSense D435i. The goal is autonomous
-exploration and mapping of the local area, with missions from an external planner taking
-priority over exploration. Full intent: [`docs/concept.md`](docs/concept.md).
+natively on the robot's Raspberry Pi 5 under Ubuntu Server 24.04, with the kit's own OV5647
+Pi camera and HC-SR04 ultrasonic on the head. A RealSense D435i replaced them from
+2025-12-31 until 2026-09-18, when it went to the family's Orin Nano (DEC-25). The goal is
+autonomous exploration and mapping of the local area, with missions from an external
+planner taking priority over exploration. It is the family's **baseline intent-tier
+reference**, and its hardware ceiling is the kit's: no accelerator, no bus servos
+(DEC-26). Full intent: [`docs/concept.md`](docs/concept.md).
 
 **It is a working robot, not a design.** Locomotion, odometry, SLAM, Nav2 and frontier
-exploration all run end to end on the bench ([`docs/test-log.md`](docs/test-log.md)).
+exploration all ran end to end on the bench with the D435i ([`docs/test-log.md`](docs/test-log.md)).
 On 2026-09-15, after a day of floor fixes (DEC-21, DEC-22), **the robot reached a
 frontier goal autonomously on the battery for the first time**
 ([`docs/test-log.md`](docs/test-log.md)).
@@ -123,6 +126,11 @@ because the controller's velocity scaling did not match Nav2's commands (fixed b
 untested). The Pi runs at a load average around 10 with everything up
 ([OQ-02](docs/open-questions.md)).
 
-**Frontier:** the movement calibration in `docs/operations.md`, then a full-stack battery
+**Since 2026-09-18 the D435i is gone (DEC-25)**, and the code still expects it. The
+figures above were measured with it.
+
+**Frontier:** drivers for the kit's camera and ultrasonic and a route into mapping and the
+costmaps ([OQ-19](docs/open-questions.md)); then the movement calibration in
+`docs/operations.md`, then a full-stack battery
 run to see Nav2 reach a frontier, then collision monitor and costmap tuning on the floor
 ([`docs/roadmap.md`](docs/roadmap.md)).

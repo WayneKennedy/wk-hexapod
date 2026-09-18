@@ -14,7 +14,7 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   ([`references.md`](references.md)) and every hardware driver is a port of it.
 
 - **DEC-02 — The RealSense D435i replaces the Pi camera and the ultrasonic sensor.**
-  (Owner, 2025-12-31.) One USB 3 device gives RGB, depth computed in the camera, and an
+  (Owner, 2025-12-31; **superseded by DEC-25, 2026-09-18**.) One USB 3 device gives RGB, depth computed in the camera, and an
   IMU. Depth feeds both RTAB-Map and, via `depthimage_to_laserscan`, the Nav2 costmaps. The
   ultrasonic driver and Pi camera node were kept as dead code until 2026-09-09 and are now
   removed (git history has them).
@@ -189,3 +189,26 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   kept in [`test-log.md`](test-log.md) as a negative result. The HAT's home is a
   Devastator fact and belongs in
   [wk-robotics](https://github.com/WayneKennedy/wk-robotics), not here.
+
+- **DEC-25 — The head returns to the kit's sensors; the stack stays ROS 2.** (Owner,
+  2026-09-18.) Supersedes DEC-02. The D435i leaves this robot and the kit's OV5647 Pi
+  camera and HC-SR04 ultrasonic go back on the pan/tilt head; both are in hand. The D435i
+  is banked with the family's Jetson Orin Nano as a pair, because depth computed in the
+  camera is what justifies its cost over a standard camera, and a CPU-only Pi 5 could not
+  use it fully here ([OQ-02](open-questions.md)); the family reasoning is in
+  [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#perception-placement). The ROS 2 stack is kept.
+  **What this breaks:** RTAB-Map RGB-D mapping, the depth-derived `/scan` that feeds both
+  costmaps and the collision monitor, the dashboard's depth stream and the face node's
+  colour source all took their input from the D435i. How the robot maps and sees obstacles
+  with one camera and one range sensor is [OQ-19](open-questions.md). Resolves OQ-07. The
+  ultrasonic driver and Pi camera node removed on 2026-09-09 are in git history (DEC-02).
+
+- **DEC-26 — The robot is the family's baseline intent-tier reference, and its hardware
+  ceiling is the kit's.** (Owner, 2026-09-18.) It stays a working intent-tier reference —
+  ROS 2 on a CPU-only Pi 5, no reflex tier (DEC-08), primitive sensors (DEC-25) — beneath
+  wk-devastator, which adds a reflex tier and an accelerator. It is not the family's R&D
+  platform for new hardware: the GPIO riser blocks the AI HAT+ 2 (DEC-24), and its servos
+  are standard-size PWM hobby servos, lugged at each end and driven from a PWM board on
+  that riser, so a switch to ST3215 bus servos is not feasible. The owner judges a new
+  custom hexapod more feasible than remaking this one
+  ([wk-robotics `ideas.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/ideas.md#a-printed-hexapod)).

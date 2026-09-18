@@ -1,13 +1,15 @@
 # wk-hexapod
 
 **A ROS 2 autonomous hexapod on Freenove Big Hexapod hardware**, running natively on a
-Raspberry Pi 5. It walks with an analytic inverse-kinematics tripod gait, maps with an
-Intel RealSense D435i and RTAB-Map, navigates with Nav2, and explores frontiers on its own
-unless an external mission planner gives it something better to do.
+Raspberry Pi 5. It walks with an analytic inverse-kinematics tripod gait, navigates with
+Nav2, and explores frontiers on its own unless an external mission planner gives it
+something better to do. It is the family's baseline intent-tier reference: CPU-only Pi,
+no reflex tier, the kit's own sensors (DEC-26).
 
-**Status:** the native stack is verified end to end on the bench (2026-09-09, USB power,
-servos unpowered): drivers, SLAM producing a map, Nav2 active, exploration sending goals,
-mission API answering. The first battery run of this stack is the next step. See
+**Status:** the native stack was verified end to end on the bench (2026-09-09, USB power,
+servos unpowered) and reached a frontier on the battery (2026-09-15), both with a RealSense
+D435i. On 2026-09-18 the D435i left and the kit's camera and ultrasonic returned (DEC-25);
+the next step is driving and mapping with them ([OQ-19](docs/open-questions.md)). See
 [`docs/roadmap.md`](docs/roadmap.md) for direction, [`docs/decisions.md`](docs/decisions.md)
 for what is settled, and [`docs/open-questions.md`](docs/open-questions.md) for what is not.
 
@@ -17,8 +19,9 @@ for what is settled, and [`docs/open-questions.md`](docs/open-questions.md) for 
   all hobby PWM servos on two PCA9685 drivers, driven straight off the Pi. There is no
   microcontroller: it is the family's counter-example to the two-tier compute rule, viable
   because a six-legged walker is statically stable.
-- **Sensing:** RealSense D435i (RGB, depth, IMU) on the head, replacing the kit's Pi camera
-  and ultrasonic sensor; MPU6050 body IMU; ADS7830 dual-battery ADC.
+- **Sensing:** the kit's OV5647 Pi camera and HC-SR04 ultrasonic on the head (a RealSense
+  D435i replaced them from 2025-12-31 to 2026-09-18; DEC-25); MPU6050 body IMU; ADS7830
+  dual-battery ADC.
 - **Software:** ROS 2 Jazzy on Ubuntu Server 24.04, all from apt. Six packages: hardware
   drivers, locomotion controller, interfaces, bring-up, perception, autonomy.
 - **Behaviour:** boots, stands, maps or localizes, waits briefly for a mission, then

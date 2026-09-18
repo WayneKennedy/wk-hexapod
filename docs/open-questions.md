@@ -8,7 +8,21 @@ owner deciding.
 
 ## Locomotion and navigation
 
-- **OQ-16 — Look with the head before turning the body.** (Owner, 2026-09-15.) Nav2's
+- **OQ-19 — Mapping and obstacle sensing without depth.** (2026-09-18, opened by
+  [DEC-25](decisions.md).) The head carries the OV5647 camera and one HC-SR04; the code
+  still expects the D435i (`realsense_slam.launch.py`, `depthimage_to_laserscan`,
+  RTAB-Map in RGB-D mode). To settle: the camera driver on Ubuntu 24.04 (the Pi camera
+  node removed 2026-09-09 is in git history; the CSI camera stack on Ubuntu rather than
+  Raspberry Pi OS is untested here); an ultrasonic driver (the old one was dropped because
+  software-timed echo on a non-real-time kernel was unreliable —
+  [`hardware.md`](hardware.md#sensor-swap)); how a single range reading reaches Nav2
+  (candidates, unexamined: a `sensor_msgs/Range` into a range-sensor costmap layer, or a
+  head-pan sweep assembled into a scan); and what mapping, if any, replaces RGB-D
+  RTAB-Map. The OQ-03 analysis and the OQ-16 head-sweep argument were made for the
+  D435i and need redoing against these sensors. Blocks roadmap milestone 1.
+
+- **OQ-16 — Look with the head before turning the body.** (Owner, 2026-09-15; the
+  D435i it assumes has left, DEC-25 — redo under OQ-19.) Nav2's
   pure-pursuit controller spins the whole robot to face each new path
   (`use_rotate_to_heading`), eighteen servos for what the head's pan servo and the
   D435i's 87° field of view could do standing still. Two candidates: the explorer runs a
@@ -17,7 +31,8 @@ owner deciding.
   **Recommendation:** both, once the movement calibration is done; measure the map growth
   per sweep and the battery cost per turn before and after.
 
-- **OQ-03 — Collision monitor and costmap tuning on the floor.** The collision monitor
+- **OQ-03 — Collision monitor and costmap tuning on the floor.** (The analysis below is
+  for the D435i, which has left — DEC-25; the sensor question is now OQ-19.) The collision monitor
   runs a 0.44 × 0.40 m stop polygon on `/scan` with a 3 s source timeout; costmaps use a
   0.15 m robot radius and 0.3 m inflation. **First floor run (2026-09-15,
   [`test-log.md`](test-log.md)): the robot walked into obstacles and the monitor never
@@ -47,7 +62,8 @@ owner deciding.
 
 ## Compute
 
-- **OQ-02 — CPU load.** Load average ~10 on the four-core Pi 5 with the full boot stack
+- **OQ-02 — CPU load.** (Measured with the D435i and RGB-D RTAB-Map, both gone under
+  DEC-25; the load under OQ-19's replacement is unmeasured.) Load average ~10 on the four-core Pi 5 with the full boot stack
   (2026-09-09; RealSense point cloud already disabled), 15 in the first minutes after a
   cold boot and 23 while exploring on the battery (2026-09-15). At that load `planner_server` misses `bt_navigator`'s 20 ms
   `default_server_timeout` on the 1 Hz replan and every Nav2 goal aborts within seconds
@@ -84,7 +100,8 @@ owner deciding.
   the CNN detector, which on a Pi CPU is far slower than HOG and would add to OQ-02. It is
   not in the boot stack. Whether faces are a goal of this robot at all is undecided.
 
-- **OQ-07 — Which IMU.** The D435i's gyro and accel are streamed and ignored; the MPU6050
+- **OQ-07 — Which IMU.** Resolved 2026-09-18 by [DEC-25](decisions.md): the D435i has
+  left, so the MPU6050 is the only IMU. Kept for the record. The D435i's gyro and accel are streamed and ignored; the MPU6050
   on the shield is the only IMU used. The camera IMU sits on the moving head, which argues
   for keeping the body IMU for odometry, but the D435i's is better calibrated for visual-
   inertial use in RTAB-Map. Not examined.

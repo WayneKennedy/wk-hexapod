@@ -35,7 +35,7 @@ versions verified on the robot on 2026-09-09.
 | Package | Version | Role |
 |---|---|---|
 | `ros-jazzy-ros-base` | 0.11.0 | ROS 2 Jazzy |
-| `ros-jazzy-realsense2-camera` / `librealsense2` | 4.58.1 / 2.58.1 | D435i driver. Topics prefixed `/camera/camera/`; profile params are `depth_module.depth_profile` and `rgb_camera.color_profile` |
+| `ros-jazzy-realsense2-camera` / `librealsense2` | 4.58.1 / 2.58.1 | D435i driver; the camera left on 2026-09-18 (DEC-25) and the package stays installed until OQ-19 replaces it. Topics prefixed `/camera/camera/`; profile params are `depth_module.depth_profile` and `rgb_camera.color_profile` |
 | `ros-jazzy-rtabmap-ros` | 0.22.1 | RGB-D SLAM. `queue_size` renamed `sync_queue_size` |
 | `ros-jazzy-navigation2`, `nav2-bringup` | 1.3.12 | Nav2. Jazzy specifics recorded in `nav2_params.yaml` |
 | `ros-jazzy-depthimage-to-laserscan` | 2.5.1 | `/scan` from depth |

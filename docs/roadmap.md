@@ -15,9 +15,12 @@ servos unpowered.
 **Exit met:** 36 nodes up, a 5 cm occupancy grid produced from the camera, Nav2 planning
 paths to frontiers. Not met on purpose: nothing walked.
 
-## Milestone 1 — It explores a room *(current)*
+## Milestone 1 — It explores a room *(current; blocked on OQ-19)*
 
-The first battery run of the native stack.
+The first battery run of the native stack. **Since 2026-09-18 the D435i is gone
+(DEC-25)**: before anything below, the kit's camera and ultrasonic need drivers and a
+route into mapping and the costmaps ([OQ-19](open-questions.md)). Steps 2 and 4 were
+framed against the D435i and are redone under it.
 
 1. Run the movement calibration of `operations.md` (DEC-22): directions, yaw sign, the
    two slip factors, the real walking speed.

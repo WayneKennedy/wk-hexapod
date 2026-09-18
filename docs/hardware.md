@@ -23,12 +23,17 @@ below is a direct peripheral of the Pi ([`architecture.md`](architecture.md#buse
 
 ## Sensor swap
 
-| Kit part | Replaced by | Why |
+**Reverted 2026-09-18 (DEC-25):** the D435i has left and the kit's OV5647 camera and
+HC-SR04 go back on the head. Driver, wiring and mapping for them are
+[OQ-19](open-questions.md). The history below explains why they were removed in 2025 and
+what the reversion has to solve.
+
+| Kit part | Replaced by (2025-12-31 to 2026-09-18) | Why |
 |---|---|---|
 | OV5647 Pi camera on the pan/tilt head | Intel RealSense D435i on the same head | RGB + depth + IMU in one USB 3 device; depth computed in the camera (DEC-02) |
 | HC-SR04 ultrasonic on the head (GPIO 27/22) | `/scan` derived from RealSense depth | Software-timed echo on a non-real-time kernel was unreliable; a single range point cannot feed a costmap |
 
-The D435i on the robot (2026-09-09): serial `032622073916`, firmware **5.17.0.10**,
+The D435i as it was on the robot (2026-09-09): serial `032622073916`, firmware **5.17.0.10**,
 enumerates as USB 3.2. Its IMU calibration is not available on this unit (the driver warns
 and uses defaults). Streams in use: colour and aligned depth at **640×480, 15 fps**; the
 camera's gyro and accel are enabled but nothing consumes them ([OQ-07](open-questions.md)).

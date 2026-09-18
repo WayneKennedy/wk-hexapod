@@ -8,8 +8,8 @@ model. Package sources are under `ros2_ws/src/`.
 The family's [two-tier split](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#compute-the-two-tier-split)
 puts deterministic loops on a microcontroller and everything else on a Pi. **The hexapod
 has only the second tier.** Every device is a direct peripheral of the Pi 5; the only work
-done outside the Pi's CPU is stereo depth inside the RealSense and PWM pulse generation
-inside the PCA9685 chips.
+done outside the Pi's CPU is PWM pulse generation inside the PCA9685 chips (and, until
+DEC-25, stereo depth inside the RealSense).
 
 | Family tier | On the hexapod |
 |---|---|
@@ -36,7 +36,8 @@ once starved the odometry publisher), and a buzzer that floats on when its proce
 | ADS7830 ADC (0x48) | I2C bus 1 | `battery_monitor` | 1 Hz |
 | WS2812 strip, 7 LEDs (PCB V2) | SPI0 MOSI | `led_controller` | on command |
 | Buzzer | GPIO 17 | `buzzer_controller` (disabled) / `hexapod-buzzer-guard.service` | held low |
-| RealSense D435i | USB 3 | `realsense2_camera` (`/camera/camera`) | 15 fps colour + depth |
+| RealSense D435i — **removed 2026-09-18 (DEC-25); the code still expects it** | USB 3 | `realsense2_camera` (`/camera/camera`) | 15 fps colour + depth |
+| OV5647 camera, HC-SR04 ultrasonic — **fitted back by DEC-25; no driver yet** | CSI; GPIO | none ([OQ-19](open-questions.md)) | — |
 
 ## Nodes and topics
 
@@ -81,6 +82,9 @@ never overlap; odometry, joint-state and IMU callbacks run in a reentrant group 
 flowing during a blocking gait cycle.
 
 ### Perception and SLAM (`hexapod_bringup/launch/realsense_slam.launch.py`)
+
+**As the code stands; its input, the D435i, has left (DEC-25).** The replacement is
+[OQ-19](open-questions.md).
 
 - `realsense2_camera` at 640×480×15 colour and depth, depth aligned to colour, IMU streams
   enabled but unused, point cloud off, **TF off** — the URDF owns the camera frames (DEC-12).
