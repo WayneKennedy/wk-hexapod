@@ -75,6 +75,18 @@ owner deciding.
   connected, rate-limit frontier detection, drop the IMU rate, or move a perception stage
   off the CPU per the family's
   [perception placement](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#perception-placement).
+  **Owner's hypothesis to test (2026-09-18):** the Pi carries reflex work (the 18-servo
+  gait) as well as intent, and a separate reflex MCU — as on wk-devastator — would free it.
+  Evidence so far argues against it for CPU and for it on timing. Walking with autonomy off
+  ran at load average 1.0, the servo driver 5 % busy and the gait thread mostly asleep; the
+  load of 10–12 was measured with the servos unpowered, so no gait ran; the hot nodes above
+  are intent-tier. But reflex loops on the Pi do run late: a 4.21 s gait cycle against
+  1.0 s from wake latency, the odometry starvation behind DEC-09, and 607 extrapolation
+  errors in 150 s ([`test-log.md`](test-log.md)). **Test:** per-process CPU (`pidstat` or
+  `py-spy`) with the full stack, standing with servos powered, then walking a fixed
+  `/cmd_vel`, then walking with autonomy off; the standing-to-walking difference is the
+  reflex cost, and late gait cycles or TF extrapolation errors under load are the timing
+  cost.
 
 - **OQ-09 — A reflex tier retrofit.** An MCU (Teensy or RP2040, micro-ROS) owning the
   PCA9685 chips, MPU6050, buzzer and servo-power pin would remove the buzzer float, the
