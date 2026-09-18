@@ -69,10 +69,10 @@ owner deciding.
   `default_server_timeout` on the 1 Hz replan and every Nav2 goal aborts within seconds
   ([`test-log.md`](test-log.md), 2026-09-15); the timeout was raised to 1000 ms on
   2026-09-15 (DEC-21); the load is the cause and is still open. The hot Python nodes were
-  `web_dashboard` (JPEG-encoding three streams with no viewer), `frontier_explorer`
+  `web_dashboard` (corrected 2026-09-18 from the code, not measured: JPEG encoding runs only in each connected client's MJPEG generator, but with no viewer the node still subscribes to raw colour and depth at 640×480×15 — about 23 MB/s through rclpy — converting every colour frame, normalising and colour-mapping every depth frame, and re-rendering every `/map`; the fix is to subscribe or convert only while a stream client is connected, and each connected stream re-encodes at 20 fps even when the frame is unchanged), `frontier_explorer`
   (frontier detection over the whole map each loop), `mission_server`, and `imu_driver`
-  (100 Hz I2C polling). Options: encode dashboard streams only while a client is
-  connected, rate-limit frontier detection, drop the IMU rate, or move a perception stage
+  (100 Hz I2C polling). Options: subscribe to and convert dashboard streams only while a client
+  is connected, rate-limit frontier detection, drop the IMU rate, or move a perception stage
   off the CPU per the family's
   [perception placement](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#perception-placement).
   **Owner's hypothesis to test (2026-09-18):** the Pi carries reflex work (the 18-servo
