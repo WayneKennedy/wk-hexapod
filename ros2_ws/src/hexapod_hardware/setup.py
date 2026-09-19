@@ -29,6 +29,7 @@ setup(
             'buzzer_controller = hexapod_hardware.buzzer_controller:main',
             'power_indicator = hexapod_hardware.power_indicator:main',
             'startup_sequence = hexapod_hardware.startup_sequence:main',
+            'ultrasonic_driver = hexapod_hardware.ultrasonic_driver:main',
         ],
     },
 )

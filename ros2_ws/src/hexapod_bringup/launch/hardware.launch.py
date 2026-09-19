@@ -6,7 +6,7 @@ Starts all hardware interface nodes:
 - Servo driver
 - Battery monitor
 - LED controller
-- Range finder driver
+- Ultrasonic driver (HC-SR04)
 - Buzzer controller
 - Power indicator (LED status based on battery)
 - Startup sequence (safe servo initialization)
@@ -52,6 +52,15 @@ def generate_launch_description():
             package='hexapod_hardware',
             executable='servo_driver',
             name='servo_driver',
+            parameters=[config_file],
+            output='screen',
+        ),
+
+        # Ultrasonic (HC-SR04 on the head)
+        Node(
+            package='hexapod_hardware',
+            executable='ultrasonic_driver',
+            name='ultrasonic_driver',
             parameters=[config_file],
             output='screen',
         ),

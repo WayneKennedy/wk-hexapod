@@ -8,8 +8,9 @@ no reflex tier, the kit's own sensors (DEC-26).
 
 **Status:** the native stack was verified end to end on the bench (2026-09-09, USB power,
 servos unpowered) and reached a frontier on the battery (2026-09-15), both with a RealSense
-D435i. On 2026-09-18 the D435i left and the kit's camera and ultrasonic returned (DEC-25);
-the next step is driving and mapping with them ([OQ-19](docs/open-questions.md)). See
+D435i. On 2026-09-19 the D435i left, the kit's camera and ultrasonic returned, and the stack
+was rebuilt around a sonar-fed costmap map (DEC-25, DEC-27, DEC-28); the head calibration and
+a floor run on the battery are next ([`docs/roadmap.md`](docs/roadmap.md)). See
 [`docs/roadmap.md`](docs/roadmap.md) for direction, [`docs/decisions.md`](docs/decisions.md)
 for what is settled, and [`docs/open-questions.md`](docs/open-questions.md) for what is not.
 

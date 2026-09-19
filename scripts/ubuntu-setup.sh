@@ -41,7 +41,7 @@ log "Step 1: timezone (family rule: robots run UTC)"
 run timedatectl set-timezone Etc/UTC
 
 # ---------------------------------------------------------------------------
-log "Step 2: /boot/firmware/config.txt (I2C 400kHz, SPI, safe GPIO defaults)"
+log "Step 2: /boot/firmware/config.txt (I2C 400kHz, SPI, camera, safe GPIO defaults)"
 ensure_config_line() {
     local line="$1"
     if grep -qF "$line" "$CONFIG_FILE"; then
@@ -64,6 +64,10 @@ ensure_config_line "dtparam=spi=on"
 ensure_config_line "gpio=17=op,dl"
 # Servo power enable (GPIO 4, low = enabled): keep servos off until the driver runs.
 ensure_config_line "gpio=4=op,dh"
+# OV5647 Pi camera on CAM0. Ubuntu's kernel does not auto-detect it, so the
+# overlay is explicit; libcamera then finds it through camera_ros.
+ensure_config_line "camera_auto_detect=0"
+ensure_config_line "dtoverlay=ov5647,cam0"
 
 # ---------------------------------------------------------------------------
 log "Step 3: ROS 2 apt repository"
@@ -78,7 +82,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-log "Step 4: apt packages (ROS 2 Jazzy, Nav2, RTAB-Map, RealSense, Python libs)"
+log "Step 4: apt packages (ROS 2 Jazzy, Nav2, camera, Python libs)"
 if dpkg-query -W -f='${Version}\n' '*' 2>/dev/null | grep -q -E 'rpt|deb12'; then
     warn "  Raspberry Pi OS (bookworm) packages are installed on this host."
     warn "  They conflict with ROS packages. See docs/operations.md, 'Foreign packages'."
@@ -87,9 +91,7 @@ APT_PACKAGES=(
     ros-jazzy-ros-base ros-dev-tools python3-colcon-common-extensions python3-rosdep python3-vcstool
     ros-jazzy-robot-state-publisher ros-jazzy-rmw-fastrtps-cpp ros-jazzy-imu-filter-madgwick
     ros-jazzy-navigation2 ros-jazzy-nav2-bringup
-    ros-jazzy-rtabmap-ros ros-jazzy-realsense2-camera ros-jazzy-depthimage-to-laserscan
-    # camera-ros drives the kit's OV5647 through libcamera (DEC-25, the head returns to the
-    # kit's sensors). realsense2-camera stays until the D435i launch path is retired (OQ-19).
+    # camera-ros drives the kit's OV5647 through libcamera (DEC-25).
     ros-jazzy-camera-ros
     ros-jazzy-cv-bridge ros-jazzy-image-transport ros-jazzy-diagnostic-updater
     ros-jazzy-foxglove-bridge ros-jazzy-pcl-ros ros-jazzy-laser-geometry
@@ -101,14 +103,12 @@ run apt-get update -qq
 run apt-get install -y -qq --no-install-recommends "${APT_PACKAGES[@]}"
 
 # ---------------------------------------------------------------------------
-log "Step 5: udev rules (RealSense as non-root)"
-if [[ ! -f /etc/udev/rules.d/99-realsense-libusb.rules ]]; then
-    run curl -sL -o /etc/udev/rules.d/99-realsense-libusb.rules \
-        https://raw.githubusercontent.com/IntelRealSense/librealsense/master/config/99-realsense-libusb.rules
-    run udevadm control --reload-rules
-    run udevadm trigger
+log "Step 5: camera check"
+if [[ -e /dev/media0 ]] && command -v dmesg >/dev/null && dmesg 2>/dev/null | grep -q "ov5647.*probe.*failed"; then
+    warn "  The OV5647 did not answer on I2C (CAM0). Check the ribbon: seating,"
+    warn "  contact orientation, and that a Pi 5 (22-pin) cable is in CAM/DISP 0."
 else
-    log "  present"
+    log "  no OV5647 probe failure in the kernel log"
 fi
 
 # ---------------------------------------------------------------------------

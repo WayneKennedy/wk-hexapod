@@ -43,6 +43,18 @@
       accel_range: 2        # +/- 2g
       gyro_range: 250       # +/- 250 deg/s
 
+    # HC-SR04 ultrasonic on the head (vendor pins). Echo timed from kernel
+    # edge timestamps; no echo within max_range is published as max_range.
+    ultrasonic:
+      gpiochip: 4             # Pi 5 header GPIO on this kernel
+      trigger_gpio: 27
+      echo_gpio: 22
+      rate: 15.0              # Hz; datasheet asks >= 60 ms between pings
+      min_range: 0.03         # m
+      max_range: 2.0          # m; longer echoes are reported as max_range
+      field_of_view: 0.26     # rad; datasheet measuring angle 15 deg
+      frame_id: ultrasonic_link
+
     # Battery Configuration
     # Physical switches: LOAD (servos) and CTRL (Pi)
     battery:

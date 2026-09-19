@@ -35,15 +35,14 @@ versions verified on the robot on 2026-09-09.
 | Package | Version | Role |
 |---|---|---|
 | `ros-jazzy-ros-base` | 0.11.0 | ROS 2 Jazzy |
-| `ros-jazzy-realsense2-camera` / `librealsense2` | 4.58.1 / 2.58.1 | D435i driver; the camera left on 2026-09-18 (DEC-25) and the package stays installed until OQ-19 replaces it. Topics prefixed `/camera/camera/`; profile params are `depth_module.depth_profile` and `rgb_camera.color_profile` |
-| `ros-jazzy-rtabmap-ros` | 0.22.1 | RGB-D SLAM. `queue_size` renamed `sync_queue_size` |
-| `ros-jazzy-navigation2`, `nav2-bringup` | 1.3.12 | Nav2. Jazzy specifics recorded in `nav2_params.yaml` |
-| `ros-jazzy-depthimage-to-laserscan` | 2.5.1 | `/scan` from depth |
+| `ros-jazzy-navigation2`, `nav2-bringup` | 1.3.12 | Nav2. Jazzy specifics recorded in `nav2_params.yaml`. `RangeSensorLayer` is the map's only source (DEC-28); the collision monitor's `range` source reads the same topic |
+| `ros-jazzy-camera-ros` / `ros-jazzy-libcamera` | 0.7.0 / 0.7.2 | OV5647 driver (added 2026-09-19, DEC-25). The ROS build of libcamera carries the Raspberry Pi **PiSP** pipeline, `libpisp` and an `ov5647.json` tuning file, which Ubuntu's own `libcamera0.2` (0.2.0) does not: **no source build is needed on a Pi 5** |
 | `ros-jazzy-imu-filter-madgwick` | 2.1.5 | `/imu/data` orientation |
 | `ros-jazzy-robot-state-publisher` | 3.3.4 | URDF → TF |
 | `ros-jazzy-foxglove-bridge` | 3.4.1 | Installed, not launched |
 
-Python from apt: `python3-gpiozero` 2.0.1, `python3-lgpio`, `python3-spidev`,
+Python from apt: `python3-gpiozero` 2.0.1, `python3-lgpio` (its edge timestamps are
+`CLOCK_MONOTONIC`; the ultrasonic driver times echoes with them), `python3-spidev`,
 `python3-smbus`, `python3-numpy` 1.26, `python3-opencv` 4.6, `python3-flask` 3.0. From
 pip into the system interpreter: `rpi-ws281x` 5.0.0, `mpu6050-raspberrypi` 1.2,
 `face_recognition` (dlib 20.0.1, built from source).
@@ -51,9 +50,10 @@ pip into the system interpreter: `rpi-ws281x` 5.0.0, `mpu6050-raspberrypi` 1.2,
 ## Documentation drawn on
 
 - [Raspberry Pi `config.txt` GPIO control](https://www.raspberrypi.com/documentation/computers/config_txt.html#gpio-control)
-  — the `gpio=` directive used for the safe boot defaults.
-- [librealsense udev rules](https://github.com/IntelRealSense/librealsense/blob/master/config/99-realsense-libusb.rules)
-  — installed by the setup script.
+  — the `gpio=` directive used for the safe boot defaults, and `dtoverlay=ov5647,cam0`.
+- [Nav2 `RangeSensorLayer`](https://github.com/ros-navigation/navigation2/blob/jazzy/nav2_costmap_2d/plugins/range_sensor_layer.cpp)
+  — read for DEC-28: it keeps unseen cells unknown, and only clears on a no-echo reading
+  when that reading equals `max_range`, which is why the driver reports it that way.
 - [micro-ROS board support](https://github.com/micro-ROS/micro_ros_arduino) — relevant
   only to [OQ-09](open-questions.md).
 

@@ -9,56 +9,67 @@ owner deciding.
 ## Locomotion and navigation
 
 - **OQ-19 — Mapping and obstacle sensing without depth.** (2026-09-18, opened by
-  [DEC-25](decisions.md).) The head carries the OV5647 camera and one HC-SR04; the code
-  still expects the D435i (`realsense_slam.launch.py`, `depthimage_to_laserscan`,
-  RTAB-Map in RGB-D mode). To settle: the camera driver on Ubuntu 24.04 (the Pi camera
-  node removed 2026-09-09 is in git history; the CSI camera stack on Ubuntu rather than
-  Raspberry Pi OS is untested here); an ultrasonic driver (the old one was dropped because
-  software-timed echo on a non-real-time kernel was unreliable —
-  [`hardware.md`](hardware.md#sensor-swap)); how a single range reading reaches Nav2
-  (candidates, unexamined: a `sensor_msgs/Range` into a range-sensor costmap layer, or a
-  head-pan sweep assembled into a scan); and what mapping, if any, replaces RGB-D
-  RTAB-Map. The OQ-03 analysis and the OQ-16 head-sweep argument were made for the
-  D435i and need redoing against these sensors. Blocks roadmap milestone 1.
+  [DEC-25](decisions.md).) **Resolved 2026-09-19 on the robot**, merged 2026-09-21: the
+  camera and ultrasonic drivers are back (DEC-25, implemented), the sonar feeds a
+  range-sensor costmap layer that is the map ([DEC-28](decisions.md)), and the head owns
+  looking ([DEC-27](decisions.md)). What it left open is OQ-20 to OQ-23.
 
-- **OQ-16 — Look with the head before turning the body.** (Owner, 2026-09-15; the
-  D435i it assumes has left, DEC-25 — redo under OQ-19.) Nav2's
-  pure-pursuit controller spins the whole robot to face each new path
-  (`use_rotate_to_heading`), eighteen servos for what the head's pan servo and the
-  D435i's 87° field of view could do standing still. Two candidates: the explorer runs a
-  `LookAround` head sweep at each new goal so the map grows without walking, and
-  `use_rotate_to_heading: false` so the controller arcs into a path instead of spinning.
-  **Recommendation:** both, once the movement calibration is done; measure the map growth
-  per sweep and the battery cost per turn before and after.
+- **OQ-16 — Look with the head before turning the body.** (Owner, 2026-09-15.)
+  **Largely resolved 2026-09-19 by [DEC-27](decisions.md)**, and the sensor change made it
+  urgent rather than cosmetic: the head now carries the only range sensor. The head scans
+  ahead of the body's next move, the explorer surveys with the head at each frontier, and
+  every body rotation that existed purely to look is gone. **Still open:** whether
+  `use_rotate_to_heading` should also go. It is kept true because a 15° cone must be
+  pointed along a path before the robot walks it, but the robot is omnidirectional and
+  could strafe instead (+y unverified, DEC-22). Measure the battery cost per turn and the
+  map growth per sweep on the floor before changing it.
 
-- **OQ-03 — Collision monitor and costmap tuning on the floor.** (The analysis below is
-  for the D435i, which has left — DEC-25; the sensor question is now OQ-19.) The collision monitor
-  runs a 0.44 × 0.40 m stop polygon on `/scan` with a 3 s source timeout; costmaps use a
-  0.15 m robot radius and 0.3 m inflation. **First floor run (2026-09-15,
-  [`test-log.md`](test-log.md)): the robot walked into obstacles and the monitor never
-  stopped it.** Working analysis: the stop polygon ends 0.22 m ahead of `base_link`,
-  inside the D435i's minimum depth range (about 0.28 m at the default profile; the
-  launch sets no profile) and close to `range_min` 0.2 m, so nothing the monitor acts
-  on can ever be seen; and the scan is a 10-pixel band at the camera's height, blind to
-  anything lower. **Recommendation:** an `approach` or slowdown polygon reaching
-  0.4–0.5 m ahead, a lower depth profile (424×240 halves the minimum range), a check
-  of the camera height against the obstacles in the room, and then the costmap
-  inflation against the measured stopping distance at 0.05 m/s.
+- **OQ-03 — Collision monitor and costmap tuning on the floor.** The collision monitor
+  takes the sonar (`/ultrasonic/range`) as its source since 2026-09-19. **First floor run
+  (2026-09-15, [`test-log.md`](test-log.md)): the robot walked into obstacles and the
+  monitor never stopped it**, when the source was the depth-derived `/scan`, whose minimum
+  range exceeded the stop polygon. [DEC-25](decisions.md) changed the geometry with the
+  sensors: the sonar reads from 0.03 m, the stop polygon reaches 0.32 m ahead (past the
+  0.225 m foot tips), a slowdown polygon reaches 0.50 m, and both costmaps use a 0.24 m
+  robot radius instead of the body's 0.15 m. **None of it is tested against a real
+  obstacle**, and the sonar brings its own blind spots: one cone wherever the head points,
+  nothing below its height, and specular loss on angled or soft surfaces. Measure the
+  stopping distance at 0.05 m/s on the floor, then tune inflation against it.
 
 - **OQ-05 — Return-to-home and semantic waypoints.** `return_home` exists as a mission
   type; the home pose is the map origin. No named places, no docking (Nav2's docking server
   runs with no docks defined).
 
-- **OQ-12 — Two writers to the head servos.** `look_around` publishes `/head_command`
-  while the controller's `/joint_commands` carries pan and tilt fixed at 90°. During a
-  combined sweep (head plus body rotation) the controller's gait sub-steps will keep
-  re-centring the head. Unverified on hardware; the controller should probably track the
-  commanded head angles or drop them from `/joint_commands`.
+- **OQ-12 — Two writers to the head servos.** Resolved 2026-09-19 by
+  [DEC-27](decisions.md): `head_controller` is the only writer; the leg controller sends
+  NaN in the head slots of `/joint_commands` and `servo_driver` skips them.
 
 - **OQ-13 — IMU filter conventions.** `imu_filter_madgwick` was added on 2026-09-09 to
   provide `/imu/data` (DEC-19). Whether its ENU yaw sign and frame match what the
   controller's complementary filter and balance loop assume has not been checked against
   the robot turning. Check before trusting yaw fusion.
+
+- **OQ-20 — The map drifts and does not survive the run.** (2026-09-19,
+  [DEC-28](decisions.md).) `map → odom` is a static identity, so the map is only as good as
+  gait odometry: it drifts with slip and yaw error, nothing closes a loop, and every boot
+  starts an empty 12 × 12 m grid. Enough to explore a room; not enough to come back to one,
+  which milestones 2 and 3 need ([`roadmap.md`](roadmap.md)). Options, none examined:
+  accept it and keep maps within a run; put landmarks the mono camera can recognise (ArUco
+  or AprilTag) on walls to correct `map → odom`; attempt scan matching on accumulated sonar
+  sweeps (doubtful with a 15° cone); or fit a cheap 2D lidar, which would make
+  `slam_toolbox` viable. Weigh against [OQ-22](#perception-and-sensing), and check
+  [wk-inventory](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md)
+  before buying anything.
+
+- **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
+  `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
+  default 300 °/s, unmeasured), and that model is what places `ultrasonic_link` on the TF
+  tree. If it is wrong, or a servo stalls, readings taken while the head moves land at the
+  wrong bearing in the map. Also unverified: `pan_direction` (which way a rising servo
+  angle turns the head) and the travel limits, kept at ±40° inside the vendor app's 50–180
+  clamp. Needs the battery and the owner: command known angles, watch the head, and check
+  the dashboard's sonar fan against a target at a known bearing. Cheapest mitigation if the
+  model proves poor: only trust readings taken while the head is settled.
 
 ## Compute
 
@@ -113,15 +124,28 @@ owner deciding.
 
 ## Perception and sensing
 
+- **OQ-22 — What the mono camera is for.** (2026-09-19, [DEC-28](decisions.md).) The
+  OV5647 feeds only the dashboard stream and optional face recognition; nothing in
+  navigation uses it. It is the robot's only rich sensor, and every obvious use costs CPU
+  the Pi may not have ([OQ-02](#compute)): fiducial markers for drift correction
+  ([OQ-20](#locomotion-and-navigation)), monocular visual odometry, or a small detector for
+  what the sonar misses — chair legs, edges, anything soft. Nothing decided, nothing built.
+
+- **OQ-23 — The Pi camera does not probe.** (2026-09-19.) `ov5647: probe of 10-0036 failed
+  with error -121` at every boot and libcamera reports no cameras, so `camera_ros` exits at
+  once and `camera:=false` is the working default for bench runs. The software side is in
+  place (overlay, libcamera 0.7.2 with the PiSP pipeline and an OV5647 tuning file,
+  `camera_ros` from apt); the sensor simply does not acknowledge on I2C. Suspects, in
+  order: ribbon seating, contact orientation, the wrong connector (the Pi 5 has CAM/DISP 0
+  and 1), or a cable that is not the Pi 5's 22-pin type. A physical check by the owner, not
+  a software change.
+
 - **OQ-06 — Face recognition scope and cost.** `face_recognition_node` is configured for
   the CNN detector, which on a Pi CPU is far slower than HOG and would add to OQ-02. It is
   not in the boot stack. Whether faces are a goal of this robot at all is undecided.
 
-- **OQ-07 — Which IMU.** Resolved 2026-09-18 by [DEC-25](decisions.md): the D435i has
-  left, so the MPU6050 is the only IMU. Kept for the record. The D435i's gyro and accel are streamed and ignored; the MPU6050
-  on the shield is the only IMU used. The camera IMU sits on the moving head, which argues
-  for keeping the body IMU for odometry, but the D435i's is better calibrated for visual-
-  inertial use in RTAB-Map. Not examined.
+- **OQ-07 — Which IMU.** Closed 2026-09-19 by [DEC-25](decisions.md): the D435i left, so
+  the shield's MPU6050 is the only IMU and there is nothing to choose.
 
 ## Power and safety
 

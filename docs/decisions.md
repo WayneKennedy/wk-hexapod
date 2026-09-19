@@ -202,6 +202,20 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   colour source all took their input from the D435i. How the robot maps and sees obstacles
   with one camera and one range sensor is [OQ-19](open-questions.md). Resolves OQ-07. The
   ultrasonic driver and Pi camera node removed on 2026-09-09 are in git history (DEC-02).
+  **Implemented on the robot, 2026-09-19** (its commit `343638f`, merged 2026-09-21): the
+  one D435i in the family was
+  reassigned to another robot, and the OV5647 Pi camera and HC-SR04 were refitted to the
+  pan/tilt head. This reverses DEC-02 and takes RGB-D SLAM with it: removed from the
+  stack are `realsense2_camera`, `depthimage_to_laserscan`, RTAB-Map (DEC-05), `/scan`,
+  the saved-map and localization path (DEC-11, `scripts/save-map.sh`), `slam_monitor`
+  and `LocalizationStatus`. Added: `ultrasonic_driver` (`/ultrasonic/range`) and
+  `camera_ros` (`/camera/image_raw`), both on apt packages, no source builds.
+  DEC-02's second reason for dropping the ultrasonic — unreliable software-timed echo —
+  does not survive: the driver times the echo from kernel line-event timestamps, and
+  fifteen consecutive pings agreed to 2 mm ([`test-log.md`](test-log.md), 2026-09-19).
+  Its first reason stands: one range point cannot fill a costmap, which is what DEC-27
+  and DEC-28 are for. **The camera has not yet worked**: the sensor does not acknowledge
+  on I2C ([`hardware.md`](hardware.md#head-sensors), [OQ-23](open-questions.md)).
 
 - **DEC-26 — The robot is the family's baseline intent-tier reference, and its hardware
   ceiling is the kit's.** (Owner, 2026-09-18.) It stays a working intent-tier reference —
@@ -212,6 +226,41 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   that riser, so a switch to ST3215 bus servos is not feasible. The owner judges a new
   custom hexapod more feasible than remaking this one
   ([wk-robotics `ideas.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/ideas.md#a-printed-hexapod)).
+
+- **DEC-27 — The head looks; the body walks. `head_controller` owns the head servos.**
+  (Owner, 2026-09-19: "it jars to see 18 servos walking on the spot to rotate in the pan
+  axis, when a cheap servo mounted to the camera could be used".) Both sensors are on the
+  head, so pointing them is now a first-class behaviour rather than a side effect of
+  driving. One node owns pan and tilt, which also resolves OQ-12: the leg controller
+  publishes NaN in the head slots of `/joint_commands` and `servo_driver` skips them, so
+  gait sub-steps no longer re-centre the head. The head scans a ±30° sector centred on
+  Nav2's pure-pursuit carrot (`/lookahead_point`), so it is already looking where the body
+  is about to go, and `LookAround` is now a head-only survey (its body-rotation phases are
+  deleted). Turning in place purely to look is removed everywhere it was found: no `Spin`
+  recovery in the behaviour trees or `behavior_server`, and frontier goals no longer carry
+  a heading to align with (goal-checker yaw tolerance π). Rotating to *travel* along a path
+  is kept: `use_rotate_to_heading` stays true, because a single forward cone must be
+  pointed where the robot is going, and the head leads the turn. Unverified: the pan sign,
+  the travel limits, and the servo slew rate ([OQ-21](open-questions.md)) — the servos need
+  the battery and the owner present.
+
+- **DEC-28 — The map is Nav2's global costmap, built from the sonar and anchored to
+  odometry. There is no SLAM.** (2026-09-19, implementing the owner's request to see what
+  the primitive sensors can still do.) A single 15° cone at 15 Hz cannot support scan
+  matching or loop closure, and the mono camera cannot be trusted for either on this CPU
+  (OQ-22), so rather than pretend: `nav2_costmap_2d::RangeSensorLayer` on
+  `/ultrasonic/range` fills a fixed 12 × 12 m global costmap, `map → odom` is a static
+  identity, and the frontier explorer reads `/global_costmap/costmap` instead of `/map`.
+  The layer's probabilistic cone model is the standard one for sonar and keeps unseen
+  cells unknown, which is what makes frontier exploration work at all. Consequences,
+  accepted: gait odometry drift is map drift, nothing corrects it, maps do not survive a
+  run, and `checking_map`/`localization_mode` become unreachable states. Two changes fall
+  out of it: the behaviour trees must not clear the global costmap (that would erase the
+  map), and the explorer must ignore frontiers within `min_goal_distance` of the robot,
+  because the cells beside its own body that the forward cone never sees would otherwise
+  be "reached" instantly and forever. Verified end to end on USB power the same day;
+  **the map's geometry is not verified**, because the head servos cannot move without the
+  battery ([`test-log.md`](test-log.md)).
 
 - **DEC-29 — No assistant runs on the robot. Sessions run on the always-on workstation and
   operate the robot over SSH.** (Owner, 2026-09-21. Supersedes the 2026-09-18 rule that the

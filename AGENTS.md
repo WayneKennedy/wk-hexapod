@@ -21,26 +21,30 @@ and none of the other three count if the content is wrong.
 ## What this project is
 
 **A ROS 2 Jazzy autonomous hexapod on Freenove Big Hexapod (FNK0052) hardware**, running
-natively on the robot's Raspberry Pi 5 under Ubuntu Server 24.04, with the kit's own OV5647
-Pi camera and HC-SR04 ultrasonic on the head. A RealSense D435i replaced them from
-2025-12-31 until 2026-09-18, when it went to the family's Orin Nano (DEC-25). The goal is
-autonomous exploration and mapping of the local area, with missions from an external
-planner taking priority over exploration. It is the family's **baseline intent-tier
-reference**, and its hardware ceiling is the kit's: no accelerator, no bus servos
-(DEC-26). Full intent: [`docs/concept.md`](docs/concept.md).
+natively on the robot's Raspberry Pi 5 under Ubuntu Server 24.04. The goal is autonomous
+exploration and mapping of the local area, with missions from an external planner taking
+priority over exploration. It is the family's **baseline intent-tier reference**, and its
+hardware ceiling is the kit's: no accelerator, no bus servos (DEC-26). Full intent:
+[`docs/concept.md`](docs/concept.md).
 
-**It is a working robot, not a design.** Locomotion, odometry, SLAM, Nav2 and frontier
-exploration all ran end to end on the bench with the D435i ([`docs/test-log.md`](docs/test-log.md)).
-On 2026-09-15, after a day of floor fixes (DEC-21, DEC-22), **the robot reached a
-frontier goal autonomously on the battery for the first time**
-([`docs/test-log.md`](docs/test-log.md)).
+**Its sensing changed on 2026-09-19** (DEC-25): the Intel RealSense D435i went to the family's
+Orin Nano and the kit's OV5647 camera and HC-SR04 ultrasonic went back on the pan/tilt head.
+So there is **no depth and no SLAM**: one 15° sonar cone on a servo is the only range
+sensor, the head does the looking instead of the body (DEC-27), and the map is Nav2's
+sonar-fed global costmap anchored to odometry, lasting one run (DEC-28). Read those three
+decisions before changing anything in perception or navigation.
+
+**It is a working robot, not a design.** Locomotion, odometry, Nav2 and frontier
+exploration run end to end ([`docs/test-log.md`](docs/test-log.md)). On 2026-09-15, after
+a day of floor fixes (DEC-21, DEC-22), **the robot reached a frontier goal autonomously on
+the battery for the first time** — with the D435i it no longer has.
 
 ## Where things live
 
 - [`docs/concept.md`](docs/concept.md) — what it is, what it is for, and its history.
 - [`docs/architecture.md`](docs/architecture.md) — every bus, node, topic and frame;
   where the hexapod sits in the family's tier model.
-- [`docs/hardware.md`](docs/hardware.md) — the kit, the sensor swap, GPIO and I2C map,
+- [`docs/hardware.md`](docs/hardware.md) — the kit, the head sensors, GPIO and I2C map,
   power modes, calibration, **the buzzer hazard**.
 - [`docs/operations.md`](docs/operations.md) — install, run, service, maps, remote
   missions, tests, troubleshooting.
@@ -121,23 +125,22 @@ the owner present (below).
 - Never add the Raspberry Pi OS (bookworm) apt repository to this host
   ([`docs/operations.md`](docs/operations.md#foreign-packages)).
 - The robot is usually on USB power during development: sensors and LEDs work, servos do
-  not. Anything that moves a leg needs the battery and the owner present.
+  not. Anything that moves a leg **or the head** needs the battery and the owner present,
+  which is why the head's calibration is still open ([OQ-21](docs/open-questions.md)).
 
 ## Status
 
-**Native stack verified on the bench, 2026-09-09, USB power.** All 36 nodes run under the
-service: drivers, startup sequence, RealSense, RTAB-Map in mapping mode producing an
-occupancy grid, Nav2 active, frontier exploration sending goals, dashboard mission API
-answering. Nav2 reported "failed to make progress" because the servos were unpowered and
-because the controller's velocity scaling did not match Nav2's commands (fixed by DEC-22,
-untested). The Pi runs at a load average around 10 with everything up
+**Sonar stack verified on the bench, 2026-09-19, USB power.** The whole chain ran
+unattended: head survey → sonar map → frontier goal, with Nav2 active and the dashboard
+answering ([`docs/test-log.md`](docs/test-log.md)). Nav2 reported "failed to make
+progress" because the servos are dead on USB power. **The head servos could not move
+either, so the map's geometry is unverified** — the pipeline is proven, the map is not.
+The camera does not probe ([OQ-23](docs/open-questions.md)); bench runs use
+`camera:=false`. Load average 19–23 on four cores with everything up
 ([OQ-02](docs/open-questions.md)).
 
-**Since 2026-09-18 the D435i is gone (DEC-25)**, and the code still expects it. The
-figures above were measured with it.
-
-**Frontier:** drivers for the kit's camera and ultrasonic and a route into mapping and the
-costmaps ([OQ-19](docs/open-questions.md)); then the movement calibration in
-`docs/operations.md`, then a full-stack battery
-run to see Nav2 reach a frontier, then collision monitor and costmap tuning on the floor
-([`docs/roadmap.md`](docs/roadmap.md)).
+**Frontier:** the head calibration in `docs/operations.md` (pan sign, limits, slew rate —
+battery and owner needed), then a survey that matches a real room, then the collision
+monitor against real obstacles ([`docs/roadmap.md`](docs/roadmap.md)). Deciding how the
+robot will know where it is without SLAM ([OQ-20](docs/open-questions.md)) blocks
+milestone 2.

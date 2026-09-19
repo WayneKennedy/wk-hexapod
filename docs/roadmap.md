@@ -15,25 +15,31 @@ servos unpowered.
 **Exit met:** 36 nodes up, a 5 cm occupancy grid produced from the camera, Nav2 planning
 paths to frontiers. Not met on purpose: nothing walked.
 
-## Milestone 1 — It explores a room *(current; blocked on OQ-19)*
+## Milestone 1 — It explores a room *(current, restarted on sonar)*
 
-The first battery run of the native stack. **Since 2026-09-18 the D435i is gone
-(DEC-25)**: before anything below, the kit's camera and ultrasonic need drivers and a
-route into mapping and the costmaps ([OQ-19](open-questions.md)). Steps 2 and 4 were
-framed against the D435i and are redone under it.
+The movement calibration was done on 2026-09-15 and the robot reached a frontier on the
+battery. The sensor change of 2026-09-19 (DEC-25) put the perception half back to the
+start: everything below is on the sonar and the head.
 
-1. Run the movement calibration of `operations.md` (DEC-22): directions, yaw sign, the
-   two slip factors, the real walking speed.
-2. Tune the collision monitor and costmaps against real obstacles (OQ-03).
-3. Verify the IMU filter conventions with the robot turning (OQ-13) and the head-servo
-   conflict during look-around (OQ-12).
-4. Bring the CPU load down to where the loops keep their rates (OQ-02).
+1. Head calibration with the battery and the owner present: pan sign, limits, slew rate
+   (OQ-21), and the sonar fan checked against a target at a known bearing.
+2. A stationary head survey that matches the room, then a walking one (DEC-28).
+3. Tune the collision monitor and costmaps against real obstacles, now that the source is
+   the sonar (OQ-03).
+4. Verify the IMU filter conventions with the robot turning (OQ-13).
+5. Bring the CPU load down to where the loops keep their rates (OQ-02).
 
-**Exit:** the robot maps a room unattended and the map survives `scripts/save-map.sh`.
+**Exit:** the robot maps a room unattended, on sonar, and Nav2 reaches frontiers in it
+without the body turning to look.
 
 ## Milestone 2 — It localizes and takes missions
 
-1. Boot into localization against a saved map, pass the look-around, wait for a mission.
+**Blocked on a decision, not on work.** Localization against a saved map went with
+RTAB-Map (DEC-25), and sonar alone cannot replace it: a map that drifts and dies with the
+run has nothing to localize against (OQ-20). Decide first how the robot is to know where
+it is — landmarks for the mono camera (OQ-22), a 2D lidar, or accepting single-run maps.
+
+1. Whatever OQ-20 decides, then: boot, know where you are, wait for a mission.
 2. `navigate` and `return_home` missions from a remote machine via `scripts/mission.sh`.
 3. Decide what an approved planner is and how it authenticates (OQ-04).
 

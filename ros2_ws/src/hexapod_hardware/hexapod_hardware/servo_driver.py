@@ -401,9 +401,12 @@ class ServoDriver(Node):
                 angle = msg.data[leg_idx * 3 + joint_idx]
                 self.set_servo_angle(channels[joint_idx], angle)
 
-        # Head servos (last 2 values)
-        if len(msg.data) >= 20:
+        # Head servos (last 2 values). NaN means the sender does not own the
+        # head: the controller sends NaN and head_controller drives the head
+        # through /head_command, so gait steps never re-centre it.
+        if not math.isnan(msg.data[18]):
             self.set_servo_angle(self.head_pan_channel, msg.data[18])
+        if not math.isnan(msg.data[19]):
             self.set_servo_angle(self.head_tilt_channel, msg.data[19])
 
     def leg_positions_callback(self, msg):

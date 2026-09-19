@@ -18,7 +18,7 @@ uint8 state
 # Human-readable state name
 string state_name
 
-# SLAM mode: "mapping" or "localization"
+# SLAM mode: "mapping" (sonar map, rebuilt each boot) or "localization"
 string slam_mode
 
 # True if currently executing a mission

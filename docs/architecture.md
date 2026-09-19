@@ -8,8 +8,8 @@ model. Package sources are under `ros2_ws/src/`.
 The family's [two-tier split](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#compute-the-two-tier-split)
 puts deterministic loops on a microcontroller and everything else on a Pi. **The hexapod
 has only the second tier.** Every device is a direct peripheral of the Pi 5; the only work
-done outside the Pi's CPU is PWM pulse generation inside the PCA9685 chips (and, until
-DEC-25, stereo depth inside the RealSense).
+done outside the Pi's CPU is PWM pulse generation inside the PCA9685 chips: since the
+RealSense left (DEC-25) nothing on the robot computes anything on the Pi's behalf.
 
 | Family tier | On the hexapod |
 |---|---|
@@ -36,8 +36,8 @@ once starved the odometry publisher), and a buzzer that floats on when its proce
 | ADS7830 ADC (0x48) | I2C bus 1 | `battery_monitor` | 1 Hz |
 | WS2812 strip, 7 LEDs (PCB V2) | SPI0 MOSI | `led_controller` | on command |
 | Buzzer | GPIO 17 | `buzzer_controller` (disabled) / `hexapod-buzzer-guard.service` | held low |
-| RealSense D435i — **removed 2026-09-18 (DEC-25); the code still expects it** | USB 3 | `realsense2_camera` (`/camera/camera`) | 15 fps colour + depth |
-| OV5647 camera, HC-SR04 ultrasonic — **fitted back by DEC-25; no driver yet** | CSI; GPIO | none ([OQ-19](open-questions.md)) | — |
+| HC-SR04 ultrasonic (head) | GPIO 27 trigger, GPIO 22 echo | `ultrasonic_driver` | 15 Hz |
+| OV5647 camera (head) | CSI CAM0, libcamera | `camera_ros` (`/camera/image_raw`) | on demand |
 
 ## Nodes and topics
 
@@ -45,7 +45,8 @@ once starved the odometry publisher), and a buzzer that floats on when its proce
 
 | Node | Subscribes | Publishes / serves |
 |---|---|---|
-| `servo_driver` | `/joint_commands` (20 angles: 6 legs × coxa/femur/tibia, pan, tilt), `/leg_positions`, `/leg_command`, `/head_command`, `/servo_relax`, `/pose_command` (relax only) | `servo_driver/initialize` service |
+| `servo_driver` | `/joint_commands` (20 angles: 6 legs × coxa/femur/tibia, pan, tilt; **pan and tilt are NaN**, meaning "not mine"), `/leg_positions`, `/leg_command`, `/head_command`, `/servo_relax`, `/pose_command` (relax only) | `servo_driver/initialize` service |
+| `ultrasonic_driver` | — | `/ultrasonic/range` (`sensor_msgs/Range`, frame `ultrasonic_link`, 0.03–2 m). Echo timed from kernel edge timestamps; no echo within range is published as `max_range` |
 | `imu_driver` | — | `/imu/data_raw` (`sensor_msgs/Imu`, no orientation) |
 | `imu_filter` (`imu_filter_madgwick`, in `hexapod_bringup` launch) | `/imu/data_raw` | `/imu/data` with orientation quaternion, no TF |
 | `battery_monitor` | — | `/battery/voltages` (LOAD and CTRL rails), diagnostics |
@@ -53,6 +54,28 @@ once starved the odometry publisher), and a buzzer that floats on when its proce
 | `buzzer_controller` | `/buzzer/state` | `buzzer/beep` service. **Disabled by default** (DEC-10): requests are logged and dropped |
 | `power_indicator` | `/battery/voltages` | `/leds/zone` (left = LOAD rail, right = CTRL rail; blue below 0.5 V means USB) |
 | `startup_sequence` | — | `/leds/zone`, `/buzzer/state`, `/pose_command`, `/robot/initialized`; `/robot/safe_startup` service |
+
+### Looking (`hexapod_controller/head_controller`)
+
+**The head is the robot's only steerable sense.** Both the camera and the ultrasonic sit
+on the pan/tilt head, so where the robot can see is a head-servo decision. `head_controller`
+is the single owner of those two servos (DEC-27): the leg controller sends NaN in the head
+slots of `/joint_commands`, and nothing else publishes `/head_command`.
+
+| Direction | Topic / interface |
+|---|---|
+| In | `/lookahead_point` (Nav2 pure-pursuit carrot), `/cmd_vel`, `/head/look_at` (`PointStamped`, any frame), `/pose_command`, `/servo_relax`, `/ultrasonic/range` |
+| Out | `/head_command` (servo degrees), `/joint_states` (`head_pan_joint`, `head_tilt_joint`) |
+| Action | `/look_around` (`LookAround`): full-width pan sweeps with the body still |
+
+Behaviours, highest priority first: the **survey** (the `LookAround` action), a **look_at**
+gaze held for a few seconds, and otherwise a continuous **scan** — the pan sweeps a ±30°
+sector in 10° steps, centred on Nav2's carrot while it is fresh, else on the direction of
+a turn, else straight ahead. So the head is already pointing where the body is about to go.
+
+Head joint states follow a slew-rate **model** of the servo, not the command, because the
+servos have no feedback. The model is what puts `ultrasonic_link` on the TF tree, so a
+wrong `slew_rate` mis-places sonar readings ([OQ-21](open-questions.md)).
 
 ### Locomotion (`hexapod_controller`)
 
@@ -65,7 +88,7 @@ writes them.
 | Direction | Topic / interface |
 |---|---|
 | In | `/cmd_vel` (`Twist`), `/pose_command` (`home`, `stand`, `relax`), `/imu/data`, body pose command |
-| Out | `/joint_commands` (per gait sub-step), `/joint_states` (50 Hz, includes `head_pan_joint`/`head_tilt_joint`), `/odom` (20 Hz), TF `odom → base_link`, `/servo_relax` |
+| Out | `/joint_commands` (per gait sub-step; head slots NaN), `/joint_states` (50 Hz, legs only), `/odom` (20 Hz), TF `odom → base_link`, `/servo_relax` |
 | Services | `hexapod/initialize` (home then stand), `hexapod/enable_balance`, `hexapod/reset_odometry` |
 | Action | `hexapod/move_distance` (`hexapod_interfaces/MoveDistance`) |
 
@@ -81,66 +104,78 @@ The node runs on a multithreaded executor. Gait callbacks are mutually exclusive
 never overlap; odometry, joint-state and IMU callbacks run in a reentrant group so TF keeps
 flowing during a blocking gait cycle.
 
-### Perception and SLAM (`hexapod_bringup/launch/realsense_slam.launch.py`)
+### Mapping — there is no SLAM
 
-**As the code stands; its input, the D435i, has left (DEC-25).** The replacement is
-[OQ-19](open-questions.md).
+The D435i is gone (DEC-25), so there is no depth, no visual odometry and no loop closure.
+What takes its place (DEC-28):
 
-- `realsense2_camera` at 640×480×15 colour and depth, depth aligned to colour, IMU streams
-  enabled but unused, point cloud off, **TF off** — the URDF owns the camera frames (DEC-12).
-  Topics carry the `/camera/camera/` prefix.
-- `depthimage_to_laserscan` → `/scan` from the aligned depth image, 0.2–3.0 m, frame
-  `camera_depth_frame`.
-- `rtabmap` (RGB-D, odometry from `/odom`) → `/map` (5 cm grid), `map → odom` TF, database
-  in `~/.ros/rtabmap.db` (mapping, wiped per run) or `~/.hexapod/maps/rtabmap.db`
-  (localization; DEC-11).
+- **The map is Nav2's global costmap**, a fixed 12 × 12 m grid at 5 cm whose only source is
+  `nav2_costmap_2d::RangeSensorLayer` fed from `/ultrasonic/range`. The layer holds a
+  probability per cell and only calls a cell free or occupied once readings cross its
+  thresholds, so unseen space stays unknown and the frontier explorer has something to aim
+  at. It is published as `/global_costmap/costmap`.
+- **`map` is odometry.** `map → odom` is a static identity published by
+  `navigation.launch.py`. Gait odometry drift is therefore map drift, uncorrected, and a
+  map is only meaningful within one run: nothing is saved and nothing is localized against
+  ([OQ-20](open-questions.md)).
+- **The camera feeds no part of navigation.** `camera_ros` publishes `/camera/image_raw`
+  for the dashboard and face recognition only ([OQ-22](open-questions.md)).
 
 ### Navigation (`hexapod_bringup/launch/navigation.launch.py`)
 
 Nav2's `navigation_launch.py` only — planner, controller (regulated pure pursuit),
 smoother, behaviours, BT navigator, waypoint follower, velocity smoother, collision
-monitor, docking server (no docks). Map and localization come from RTAB-Map (DEC-06). Both
-costmaps take obstacles from `/scan`; the local costmap is a 2 m rolling window with a
-0.15 m robot radius.
+monitor, docking server (no docks). Nav2's map server and AMCL are not started (DEC-06):
+there is nothing to load or localize against.
+
+Both costmaps take obstacles from the sonar through a `RangeSensorLayer`; the local costmap
+is a 3 m rolling window and the global one is the map above. The robot radius is **0.24 m**,
+the reach of the foot tips, not the 0.15 m body radius used until 2026-09-19. The collision
+monitor watches `/ultrasonic/range` directly, with a stop polygon 0.32 m ahead and a
+slowdown polygon at 0.50 m ([OQ-03](open-questions.md)).
+
+**The behaviour trees are this repository's** (`hexapod_bringup/config/behavior_trees/`),
+not Nav2's packaged defaults, for two reasons: the defaults clear the global costmap in
+recovery, which here would erase the map, and their `Spin` recovery turns eighteen servos
+to look around, which is the head's job. `Spin` is not loaded in `behavior_server` either.
 
 ### Autonomy (`hexapod_autonomy`)
 
 | Node | Role | Interfaces |
 |---|---|---|
-| `autonomy_manager` | State machine: `waiting_for_startup → checking_map → (look_around → localization_mode → waiting_for_mission) or mapping_mode → exploring → exploration_complete / error` | `/autonomy/state` (`AutonomyState`), `/robot/initialized`; calls `/rtabmap/set_mode_mapping` when localization fails |
-| `slam_monitor` | RTAB-Map localization status from loop closures | `LocalizationStatus` |
-| `look_around` | Head sweep, body rotation, or both, to gather features for localization | `LookAround` action; `/head_command`, `/cmd_vel` |
-| `frontier_explorer` | Frontier detection on `/map`, closest-first, Nav2 `navigate_to_pose` goals, blacklists unreachable goals | `ExploreFrontiers` action |
+| `autonomy_manager` | State machine: `waiting_for_startup → look_around → mapping_mode → exploring → exploration_complete / error`. The head survey is the first act of every run; `checking_map` and `localization_mode` are unreachable while there is no saved map | `/autonomy/state` (`AutonomyState`), `/robot/initialized` |
+| `frontier_explorer` | Frontier detection on `/global_costmap/costmap`, closest-first, Nav2 `navigate_to_pose` goals, blacklists unreachable goals, head survey on arrival, ignores frontiers nearer than `min_goal_distance` | `ExploreFrontiers` action |
 | `mission_server` | External missions: `explore`, `navigate`, `patrol`, `return_home` | `/mission/start` (`StartMission`), `/mission/stop` (`StopMission`); `/mission/command` |
-| `web_dashboard` (`hexapod_perception`) | Flask on port 8080: camera, depth and map streams, battery, faces, mission control | `POST /api/mission/start`, `POST /api/mission/stop`, `GET /api/autonomy/state`, `GET /status` |
+| `web_dashboard` (`hexapod_perception`) | Flask on port 8080: camera, **sonar fan** and map streams, battery, faces, mission control | `POST /api/mission/start`, `POST /api/mission/stop`, `GET /api/autonomy/state`, `GET /status` |
 
-`face_recognition_node` (`hexapod_perception`) consumes the RealSense colour stream and is
-launched separately by `perception.launch.py`; it is not part of the boot stack.
+`face_recognition_node` (`hexapod_perception`) consumes `/camera/image_raw` and is launched
+separately by `perception.launch.py`; it is not part of the boot stack.
 
 ## Frames
 
-`map → odom` (RTAB-Map) → `base_link` (controller odometry) → fixed `base_footprint`,
-`imu_link`, `laser_frame`; revolute `head_pan_joint` → `head_pan_link` → `head_tilt_joint`
-→ `head_tilt_link` → fixed `camera_link` → `camera_depth_frame`,
-`camera_depth_optical_frame`, `camera_color_frame`, `camera_color_optical_frame`,
-`camera_imu_optical_frame`. All from `hexapod_bringup/urdf/hexapod.urdf` via
-`robot_state_publisher`, fed by the controller's `/joint_states`.
+`map → odom` (static identity) → `base_link` (controller odometry) → fixed
+`base_footprint`, `imu_link`; revolute `head_pan_joint` → `head_pan_link` →
+`head_tilt_joint` → `head_tilt_link` → fixed `camera_link` → `camera_optical_frame`, and
+fixed `ultrasonic_link`. All from `hexapod_bringup/urdf/hexapod.urdf` via
+`robot_state_publisher`, fed by the leg controller's `/joint_states` (legs) and
+`head_controller`'s (head). The head offsets in the URDF are estimates, not measured.
 
 ## Launch structure
 
 ```
 robot.launch.py                 (systemd: autonomy:=true)
-├── robot_state_publisher, imu_driver, imu_filter, battery_monitor, servo_driver,
-│   led_controller, buzzer_controller, power_indicator, startup_sequence, controller
+├── robot_state_publisher, imu_driver, imu_filter, ultrasonic_driver, camera_ros
+│   (camera:=true), battery_monitor, servo_driver, led_controller, buzzer_controller,
+│   power_indicator, startup_sequence, controller, head_controller
 └── autonomy.launch.py          (autonomy:=true)
-    ├── realsense_slam.launch.py   (slam:=true; localization if a saved map exists)
-    ├── navigation.launch.py       (nav:=true)
-    ├── slam_monitor, look_around, frontier_explorer, mission_server, autonomy_manager
+    ├── navigation.launch.py       (nav:=true; Nav2 plus the static map → odom)
+    ├── frontier_explorer, mission_server, autonomy_manager
     └── web_dashboard              (dashboard:=true)
 ```
 
-`hardware.launch.py` is the drivers alone; `controller.launch.py` is the controller alone
-with direct servo access (`test_ros.sh`); `perception.launch.py` adds face recognition.
+`hardware.launch.py` is the drivers alone; `controller.launch.py` is the leg controller
+alone with direct servo access (`test_ros.sh`); `perception.launch.py` adds face
+recognition.
 
 ## Topic contract
 
@@ -148,4 +183,5 @@ The hexapod speaks the family
 [contract](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#the-topic-contract):
 `/cmd_vel`, `/joint_commands`, `/joint_states`, `/imu/data`, `/odom` and `/tf`. It has no
 `/wheel_odom` (gait odometry is published as `/odom`) and no `/telemetry` (battery is
-`/battery/voltages`).
+`/battery/voltages`). Two nodes publish `/joint_states`, legs and head, and
+`robot_state_publisher` merges them by joint name.

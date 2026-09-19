@@ -4,40 +4,10 @@ autonomy_manager:
   ros__parameters:
     # Time to wait for external mission before auto-exploring
     mission_timeout_sec: 60.0
-    # Saved map (scripts/save-map.sh). Presence selects localization mode.
-    map_db_path: "~/.hexapod/maps/rtabmap.db"
+    # Head survey (LookAround, head_controller) before exploring: sweeps
+    survey_sweeps: 2
     # State publish rate
     state_publish_rate_hz: 2.0
-
-slam_monitor:
-  ros__parameters:
-    # Saved map (scripts/save-map.sh). Presence selects localization mode.
-    map_db_path: "~/.hexapod/maps/rtabmap.db"
-    # Minimum consecutive loop closures to confirm localization
-    min_loop_closures: 3
-    # Timeout before declaring localization failed
-    localization_timeout_sec: 15.0
-    # Status publish rate
-    publish_rate_hz: 2.0
-
-look_around:
-  ros__parameters:
-    # Head pan limits (degrees)
-    head_pan_min: 45.0
-    head_pan_max: 135.0
-    head_pan_center: 90.0
-    # Head tilt limits (degrees)
-    head_tilt_min: 70.0
-    head_tilt_max: 110.0
-    head_tilt_center: 90.0
-    # Body rotation speed (rad/s for cmd_vel)
-    body_yaw_speed: 0.3
-    # Duration for each body rotation direction
-    body_rotation_duration: 0.5
-    # Time to hold each position
-    position_hold_time: 0.4
-    # Default action timeout
-    default_timeout: 15.0
 
 frontier_explorer:
   ros__parameters:
@@ -54,6 +24,12 @@ frontier_explorer:
     free_threshold: 50
     # Maximum navigation failures before aborting
     max_nav_failures: 3
+    # The map: Nav2's global costmap, built from the sonar (nav2_params.yaml)
+    map_topic: "/global_costmap/costmap"
+    # Head survey at each reached frontier; 0 disables
+    survey_sweeps: 1
+    # Ignore frontiers nearer than this (m): the unseen cells beside the body
+    min_goal_distance: 0.4
 
 mission_server:
   ros__parameters:

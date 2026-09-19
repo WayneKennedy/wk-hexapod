@@ -19,7 +19,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FaceEvent.msg"
   # Autonomy messages
   "msg/AutonomyState.msg"
-  "msg/LocalizationStatus.msg"
   # Face recognition services
   "srv/CaptureTrainingImage.srv"
   "srv/TrainModel.srv"

@@ -120,7 +120,6 @@ class HexapodController(Node):
         [19, 20, 21],  # Leg 4 (LM)
         [16, 17, 18],  # Leg 5 (LF)
     ]
-    HEAD_CHANNELS = [0, 1]  # pan, tilt
 
     # Link lengths (mm)
     L1 = 33.0   # coxa
@@ -200,8 +199,6 @@ class HexapodController(Node):
 
         # Current servo angles (degrees)
         self.current_angles = [[90.0, 90.0, 90.0] for _ in range(6)]
-        # Head pan/tilt servo angles (degrees, 90 = centred)
-        self.head_angles = [90.0, 90.0]
 
         # ===== Hardware =====
         self.pwm_40 = None
@@ -264,7 +261,8 @@ class HexapodController(Node):
             JointState, 'joint_states', 10)
         self.odom_pub = self.create_publisher(
             Odometry, 'odom', 10)
-        # Servo commands to servo_driver (18 leg angles + 2 head angles)
+        # Servo commands to servo_driver (18 leg angles + 2 head slots, sent as
+        # NaN: head_controller owns the head)
         self.joint_cmd_pub = self.create_publisher(
             Float64MultiArray, 'joint_commands', 10)
         self.relax_pub = self.create_publisher(Bool, 'servo_relax', 10)
@@ -307,8 +305,8 @@ class HexapodController(Node):
         # collision monitor and costmaps reject the stale transform.
         self.odom_timer = self.create_timer(
             0.05, self._publish_odometry, callback_group=self.state_cb_group)
-        # Joint states at 50 Hz (not only while moving) so robot_state_publisher
-        # can always resolve base_link -> head -> camera frames.
+        # Joint states at 50 Hz (not only while moving). Head joints come from
+        # head_controller; robot_state_publisher merges the two by name.
         self.joint_state_timer = self.create_timer(
             0.02, self._publish_joint_states, callback_group=self.state_cb_group)
         # Gait worker: runs one blocking gait cycle per tick while a fresh,
@@ -531,12 +529,12 @@ class HexapodController(Node):
         """Publish joint angles to servo_driver"""
         msg = Float64MultiArray()
         # Format: [leg0_coxa, leg0_femur, leg0_tibia, leg1_coxa, ..., pan, tilt]
+        # Pan and tilt are NaN: servo_driver leaves the head to head_controller.
         data = []
         for i in range(6):
             for j in range(3):
                 data.append(float(self.current_angles[i][j]))
-        data.append(float(self.head_angles[0]))  # pan
-        data.append(float(self.head_angles[1]))  # tilt
+        data.extend([math.nan, math.nan])
         msg.data = data
         self.joint_cmd_pub.publish(msg)
 
@@ -549,12 +547,6 @@ class HexapodController(Node):
             for j, joint in enumerate(['coxa', 'femur', 'tibia']):
                 msg.name.append(f'leg{i+1}_{joint}')
                 msg.position.append(math.radians(self.current_angles[i][j]))
-
-        # Head joints as defined in hexapod.urdf (0 rad = servo centred at 90 deg)
-        msg.name.append('head_pan_joint')
-        msg.position.append(math.radians(self.head_angles[0] - 90.0))
-        msg.name.append('head_tilt_joint')
-        msg.position.append(math.radians(self.head_angles[1] - 90.0))
 
         self.joint_state_pub.publish(msg)
 

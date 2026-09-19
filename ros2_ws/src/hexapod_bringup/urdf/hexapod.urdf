@@ -81,80 +81,50 @@
   </joint>
 
   <!--
-    Intel RealSense D435i mounted on head
-    Dimensions: 90mm x 25mm x 25mm
-    Replaces the kit's Pi Camera and ultrasonic sensor
+    Kit head sensors: OV5647 Pi camera and HC-SR04 ultrasonic, both on the
+    tilt bracket. Offsets are estimates, not measured on the robot.
   -->
 
-  <!-- D435i camera body link -->
+  <!-- OV5647 camera module (Freenove kit) -->
   <link name="camera_link">
     <visual>
       <geometry>
-        <box size="0.025 0.090 0.025"/>
+        <box size="0.01 0.025 0.024"/>
       </geometry>
-      <material name="realsense_grey">
-        <color rgba="0.5 0.5 0.5 1"/>
+      <material name="camera_green">
+        <color rgba="0.1 0.4 0.1 1"/>
       </material>
     </visual>
-    <collision>
-      <geometry>
-        <box size="0.025 0.090 0.025"/>
-      </geometry>
-    </collision>
   </link>
   <joint name="camera_joint" type="fixed">
     <parent link="head_tilt_link"/>
     <child link="camera_link"/>
-    <origin xyz="0.03 0 0.01" rpy="0 0 0"/>
+    <origin xyz="0.03 0 0.025" rpy="0 0 0"/>
   </joint>
 
-  <!-- D435i depth sensor (left IR camera is reference) -->
-  <link name="camera_depth_frame"/>
-  <joint name="camera_depth_joint" type="fixed">
+  <!-- Camera optical frame (Z forward per REP 103); camera_ros frame_id -->
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
     <parent link="camera_link"/>
-    <child link="camera_depth_frame"/>
-    <origin xyz="0 0.0175 0" rpy="0 0 0"/>
-  </joint>
-
-  <!-- Depth optical frame (Z forward per ROS convention) -->
-  <link name="camera_depth_optical_frame"/>
-  <joint name="camera_depth_optical_joint" type="fixed">
-    <parent link="camera_depth_frame"/>
-    <child link="camera_depth_optical_frame"/>
+    <child link="camera_optical_frame"/>
     <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
   </joint>
 
-  <!-- D435i RGB camera -->
-  <link name="camera_color_frame"/>
-  <joint name="camera_color_joint" type="fixed">
-    <parent link="camera_link"/>
-    <child link="camera_color_frame"/>
-    <origin xyz="0 -0.0175 0" rpy="0 0 0"/>
-  </joint>
-
-  <!-- RGB optical frame -->
-  <link name="camera_color_optical_frame"/>
-  <joint name="camera_color_optical_joint" type="fixed">
-    <parent link="camera_color_frame"/>
-    <child link="camera_color_optical_frame"/>
-    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
-  </joint>
-
-  <!-- D435i IMU -->
-  <link name="camera_imu_optical_frame"/>
-  <joint name="camera_imu_joint" type="fixed">
-    <parent link="camera_link"/>
-    <child link="camera_imu_optical_frame"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
-
-
-  <!-- Laser frame (for future lidar or virtual scan) -->
-  <link name="laser_frame"/>
-  <joint name="laser_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="laser_frame"/>
-    <origin xyz="0.05 0 0.04" rpy="0 0 0"/>
+  <!-- HC-SR04 ultrasonic: X along the beam; sensor_msgs/Range frame -->
+  <link name="ultrasonic_link">
+    <visual>
+      <geometry>
+        <box size="0.015 0.045 0.02"/>
+      </geometry>
+      <material name="sonar_blue">
+        <color rgba="0.1 0.2 0.6 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="ultrasonic_joint" type="fixed">
+    <parent link="head_tilt_link"/>
+    <child link="ultrasonic_link"/>
+    <origin xyz="0.03 0 0" rpy="0 0 0"/>
   </joint>
 
 </robot>

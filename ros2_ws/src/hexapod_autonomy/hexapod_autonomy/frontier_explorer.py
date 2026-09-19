@@ -3,12 +3,15 @@
 Frontier Explorer Node for Hexapod Robot
 
 Implements frontier-based exploration:
-1. Subscribe to /map occupancy grid
+1. Subscribe to the map (map_topic: Nav2's global costmap, built from the
+   head's sonar sweeps)
 2. Detect frontier cells (unknown adjacent to free)
 3. Cluster frontiers and filter by size
 4. Select closest frontier as navigation goal
 5. Send goal to Nav2 /navigate_to_pose
-6. Repeat until no frontiers remain
+6. On arrival, survey with the head (LookAround) so the map grows without
+   the body turning
+7. Repeat until no frontiers remain
 """
 
 import rclpy
@@ -21,7 +24,7 @@ from action_msgs.msg import GoalStatus
 from rclpy.duration import Duration
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, Point
-from hexapod_interfaces.action import ExploreFrontiers
+from hexapod_interfaces.action import ExploreFrontiers, LookAround
 
 # TF2 for robot pose lookup
 from tf2_ros import Buffer, TransformListener, TransformException
@@ -55,6 +58,9 @@ class FrontierExplorer(Node):
         self.declare_parameter('unknown_threshold', -1)   # OccupancyGrid unknown
         self.declare_parameter('free_threshold', 50)      # Below this = free
         self.declare_parameter('max_nav_failures', 3)
+        self.declare_parameter('map_topic', '/global_costmap/costmap')
+        self.declare_parameter('survey_sweeps', 1)
+        self.declare_parameter('min_goal_distance', 0.4)
 
         self.min_frontier_size = self.get_parameter('min_frontier_size').value
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
@@ -63,6 +69,8 @@ class FrontierExplorer(Node):
         self.unknown_threshold = self.get_parameter('unknown_threshold').value
         self.free_threshold = self.get_parameter('free_threshold').value
         self.max_nav_failures = self.get_parameter('max_nav_failures').value
+        self.survey_sweeps = self.get_parameter('survey_sweeps').value
+        self.min_goal_distance = self.get_parameter('min_goal_distance').value
 
         # State
         self.current_map = None
@@ -91,10 +99,13 @@ class FrontierExplorer(Node):
         else:
             self.get_logger().warn('Nav2 not available - exploration will detect frontiers but cannot navigate')
 
+        self.look_around_client = ActionClient(
+            self, LookAround, '/look_around', callback_group=self.callback_group)
+
         # Subscribers
         self.map_sub = self.create_subscription(
             OccupancyGrid,
-            '/map',
+            self.get_parameter('map_topic').value,
             self.map_callback,
             10,
             callback_group=self.callback_group
@@ -144,95 +155,50 @@ class FrontierExplorer(Node):
         """
         Detect frontier cells in the occupancy grid.
 
-        Frontier = unknown cell (-1) adjacent to free cell (0-49)
+        Frontier = unknown cell (-1) 4-adjacent to a free cell (0-49).
+        Returns (cells as (row, col) array, grid info).
         """
-        width = occupancy_grid.info.width
-        height = occupancy_grid.info.height
-        resolution = occupancy_grid.info.resolution
-        origin_x = occupancy_grid.info.origin.position.x
-        origin_y = occupancy_grid.info.origin.position.y
+        info = occupancy_grid.info
+        data = np.array(occupancy_grid.data, dtype=np.int16).reshape(info.height, info.width)
 
-        # Convert to numpy array
-        data = np.array(occupancy_grid.data).reshape(height, width)
-
-        # Find unknown cells
         unknown = (data == self.unknown_threshold)
-
-        # Find free cells
         free = (data >= 0) & (data < self.free_threshold)
 
-        # Simple dilation: check 4-connected neighbors for free cells
-        # Shift in all 4 directions and OR together
-        free_dilated = np.zeros_like(free)
-        free_dilated[1:, :] |= free[:-1, :]   # Shift down
-        free_dilated[:-1, :] |= free[1:, :]   # Shift up
-        free_dilated[:, 1:] |= free[:, :-1]   # Shift right
-        free_dilated[:, :-1] |= free[:, 1:]   # Shift left
-        free_dilated |= free                   # Include original
+        free_dilated = free.copy()
+        free_dilated[1:, :] |= free[:-1, :]
+        free_dilated[:-1, :] |= free[1:, :]
+        free_dilated[:, 1:] |= free[:, :-1]
+        free_dilated[:, :-1] |= free[:, 1:]
 
-        # Frontiers are unknown cells that are adjacent to free cells
-        frontier_mask = unknown & free_dilated
+        return np.argwhere(unknown & free_dilated), info
 
-        # Get frontier cell coordinates
-        frontier_cells = np.argwhere(frontier_mask)
-
-        # Convert to world coordinates
-        frontiers = []
-        for cell in frontier_cells:
-            y, x = cell
-            world_x = origin_x + (x + 0.5) * resolution
-            world_y = origin_y + (y + 0.5) * resolution
-            frontiers.append((world_x, world_y))
-
-        return frontiers, resolution
-
-    def cluster_frontiers(self, frontier_cells, resolution):
+    def cluster_frontiers(self, frontier_cells, info):
         """
-        Cluster adjacent frontier cells into groups.
-        Returns list of (centroid_x, centroid_y, size_meters).
+        Group 8-connected frontier cells (a flood fill, linear in the cell
+        count). Returns list of (centroid_x, centroid_y, size_meters) in the
+        map frame.
         """
-        if not frontier_cells:
-            return []
-
-        # Convert to numpy for clustering
-        points = np.array(frontier_cells)
-
-        # Simple clustering: group points within resolution distance
+        remaining = set(map(tuple, frontier_cells.tolist()))
+        res = info.resolution
+        ox, oy = info.origin.position.x, info.origin.position.y
         clusters = []
-        visited = set()
-
-        for i, point in enumerate(points):
-            if i in visited:
-                continue
-
-            # BFS to find connected points
-            cluster = [point]
-            queue = deque([i])
-            visited.add(i)
-
+        while remaining:
+            seed = remaining.pop()
+            queue = deque([seed])
+            members = [seed]
             while queue:
-                current_idx = queue.popleft()
-                current_point = points[current_idx]
-
-                for j, other_point in enumerate(points):
-                    if j in visited:
-                        continue
-
-                    # Check if within clustering distance (2x resolution)
-                    dist = np.linalg.norm(current_point - other_point)
-                    if dist < resolution * 2:
-                        visited.add(j)
-                        queue.append(j)
-                        cluster.append(other_point)
-
-            # Calculate cluster centroid and size
-            cluster_array = np.array(cluster)
-            centroid_x = np.mean(cluster_array[:, 0])
-            centroid_y = np.mean(cluster_array[:, 1])
-            size = len(cluster) * resolution  # Approximate size in meters
-
-            clusters.append((centroid_x, centroid_y, size))
-
+                r, c = queue.popleft()
+                for dr in (-1, 0, 1):
+                    for dc in (-1, 0, 1):
+                        n = (r + dr, c + dc)
+                        if n in remaining:
+                            remaining.remove(n)
+                            queue.append(n)
+                            members.append(n)
+            cells = np.array(members)
+            centroid_x = ox + (cells[:, 1].mean() + 0.5) * res
+            centroid_y = oy + (cells[:, 0].mean() + 0.5) * res
+            clusters.append((centroid_x, centroid_y, len(members) * res))
         return clusters
 
     def filter_frontiers(self, clusters, min_size):
@@ -289,17 +255,42 @@ class FrontierExplorer(Node):
                 )
             return (0.0, 0.0)
 
-    def create_goal_pose(self, x, y):
-        """Create PoseStamped for navigation goal."""
+    def create_goal_pose(self, x, y, from_x=None, from_y=None):
+        """Create PoseStamped for navigation goal, facing the direction of travel.
+
+        The goal checker ignores yaw (nav2_params.yaml), so this orientation
+        only tells the planner which way the path arrives; the body does not
+        turn in place on arrival.
+        """
         goal = PoseStamped()
         goal.header.frame_id = 'map'
         goal.header.stamp = self.get_clock().now().to_msg()
         goal.pose.position.x = x
         goal.pose.position.y = y
         goal.pose.position.z = 0.0
-        # Face toward the frontier (simple approach)
-        goal.pose.orientation.w = 1.0
+        yaw = 0.0 if from_x is None else math.atan2(y - from_y, x - from_x)
+        goal.pose.orientation.z = math.sin(yaw / 2.0)
+        goal.pose.orientation.w = math.cos(yaw / 2.0)
         return goal
+
+    async def survey(self):
+        """Head-only look-around at the current position; failures are logged, not fatal."""
+        if self.survey_sweeps <= 0:
+            return
+        if not self.look_around_client.wait_for_server(timeout_sec=2.0):
+            self.get_logger().warn('look_around (head_controller) not available; skipping survey')
+            return
+        goal = LookAround.Goal()
+        goal.sweeps = self.survey_sweeps
+        try:
+            handle = await self.look_around_client.send_goal_async(goal)
+            if not handle.accepted:
+                self.get_logger().warn('Head survey rejected')
+                return
+            result = await handle.get_result_async()
+            self.get_logger().info(f'Head survey: {result.result.message}')
+        except Exception as e:
+            self.get_logger().warn(f'Head survey failed: {e}')
 
     def publish_frontier_markers(self, frontiers, current_goal=None):
         """Publish visualization markers for frontiers."""
@@ -431,9 +422,9 @@ class FrontierExplorer(Node):
                     continue
 
                 # Detect frontiers
-                frontier_cells, resolution = self.detect_frontiers(self.current_map)
+                frontier_cells, info = self.detect_frontiers(self.current_map)
 
-                if not frontier_cells:
+                if len(frontier_cells) == 0:
                     self.get_logger().info('No frontiers detected, exploration complete')
                     result.success = True
                     result.message = 'No more frontiers'
@@ -442,7 +433,7 @@ class FrontierExplorer(Node):
                     return result
 
                 # Cluster and filter
-                clusters = self.cluster_frontiers(frontier_cells, resolution)
+                clusters = self.cluster_frontiers(frontier_cells, info)
                 frontiers = self.filter_frontiers(clusters, min_frontier_size)
 
                 if not frontiers:
@@ -463,8 +454,19 @@ class FrontierExplorer(Node):
                     goal_handle.succeed()
                     return result
 
-                # Get robot pose and select goal
+                # Get robot pose and select goal. Frontiers at the robot's own
+                # feet (cells beside the body the forward sonar never sees)
+                # would be "reached" at once, forever; skip them.
                 robot_x, robot_y = self.get_robot_pose()
+                frontiers = [f for f in frontiers
+                             if math.hypot(f[0] - robot_x, f[1] - robot_y) >= self.min_goal_distance]
+                if not frontiers:
+                    self.get_logger().info('Only frontiers within min_goal_distance remain, exploration complete')
+                    result.success = True
+                    result.message = 'No frontiers beyond min_goal_distance'
+                    result.frontiers_explored = self.frontiers_explored
+                    goal_handle.succeed()
+                    return result
                 selected = self.select_goal(frontiers, robot_x, robot_y, self.goal_strategy)
 
                 if selected is None:
@@ -477,7 +479,7 @@ class FrontierExplorer(Node):
 
                 # Publish feedback
                 feedback.frontiers_remaining = len(frontiers)
-                feedback.current_goal = self.create_goal_pose(goal_x, goal_y)
+                feedback.current_goal = self.create_goal_pose(goal_x, goal_y, robot_x, robot_y)
                 feedback.progress_percent = min(99.0, self.frontiers_explored * 10.0)
                 feedback.status = f'Navigating to frontier at ({goal_x:.2f}, {goal_y:.2f})'
                 goal_handle.publish_feedback(feedback)
@@ -485,13 +487,14 @@ class FrontierExplorer(Node):
                 self.get_logger().info(f'Navigating to frontier at ({goal_x:.2f}, {goal_y:.2f})')
 
                 # Navigate to frontier
-                goal_pose = self.create_goal_pose(goal_x, goal_y)
+                goal_pose = self.create_goal_pose(goal_x, goal_y, robot_x, robot_y)
                 success, message = await self.navigate_to(goal_pose)
 
                 if success:
                     self.frontiers_explored += 1
                     self.nav_failures = 0
                     self.get_logger().info(f'Reached frontier, total explored: {self.frontiers_explored}')
+                    await self.survey()
                 else:
                     self.nav_failures += 1
                     self.failed_goals.append((goal_x, goal_y))

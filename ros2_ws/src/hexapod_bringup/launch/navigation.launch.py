@@ -2,11 +2,15 @@
 Navigation launch file for Hexapod Robot
 
 Starts the Nav2 navigation servers (planner, controller, behaviors, BT
-navigator, waypoint follower, velocity smoother) with hexapod-specific
-parameters. Localization and the /map come from RTAB-Map
-(realsense_slam.launch.py), so Nav2's own map server and AMCL are not started.
+navigator, waypoint follower, velocity smoother, collision monitor) with
+hexapod-specific parameters. Nav2's map server and AMCL are not started: there
+is no saved map and nothing to localize against.
 
-Requires robot.launch.py and realsense_slam.launch.py to be running.
+The map is the global costmap, built from the head's ultrasonic sweeps, in a
+map frame that is odometry: map -> odom is a static identity published here.
+Odometry drift is therefore map drift; there is no loop closure (DEC-25).
+
+Requires robot.launch.py to be running.
 
 Usage:
   ros2 launch hexapod_bringup navigation.launch.py
@@ -16,6 +20,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -55,9 +60,18 @@ def generate_launch_description():
         }.items()
     )
 
+    map_to_odom = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_to_odom',
+        arguments=['--frame-id', 'map', '--child-frame-id', 'odom'],
+        output='screen',
+    )
+
     return LaunchDescription([
         use_sim_time_arg,
         params_file_arg,
         autostart_arg,
+        map_to_odom,
         nav2_navigation,
     ])

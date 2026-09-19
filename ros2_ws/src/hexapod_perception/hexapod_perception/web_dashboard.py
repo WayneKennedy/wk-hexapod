@@ -4,8 +4,8 @@ Web Dashboard for Hexapod Robot
 
 Provides a lightweight web interface with:
 - MJPEG camera stream with face detection overlay
-- Depth visualization
-- SLAM map display (when available)
+- Sonar fan: recent ultrasonic ranges at the head pan they were taken at
+- Map display (Nav2's global costmap, built from the sonar)
 - Robot status display
 
 Access at http://<robot-ip>:8080
@@ -15,13 +15,16 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, JointState, Range
 from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PoseStamped
 import numpy as np
 import cv2
+import math
 import threading
+import time
+from collections import deque
 from flask import Flask, Response, render_template_string, request
 import json
 
@@ -50,41 +53,45 @@ class WebDashboard(Node):
         # Parameters
         self.declare_parameter('port', 8080)
         self.declare_parameter('quality', 80)
+        self.declare_parameter('image_topic', '/camera/image_raw')
+        self.declare_parameter('map_topic', '/global_costmap/costmap')
+        self.declare_parameter('sonar_history_sec', 6.0)
         self.port = self.get_parameter('port').value
         self.quality = self.get_parameter('quality').value
+        self.sonar_history = self.get_parameter('sonar_history_sec').value
 
         # State
         self.current_frame = None
-        self.current_depth = None
+        # Sonar pings: (monotonic time, head pan rad, range m, max range m)
+        self.sonar_pings = deque(maxlen=400)
+        self.head_pan = 0.0
         self.current_map = None
         self.current_faces = []
         self.battery_voltages = [0.0, 0.0]
         self.autonomy_state = None
         self.frame_lock = threading.Lock()
-        self.depth_lock = threading.Lock()
+        self.sonar_lock = threading.Lock()
         self.map_lock = threading.Lock()
         self.autonomy_lock = threading.Lock()
 
-        # Subscribe to color camera
+        # Pi camera (camera_ros)
         self.image_sub = self.create_subscription(
             Image,
-            '/camera/camera/color/image_raw',
+            self.get_parameter('image_topic').value,
             self.image_callback,
             10
         )
 
-        # Subscribe to depth camera
-        self.depth_sub = self.create_subscription(
-            Image,
-            '/camera/camera/depth/image_rect_raw',
-            self.depth_callback,
-            10
-        )
+        # Ultrasonic ranges and the head pan they were taken at
+        self.range_sub = self.create_subscription(
+            Range, '/ultrasonic/range', self.range_callback, 10)
+        self.joint_sub = self.create_subscription(
+            JointState, '/joint_states', self.joint_callback, 10)
 
-        # Subscribe to SLAM map (when available)
+        # Map (Nav2 global costmap from the sonar)
         self.map_sub = self.create_subscription(
             OccupancyGrid,
-            '/map',
+            self.get_parameter('map_topic').value,
             self.map_callback,
             10
         )
@@ -147,6 +154,11 @@ class WebDashboard(Node):
             elif msg.encoding == 'bgr8':
                 frame = np.frombuffer(msg.data, dtype=np.uint8)
                 frame = frame.reshape((msg.height, msg.width, 3))
+            elif msg.encoding in ('bgra8', 'rgba8'):
+                frame = np.frombuffer(msg.data, dtype=np.uint8)
+                frame = frame.reshape((msg.height, msg.step // 4, 4))[:, :msg.width]
+                code = cv2.COLOR_BGRA2BGR if msg.encoding == 'bgra8' else cv2.COLOR_RGBA2BGR
+                frame = cv2.cvtColor(frame, code)
             else:
                 return
 
@@ -155,29 +167,15 @@ class WebDashboard(Node):
         except Exception as e:
             self.get_logger().warn(f'Failed to process image: {e}')
 
-    def depth_callback(self, msg):
-        """Convert depth image to colorized visualization"""
-        try:
-            # RealSense depth is 16-bit unsigned (millimeters)
-            if msg.encoding == '16UC1':
-                depth = np.frombuffer(msg.data, dtype=np.uint16)
-                depth = depth.reshape((msg.height, msg.width))
+    def joint_callback(self, msg):
+        """Track the head pan from head_controller's joint states"""
+        if 'head_pan_joint' in msg.name:
+            self.head_pan = msg.position[msg.name.index('head_pan_joint')]
 
-                # Normalize to 0-255 (clip at 4m max)
-                depth_normalized = np.clip(depth / 4000.0 * 255, 0, 255).astype(np.uint8)
-
-                # Apply colormap (TURBO gives nice depth visualization)
-                depth_colored = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_TURBO)
-
-                # Mark invalid (0) pixels as black
-                depth_colored[depth == 0] = [0, 0, 0]
-
-                with self.depth_lock:
-                    self.current_depth = depth_colored
-            else:
-                self.get_logger().warn(f'Unsupported depth encoding: {msg.encoding}')
-        except Exception as e:
-            self.get_logger().warn(f'Failed to process depth: {e}')
+    def range_callback(self, msg):
+        """Record a ping at the current head pan"""
+        with self.sonar_lock:
+            self.sonar_pings.append((time.monotonic(), self.head_pan, msg.range, msg.max_range))
 
     def map_callback(self, msg):
         """Convert occupancy grid to image"""
@@ -313,25 +311,50 @@ class WebDashboard(Node):
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         return frame
 
-    def get_depth_frame(self):
-        """Get colorized depth frame"""
-        with self.depth_lock:
-            if self.current_depth is None:
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(frame, 'No Depth Data', (200, 240),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                return frame
-            return self.current_depth.copy()
+    def get_sonar_frame(self):
+        """Fan view: the robot at bottom centre, forward up, left to the left.
+
+        Red dots are echoes; grey ticks at the rim are pings with no echo
+        within max range. Older pings fade.
+        """
+        w, h = 640, 400
+        frame = np.zeros((h, w, 3), dtype=np.uint8)
+        cx, cy = w // 2, h - 20
+        now = time.monotonic()
+        with self.sonar_lock:
+            pings = [p for p in self.sonar_pings if now - p[0] < self.sonar_history]
+            head_pan = self.head_pan
+        max_range = pings[-1][3] if pings else 2.0
+        scale = (h - 40) / max_range
+        for r in np.arange(0.5, max_range + 1e-6, 0.5):
+            cv2.circle(frame, (cx, cy), int(r * scale), (60, 60, 60), 1)
+            cv2.putText(frame, f'{r:.1f} m', (cx + 4, cy - int(r * scale) + 14),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (90, 90, 90), 1)
+        for stamp, pan, rng, rmax in pings:
+            fade = 1.0 - (now - stamp) / self.sonar_history
+            x = int(cx - math.sin(pan) * rng * scale)
+            y = int(cy - math.cos(pan) * rng * scale)
+            if rng >= rmax:
+                cv2.circle(frame, (x, y), 2, (int(120 * fade),) * 3, -1)
+            else:
+                cv2.circle(frame, (x, y), 4, (0, 0, int(80 + 175 * fade)), -1)
+        end = (int(cx - math.sin(head_pan) * max_range * scale),
+               int(cy - math.cos(head_pan) * max_range * scale))
+        cv2.line(frame, (cx, cy), end, (0, 120, 0), 1)
+        if not pings:
+            cv2.putText(frame, 'No Sonar Data', (220, 200),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        return frame
 
     def get_map_frame(self):
-        """Get SLAM map image"""
+        """Get the occupancy map image"""
         with self.map_lock:
             if self.current_map is None:
                 frame = np.zeros((400, 400, 3), dtype=np.uint8)
-                cv2.putText(frame, 'No SLAM Map', (100, 200),
+                cv2.putText(frame, 'No Map', (140, 200),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 100, 100), 2)
-                cv2.putText(frame, '(RTAB-Map not running)', (60, 240),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 80, 80), 1)
+                cv2.putText(frame, '(Nav2 global costmap not published)', (40, 240),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (80, 80, 80), 1)
                 return frame
             return self.current_map.copy()
 
@@ -358,8 +381,9 @@ class WebDashboard(Node):
         with self.map_lock:
             has_map = self.current_map is not None
 
-        with self.depth_lock:
-            has_depth = self.current_depth is not None
+        with self.sonar_lock:
+            last = self.sonar_pings[-1] if self.sonar_pings else None
+        has_sonar = last is not None and time.monotonic() - last[0] < 2.0
 
         # Autonomy state
         autonomy_info = {
@@ -398,7 +422,8 @@ class WebDashboard(Node):
             },
             'slam': {
                 'map_available': has_map,
-                'depth_available': has_depth
+                'sonar_available': has_sonar,
+                'sonar_range': round(last[2], 3) if has_sonar else None
             },
             'autonomy': autonomy_info
         }
@@ -543,8 +568,8 @@ HTML_TEMPLATE = '''
                 <img src="/stream/color" alt="Camera Feed">
             </div>
             <div class="panel video-panel">
-                <div class="panel-header">Depth Perception</div>
-                <img src="/stream/depth" alt="Depth View">
+                <div class="panel-header">Sonar (head sweep)</div>
+                <img src="/stream/sonar" alt="Sonar View">
             </div>
             <div class="panel status-panel">
                 <div class="stat">
@@ -560,11 +585,11 @@ HTML_TEMPLATE = '''
                     <span class="stat-value" id="ctrl-voltage">--</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">Depth Stream</span>
-                    <span class="stat-value" id="depth-status">--</span>
+                    <span class="stat-label">Sonar</span>
+                    <span class="stat-value" id="sonar-status">--</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">SLAM Map</span>
+                    <span class="stat-label">Map</span>
                     <span class="stat-value" id="map-status">--</span>
                 </div>
                 <div class="stat">
@@ -573,14 +598,14 @@ HTML_TEMPLATE = '''
                 </div>
                 <div class="faces" id="recognized-faces"></div>
                 <div class="legend">
-                    <strong>Depth Legend:</strong>
+                    <strong>Sonar Legend:</strong>
                     <div class="legend-item">
-                        <span class="legend-color" style="background: linear-gradient(90deg, #30123b, #7a0403, #f66b19, #f7e425);"></span>
-                        <span>Near (blue) to Far (yellow)</span>
+                        <span class="legend-color" style="background: #f00;"></span>
+                        <span>Echo (fades with age)</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-color" style="background: #000;"></span>
-                        <span>No data / out of range</span>
+                        <span class="legend-color" style="background: #888;"></span>
+                        <span>No echo within range</span>
                     </div>
                 </div>
             </div>
@@ -616,7 +641,7 @@ HTML_TEMPLATE = '''
                 </div>
             </div>
             <div class="panel video-panel" style="grid-column: span 1;">
-                <div class="panel-header">SLAM Map</div>
+                <div class="panel-header">Map (sonar)</div>
                 <img src="/stream/map" alt="SLAM Map" style="width: 100%; height: auto;">
             </div>
         </div>
@@ -648,9 +673,9 @@ HTML_TEMPLATE = '''
                     }
 
                     // SLAM status
-                    const depthEl = document.getElementById('depth-status');
-                    depthEl.textContent = data.slam.depth_available ? 'Active' : 'No Data';
-                    depthEl.className = 'stat-value ' + (data.slam.depth_available ? 'good' : '');
+                    const sonarEl = document.getElementById('sonar-status');
+                    sonarEl.textContent = data.slam.sonar_available ? data.slam.sonar_range.toFixed(2) + ' m' : 'No Data';
+                    sonarEl.className = 'stat-value ' + (data.slam.sonar_available ? 'good' : '');
 
                     const mapEl = document.getElementById('map-status');
                     mapEl.textContent = data.slam.map_available ? 'Active' : 'Not Running';
@@ -758,9 +783,9 @@ def stream_color():
     return Response(dashboard_node.generate_mjpeg(dashboard_node.get_frame_with_overlay),
                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/stream/depth')
-def stream_depth():
-    return Response(dashboard_node.generate_mjpeg(dashboard_node.get_depth_frame),
+@app.route('/stream/sonar')
+def stream_sonar():
+    return Response(dashboard_node.generate_mjpeg(dashboard_node.get_sonar_frame),
                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/stream/map')

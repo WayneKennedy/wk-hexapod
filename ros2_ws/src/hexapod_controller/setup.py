@@ -23,6 +23,7 @@ setup(
     entry_points={
         'console_scripts': [
             'controller = hexapod_controller.controller:main',
+            'head_controller = hexapod_controller.head_controller:main',
         ],
     },
 )

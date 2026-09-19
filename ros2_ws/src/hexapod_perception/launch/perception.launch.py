@@ -1,7 +1,7 @@
 """
 Launch file for Hexapod perception nodes
 
-The RealSense D435i (started by realsense_slam.launch.py) supplies the RGB
+The Pi camera (camera_ros, started by robot.launch.py) supplies the RGB
 stream; this launch starts face recognition subscribed to it.
 
 Usage:
@@ -23,7 +23,7 @@ def generate_launch_description():
 
     image_topic_arg = DeclareLaunchArgument(
         'image_topic',
-        default_value='/camera/camera/color/image_raw',
+        default_value='/camera/image_raw',
         description='RGB image topic consumed by face recognition',
     )
 

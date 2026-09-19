@@ -274,13 +274,71 @@ stacked on), so it goes to the tank bot and the SSD returns to the M.2 HAT. `BOO
 flashed back to `0xf146` before the move. **Untested:** the boot after the SSD returns
 to PCIe, and `fstrim -v /` on it.
 
+### 2026-09-19 · Sonar and head stack, USB power
+
+**Conditions:** bench, USB power (servos, including the head's, unpowered), service
+stopped, load average 4 before the run. D435i removed and the kit's camera and HC-SR04
+refitted the same day (DEC-25).
+
+**Ultrasonic, before any ROS code:** a one-off probe on the vendor pins (trigger GPIO 27,
+echo GPIO 22) timing the echo from kernel line-event timestamps (lgpio alerts): **15
+consecutive pings against a fixed target, 0.222–0.224 m**. The edge ticks are
+`CLOCK_MONOTONIC`, which is what the driver back-dates each message's stamp with. This is
+the measurement that undermines DEC-02's "software-timed echo is unreliable".
+
+**Camera: not working.** `ov5647: probe of 10-0036 failed with error -121` (no I2C
+acknowledge) at boot and on a re-bind; libcamera 0.7.2 then reports "no cameras
+available" and `camera_ros` aborts. The overlay (`camera_auto_detect=0`,
+`dtoverlay=ov5647,cam0`), the PiSP pipeline and an OV5647 tuning file are all present, so
+the fault is physical ([OQ-23](open-questions.md)). Bench runs use `camera:=false`.
+
+**Stack, drivers only** (`scripts/launch.sh autonomy:=false camera:=false`):
+`/ultrasonic/range` at **15.00 Hz**; `base_link → ultrasonic_link` present and rotating
+with the head (0.130, 0.005, 0.050 m at 10° pan); head joint states published by
+`head_controller` alone; `/head_command` stepping in servo degrees. One `LookAround`
+survey: **57 ranges in a single sweep.**
+
+**Full stack** (`autonomy:=true camera:=false`): all lifecycle nodes active and the chain
+ran unattended — `waiting_for_startup → look_around` (2 sweeps, **112 ranges**) →
+`mapping_mode → exploring`, explorer reading `/global_costmap/costmap` and sending a
+frontier goal at (0.41, 0.30). The map at that point: 240×240 at 5 cm, **281 free cells,
+135 lethal, 894 inflated**, rest unknown. Nav2 then reported `Failed to make progress`,
+as expected with no servo power. The dashboard answered with `sonar_range: 1.692`,
+`map_available: true`, state `exploring`.
+
+A second run, this time under `hexapod.service` after a rebuild: survey of **142 ranges**,
+then the explorer ended immediately with "Only frontiers within min_goal_distance remain".
+That is the correct answer to the map it had — with the head physically still, the sonar
+fills one cone and everything unknown is against the robot's own body — but it is also a
+reminder that the exploration end condition has only ever been exercised on a degenerate
+map.
+
+**What this does not prove:** the head servos never moved, so every ping was taken at one
+physical bearing while the joint-state model swept. **The pipeline is verified; the map's
+geometry is not** ([OQ-21](open-questions.md)). Also untested: the collision monitor
+against a real obstacle, the camera, and anything involving walking.
+
+**Defects found and fixed during the run:** `ultrasonic_driver` used `self.handle`, which
+collides with rclpy's `Node.handle` (`AttributeError: handle cannot be modified after node
+creation`); and `bt_navigator` refused to configure because the packaged
+navigate-**through**-poses tree still required the `Spin` behaviour that DEC-27 removed —
+that tree now has a repository copy too.
+
+**Observed, not explained:** `/battery/voltages` read LOAD 0.06 V, CTRL 0.00 V on USB
+power. The LOAD rail reading is consistent with 2026-09-16; CTRL reading 0.00 V is new
+and unexplained. Load average with the full stack up: **19–23** on four cores, 23 % idle,
+with the leg controller at 51 % of a core and `head_controller` at 30 % before its update
+rate was lowered from 50 to 20 Hz ([OQ-02](open-questions.md)).
+
 ## Next entries expected
 
-From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery:
+From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
 
-- `/imu/data` present and yaw sign correct when the robot is turned by hand (OQ-13).
-- Collision monitor behaviour against a real obstacle (OQ-03).
-- CPU load after the dashboard and explorer changes (OQ-02).
-- The movement calibration of [`operations.md`](operations.md#movement-calibration):
-  yaw sign, forward and turn directions, the two slip factors (DEC-22).
-- A battery run of the full stack after that: does Nav2 reach a frontier?
+- The head calibration of [`operations.md`](operations.md#head-calibration): pan sign,
+  travel limits, slew rate, and the sonar fan against a target at a known bearing (OQ-21).
+- A stationary head survey with the servos live: does the map match the room (DEC-28)?
+- Collision monitor behaviour against a real obstacle, now that the source is the sonar
+  and the polygons reach past the feet (OQ-03).
+- `/imu/data` yaw sign when the robot is turned by hand (OQ-13).
+- A battery run of the full stack after that: does Nav2 reach a frontier on sonar alone,
+  and does the head lead the turns (DEC-27)?

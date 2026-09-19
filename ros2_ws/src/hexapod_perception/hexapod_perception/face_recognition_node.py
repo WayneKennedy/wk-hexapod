@@ -155,13 +155,23 @@ class FaceRecognitionNode(Node):
         """Process incoming camera frames"""
         self.frame_count += 1
 
-        # Convert ROS Image to numpy array
+        # Convert ROS Image to an RGB numpy array. camera_ros chooses the pixel
+        # format from what the sensor offers, so the encoding is not fixed.
         try:
-            # RealSense colour stream is rgb8
-            frame = np.frombuffer(msg.data, dtype=np.uint8)
-            frame = frame.reshape((msg.height, msg.width, 3))
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            if msg.encoding == 'rgb8':
+                frame = buf.reshape((msg.height, msg.width, 3))
+            elif msg.encoding == 'bgr8':
+                frame = buf.reshape((msg.height, msg.width, 3))[:, :, ::-1]
+            elif msg.encoding in ('rgba8', 'bgra8'):
+                frame = buf.reshape((msg.height, msg.step // 4, 4))[:, :msg.width, :3]
+                if msg.encoding == 'bgra8':
+                    frame = frame[:, :, ::-1]
+            else:
+                self.get_logger().warn(f'Unsupported image encoding: {msg.encoding}')
+                return
             self.last_frame = msg
-            self.last_frame_rgb = frame.copy()
+            self.last_frame_rgb = np.ascontiguousarray(frame)
         except Exception as e:
             self.get_logger().warn(f'Failed to decode image: {e}')
             return

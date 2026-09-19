@@ -3,10 +3,12 @@ Main launch file for Hexapod Robot
 
 Starts all robot components:
 - Robot state publisher (URDF/TF)
-- Hardware drivers (servo, IMU + orientation filter, battery, LED, buzzer)
+- Hardware drivers (servo, IMU + orientation filter, ultrasonic, battery, LED,
+  buzzer) and the Pi camera (camera_ros)
 - Power indicator and startup sequence
-- Locomotion controller
-- Optionally: Autonomous behavior system (SLAM, Nav2, exploration, dashboard)
+- Locomotion controller (legs) and head controller (pan/tilt, sonar scan)
+- Optionally: Autonomous behavior system (sonar mapping, Nav2, exploration,
+  dashboard)
 
 Usage:
   ros2 launch hexapod_bringup robot.launch.py
@@ -57,10 +59,17 @@ def generate_launch_description():
         description='Seconds to wait for mission before auto-exploring (when autonomy:=true)'
     )
 
+    camera_arg = DeclareLaunchArgument(
+        'camera',
+        default_value='true',
+        description='Start the OV5647 Pi camera (camera_ros)'
+    )
+
     return LaunchDescription([
         use_sim_arg,
         autonomy_arg,
         mission_timeout_arg,
+        camera_arg,
 
         # ===== Robot State Publisher (URDF/TF) =====
 
@@ -99,6 +108,29 @@ def generate_launch_description():
                 'fixed_frame': 'base_link',
             }],
             output='screen',
+        ),
+
+        # Ultrasonic (HC-SR04 on the head) -> /ultrasonic/range
+        Node(
+            package='hexapod_hardware',
+            executable='ultrasonic_driver',
+            name='ultrasonic_driver',
+            parameters=[hardware_config],
+            output='screen',
+        ),
+
+        # Pi camera (OV5647 via libcamera) -> /camera/image_raw
+        Node(
+            package='camera_ros',
+            executable='camera_node',
+            name='camera',
+            parameters=[{
+                'width': 640,
+                'height': 480,
+                'frame_id': 'camera_optical_frame',
+            }],
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('camera')),
         ),
 
         # Battery Monitor
@@ -162,6 +194,15 @@ def generate_launch_description():
             package='hexapod_controller',
             executable='controller',
             name='hexapod_controller',
+            parameters=[controller_config],
+            output='screen',
+        ),
+
+        # Head: sole owner of the pan/tilt servos; sonar scan and look-around
+        Node(
+            package='hexapod_controller',
+            executable='head_controller',
+            name='head_controller',
             parameters=[controller_config],
             output='screen',
         ),

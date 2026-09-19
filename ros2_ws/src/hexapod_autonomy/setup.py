@@ -25,8 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'autonomy_manager = hexapod_autonomy.autonomy_manager:main',
-            'slam_monitor = hexapod_autonomy.slam_monitor:main',
-            'look_around = hexapod_autonomy.look_around:main',
             'frontier_explorer = hexapod_autonomy.frontier_explorer:main',
             'mission_server = hexapod_autonomy.mission_server:main',
         ],

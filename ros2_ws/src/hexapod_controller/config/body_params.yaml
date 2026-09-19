@@ -1,4 +1,5 @@
-# Hexapod controller parameters (hexapod_controller/controller.py).
+# Parameters for the two nodes of this package: hexapod_controller
+# (controller.py, legs) and head_controller (head_controller.py, head).
 # The only controller config file; robot.launch.py and controller.launch.py
 # both load it. Leg geometry (link lengths, foot positions, limits) is fixed
 # in the node from the Freenove kit dimensions.
@@ -43,3 +44,31 @@ hexapod_controller:
     # directly (standalone controller, e.g. test_ros.sh).
     hardware.direct: false
     hardware.calibration_file: ""
+
+head_controller:
+  ros__parameters:
+    # Servo degrees at straight ahead / level, and the sign that turns a
+    # relative angle (+ left, + up) into servo degrees. Unverified on the
+    # robot: check the pan sign with the owner present (docs/operations.md).
+    pan_center: 90.0
+    tilt_center: 90.0
+    pan_direction: 1.0
+    tilt_direction: 1.0
+    # Relative limits (deg). The vendor app clamps pan to servo 50-180 and
+    # tilt to 0-180 (server.py CMD_CAMERA); +/-40 stays inside that.
+    pan_limit_left: 40.0
+    pan_limit_right: 40.0
+    tilt_limit_up: 20.0
+    tilt_limit_down: 20.0
+    slew_rate: 300.0            # deg/s servo model for joint states; unmeasured
+    # Default scan: a sector centred on the Nav2 carrot, the turn, or ahead
+    scan_half_width: 30.0       # deg
+    scan_step: 10.0             # deg, less than the sonar's 15 deg cone
+    dwell_sec: 0.15             # >= 2 pings at 15 Hz per position
+    tilt_level: 0.0             # sonar horizontal
+    lookahead_timeout_sec: 1.0
+    turn_threshold: 0.05        # rad/s turning in place before the head leads
+    look_at_hold_sec: 3.0
+    pan_joint_x: 0.10           # m, head_pan_joint ahead of base_link (URDF)
+    survey_timeout_sec: 20.0
+    update_rate: 20.0          # Hz; head commands and head joint states

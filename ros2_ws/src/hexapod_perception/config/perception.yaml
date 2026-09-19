@@ -1,5 +1,5 @@
 # Hexapod Perception Configuration
-# Face recognition parameters (RGB comes from the RealSense colour stream)
+# Face recognition parameters (RGB comes from the Pi camera via camera_ros)
 
 hexapod_perception:
   ros__parameters:

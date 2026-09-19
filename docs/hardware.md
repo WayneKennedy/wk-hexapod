@@ -21,29 +21,39 @@ HAT went to the tank bot instead (DEC-24, [`test-log.md`](test-log.md)).
 The shield is a breakout, not a controller: it carries no microcontroller. Every device
 below is a direct peripheral of the Pi ([`architecture.md`](architecture.md#buses)).
 
-## Sensor swap
+## Head sensors
 
-**Reverted 2026-09-18 (DEC-25):** the D435i has left and the kit's OV5647 camera and
-HC-SR04 go back on the head. Driver, wiring and mapping for them are
-[OQ-19](open-questions.md). The history below explains why they were removed in 2025 and
-what the reversion has to solve.
+The head is the kit's own again. The RealSense D435i was **removed on 2026-09-19** and
+reassigned to another robot; the **OV5647 Pi camera and the HC-SR04 ultrasonic sensor
+were refitted** to the pan/tilt head (DEC-25). What the robot has to sense with:
 
-| Kit part | Replaced by (2025-12-31 to 2026-09-18) | Why |
-|---|---|---|
-| OV5647 Pi camera on the pan/tilt head | Intel RealSense D435i on the same head | RGB + depth + IMU in one USB 3 device; depth computed in the camera (DEC-02) |
-| HC-SR04 ultrasonic on the head (GPIO 27/22) | `/scan` derived from RealSense depth | Software-timed echo on a non-real-time kernel was unreliable; a single range point cannot feed a costmap |
+| Sensor | Interface | What it gives | What it does not |
+|---|---|---|---|
+| OV5647 Pi camera | CSI, CAM0, `dtoverlay=ov5647,cam0`, libcamera → `camera_ros` | Colour images, `/camera/image_raw` | No depth, no scale, no odometry |
+| HC-SR04 ultrasonic | GPIO 27 trigger, GPIO 22 echo | One range, 0.03–2 m, 15 Hz, in a ~15° cone wherever the head points | No bearing within the cone; misses angled and soft surfaces |
 
-The D435i as it was on the robot (2026-09-09): serial `032622073916`, firmware **5.17.0.10**,
-enumerates as USB 3.2. Its IMU calibration is not available on this unit (the driver warns
-and uses defaults). Streams in use: colour and aligned depth at **640×480, 15 fps**; the
-camera's gyro and accel are enabled but nothing consumes them ([OQ-07](open-questions.md)).
+Neither is fixed to the body: both sit on the pan/tilt head, so **where the robot can see
+is a head-servo decision**, made by `head_controller` ([`architecture.md`](architecture.md)).
+
+**Echo timing.** DEC-02 removed the ultrasonic partly because a software-timed echo on a
+non-real-time kernel was unreliable. The driver now times the echo from the kernel's
+line-event timestamps (lgpio alerts) rather than Python wake-ups. Measured 2026-09-19 on
+USB power, load average ~4, against a fixed target: **15 consecutive pings, 0.222–0.224 m**
+([`test-log.md`](test-log.md)).
+
+**The camera is not working yet** (2026-09-19): the sensor does not acknowledge on I2C, so
+`ov5647: probe of 10-0036 failed with error -121` and libcamera reports no cameras. The
+ribbon is the suspect — seating, contact orientation, or the wrong connector on the Pi 5
+(CAM/DISP 0 versus 1). Everything above it in the stack is installed and configured.
 
 ## Pin and address map
 
 | Function | Interface | Detail |
 |---|---|---|
 | Servo drivers | I2C bus 1, `0x41` and `0x40` | 0x41 serves channels 0–15, 0x40 channels 16–31 (the reference code's ordering, kept). 50 Hz, 500–2500 µs |
-| Head pan / tilt | 0x41 channels 0 / 1 | 90° = centred |
+| Head pan / tilt | 0x41 channels 0 / 1 | 90° = centred. The vendor app clamps pan to 50–180 and tilt to 0–180; `head_controller` stays inside ±40° of centre |
+| Ultrasonic | GPIO 27 (trigger), GPIO 22 (echo) | HC-SR04 on the head; echo timed from kernel edge timestamps |
+| Pi camera | CSI CAM0 | OV5647; `camera_auto_detect=0` and `dtoverlay=ov5647,cam0` in `config.txt` |
 | Legs | leg 1 RF 15,14,13 · leg 2 RM 12,11,10 · leg 3 RR 9,8,**31** · leg 4 LR 22,23,**27** · leg 5 LM 19,20,21 · leg 6 LF 16,17,18 | coxa, femur, tibia; legs 3 and 4 have non-contiguous tibia channels |
 | Servo power enable | GPIO 4 | **Low = enabled.** Firmware boots it high (off); `servo_driver` drives it low on start; the service leaves it high on stop |
 | Body IMU | I2C bus 1, `0x68` | MPU6050, ±2 g, ±250 °/s, polled at 100 Hz |
@@ -67,7 +77,7 @@ above the home pose. All from the reference `control.py`; see
 | Mode | Source | Works | Does not |
 |---|---|---|---|
 | Battery | 2× 18650 through the shield: LOAD rail (servos), CTRL rail (Pi) | Everything | — |
-| USB | USB-C into the Pi | Pi, I2C sensors, LEDs, RealSense, all software | **Servos.** The PCA9685 logic answers on I2C but the servo rail is dead |
+| USB | USB-C into the Pi | Pi, I2C sensors, LEDs, ultrasonic, camera, all software | **Servos**, including the head's. The PCA9685 logic answers on I2C but the servo rail is dead |
 
 `power_indicator` maps the two rails onto the LED strip: below 0.5 V reads as USB (blue),
 7.0 V and above green, 6.5–7.0 V yellow, below 6.5 V red. There is **no low-voltage cutoff

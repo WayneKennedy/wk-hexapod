@@ -3,29 +3,29 @@
 Autonomy Manager for Hexapod Robot
 
 Central state machine that coordinates autonomous behavior:
-1. Wait for startup sequence to complete
-2. Check if map exists, try localization
-3. Look around to gather visual features
-4. If localized, wait for external mission; else start mapping
-5. If no mission received, start frontier exploration
+1. Wait for the startup sequence to stand the robot
+2. Survey with the head (LookAround): sonar sweeps build the first map
+   around the boot pose without the body moving
+3. Map and explore frontiers
+4. After an external mission ends, wait mission_timeout for another, then
+   explore again
+
+There is no saved map to localize against: the map is built from the sonar
+each boot in an odometry-anchored frame (DEC-25), so CHECKING_MAP and
+LOCALIZATION_MODE are not entered.
 
 State Machine:
-  WAITING_FOR_STARTUP -> CHECKING_MAP -> LOOK_AROUND ->
-    -> LOCALIZATION_MODE (if localized) -> WAITING_FOR_MISSION ->
-       -> EXECUTING_MISSION (if command received)
-       -> EXPLORING (if timeout)
-    -> MAPPING_MODE (if not localized) -> EXPLORING
+  WAITING_FOR_STARTUP -> LOOK_AROUND -> MAPPING_MODE -> EXPLORING
+  EXECUTING_MISSION -> WAITING_FOR_MISSION -> EXPLORING (if timeout)
 """
 
-import os
 import rclpy
 from rclpy.node import Node
-from std_srvs.srv import Empty
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from std_msgs.msg import Bool, String
-from hexapod_interfaces.msg import AutonomyState, LocalizationStatus
+from hexapod_interfaces.msg import AutonomyState
 from hexapod_interfaces.action import LookAround, ExploreFrontiers
 from hexapod_interfaces.srv import StartMission, GetAutonomyState
 from enum import IntEnum
@@ -82,26 +82,19 @@ class AutonomyManager(Node):
 
         self.callback_group = ReentrantCallbackGroup()
 
-        # RTAB-Map mode switch (localization -> mapping after a failed localization)
-        self.rtabmap_mapping_client = self.create_client(
-            Empty, '/rtabmap/set_mode_mapping', callback_group=self.callback_group)
-
         # Parameters
         self.declare_parameter('mission_timeout_sec', 60.0)
-        self.declare_parameter('map_db_path', '~/.hexapod/maps/rtabmap.db')
+        self.declare_parameter('survey_sweeps', 2)
         self.declare_parameter('state_publish_rate_hz', 2.0)
 
         self.mission_timeout = self.get_parameter('mission_timeout_sec').value
-        self.map_db_path = os.path.expanduser(
-            self.get_parameter('map_db_path').value
-        )
+        self.survey_sweeps = self.get_parameter('survey_sweeps').value
         publish_rate = self.get_parameter('state_publish_rate_hz').value
 
         # State tracking
         self.current_state = State.WAITING_FOR_STARTUP
-        self.slam_mode = 'unknown'
+        self.slam_mode = 'mapping'
         self.robot_initialized = False
-        self.localization_status = None
         self.mission_active = False
         self.current_mission_id = ''
         self.exploration_progress = 0.0
@@ -137,13 +130,6 @@ class AutonomyManager(Node):
             10,
             callback_group=self.callback_group
         )
-        self.localization_sub = self.create_subscription(
-            LocalizationStatus,
-            '/localization_status',
-            self.localization_callback,
-            10,
-            callback_group=self.callback_group
-        )
         self.mission_sub = self.create_subscription(
             String,
             '/mission/command',
@@ -169,7 +155,6 @@ class AutonomyManager(Node):
 
         self.get_logger().info('Autonomy Manager started')
         self.get_logger().info(f'  Mission timeout: {self.mission_timeout}s')
-        self.get_logger().info(f'  Map DB path: {self.map_db_path}')
 
         # Set initial LED
         self.set_led_for_state()
@@ -179,10 +164,6 @@ class AutonomyManager(Node):
         if msg.data and not self.robot_initialized:
             self.robot_initialized = True
             self.get_logger().info('Robot initialization complete')
-
-    def localization_callback(self, msg):
-        """Track localization status from slam_monitor."""
-        self.localization_status = msg
 
     def mission_command_callback(self, msg):
         """Handle external mission command."""
@@ -231,16 +212,6 @@ class AutonomyManager(Node):
             self.current_state = new_state
             self.set_led_for_state()
 
-    def map_exists(self):
-        """Check if RTAB-Map database exists."""
-        return os.path.exists(self.map_db_path)
-
-    def is_localized(self):
-        """Check if currently localized."""
-        if self.localization_status is None:
-            return False
-        return self.localization_status.status == LocalizationStatus.LOCALIZED
-
     def _send_look_around_goal(self):
         """Send look around goal and set up callbacks."""
         if not self.look_around_client.wait_for_server(timeout_sec=5.0):
@@ -249,8 +220,8 @@ class AutonomyManager(Node):
             return
 
         goal = LookAround.Goal()
-        goal.check_localization = True
-        goal.timeout_sec = 15.0
+        goal.sweeps = self.survey_sweeps
+        goal.timeout_sec = 0.0  # head_controller's default
 
         self.get_logger().info('Starting look around sequence')
         send_goal_future = self.look_around_client.send_goal_async(goal)
@@ -276,39 +247,24 @@ class AutonomyManager(Node):
         try:
             result = future.result()
             self.get_logger().info(f'Look around complete: {result.result.message}')
-            localized = result.result.localized
+            surveyed = result.result.success
         except Exception as e:
             self.get_logger().error(f'Look around error: {e}')
-            localized = False
+            surveyed = False
 
         with self._action_lock:
             self._current_goal_handle = None
 
-        self._on_look_around_complete(localized)
+        self._on_look_around_complete(surveyed)
 
-    def _on_look_around_complete(self, localized):
-        """Handle look around completion and transition state."""
+    def _on_look_around_complete(self, surveyed):
+        """Map from here whether or not the survey completed."""
         with self._action_lock:
             self._look_around_in_progress = False
 
-        if localized:
-            self.transition_to(State.LOCALIZATION_MODE)
-        else:
-            self.get_logger().info('Localization failed, switching to mapping mode')
-            self.slam_mode = 'mapping'
-            self._set_rtabmap_mapping()
-            self.transition_to(State.MAPPING_MODE)
-
-    def _set_rtabmap_mapping(self):
-        """Tell RTAB-Map to extend the map (it started in localization mode)."""
-        if not self.rtabmap_mapping_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn('/rtabmap/set_mode_mapping not available; map will not grow')
-            return
-        future = self.rtabmap_mapping_client.call_async(Empty.Request())
-        future.add_done_callback(
-            lambda f: self.get_logger().info('RTAB-Map switched to mapping mode')
-            if f.exception() is None else
-            self.get_logger().error(f'set_mode_mapping failed: {f.exception()}'))
+        if not surveyed:
+            self.get_logger().warn('Head survey incomplete; exploring with what the sonar has')
+        self.transition_to(State.MAPPING_MODE)
 
     def _send_exploration_goal(self):
         """Send exploration goal and set up callbacks."""
@@ -386,17 +342,7 @@ class AutonomyManager(Node):
 
         if self.current_state == State.WAITING_FOR_STARTUP:
             if self.robot_initialized:
-                self.transition_to(State.CHECKING_MAP)
-
-        elif self.current_state == State.CHECKING_MAP:
-            if self.map_exists():
-                self.get_logger().info('Map database found, attempting localization')
-                self.slam_mode = 'localization'
                 self.transition_to(State.LOOK_AROUND)
-            else:
-                self.get_logger().info('No map database, starting in mapping mode')
-                self.slam_mode = 'mapping'
-                self.transition_to(State.MAPPING_MODE)
 
         elif self.current_state == State.LOOK_AROUND:
             # Look around is async - triggered once when entering this state
@@ -409,11 +355,6 @@ class AutonomyManager(Node):
         elif self.current_state == State.MAPPING_MODE:
             # In mapping mode, go directly to exploration
             self.transition_to(State.EXPLORING)
-
-        elif self.current_state == State.LOCALIZATION_MODE:
-            # Successfully localized, wait for mission
-            self.waiting_start_time = time.monotonic()
-            self.transition_to(State.WAITING_FOR_MISSION)
 
         elif self.current_state == State.WAITING_FOR_MISSION:
             if self.waiting_start_time:
