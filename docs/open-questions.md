@@ -105,6 +105,11 @@ owner deciding.
   wear. `smartmontools` is not installed; the bridge's NVMe SMART passthrough
   (`smartctl -d sntrealtek`) is untested. `fstrim.timer` stays enabled: it fails
   harmlessly while `provisioning_mode` is `full`.
+  **One of those options is no longer unverified (2026-09-20):** the JMicron `152d:0562`
+  SSK enclosure passes UNMAP correctly under both a range test and a scattered `fstrim`,
+  and now runs TRIM on hailo
+  ([wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#trim-through-the-jmicron-152d0562-bridge)).
+  That is a fact about that bridge only — the RTL9210B hang recorded here stands.
 
 ## Perception and sensing
 
