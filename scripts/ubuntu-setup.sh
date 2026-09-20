@@ -34,7 +34,14 @@ if [[ $EUID -ne 0 ]] && ! $DRY_RUN; then
 fi
 
 # ---------------------------------------------------------------------------
-log "Step 1: /boot/firmware/config.txt (I2C 400kHz, SPI, safe GPIO defaults)"
+log "Step 1: timezone (family rule: robots run UTC)"
+# UTC has no DST discontinuity: a local-time robot's clock jumps an hour twice a year, and
+# an hour of journal and rosbag timestamps either repeats or does not exist. See wk-robotics
+# docs/common.md, "Robots run on UTC" (owner, 2026-09-20).
+run timedatectl set-timezone Etc/UTC
+
+# ---------------------------------------------------------------------------
+log "Step 2: /boot/firmware/config.txt (I2C 400kHz, SPI, safe GPIO defaults)"
 ensure_config_line() {
     local line="$1"
     if grep -qF "$line" "$CONFIG_FILE"; then
@@ -59,7 +66,7 @@ ensure_config_line "gpio=17=op,dl"
 ensure_config_line "gpio=4=op,dh"
 
 # ---------------------------------------------------------------------------
-log "Step 2: ROS 2 apt repository"
+log "Step 3: ROS 2 apt repository"
 if [[ ! -f /etc/apt/sources.list.d/ros2.sources ]] && ! ls /etc/apt/sources.list.d/ros2* >/dev/null 2>&1; then
     run apt-get install -y -qq curl
     V=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F tag_name | awk -F\" '{print $4}')
@@ -71,7 +78,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-log "Step 3: apt packages (ROS 2 Jazzy, Nav2, RTAB-Map, RealSense, Python libs)"
+log "Step 4: apt packages (ROS 2 Jazzy, Nav2, RTAB-Map, RealSense, Python libs)"
 if dpkg-query -W -f='${Version}\n' '*' 2>/dev/null | grep -q -E 'rpt|deb12'; then
     warn "  Raspberry Pi OS (bookworm) packages are installed on this host."
     warn "  They conflict with ROS packages. See docs/operations.md, 'Foreign packages'."
@@ -81,6 +88,9 @@ APT_PACKAGES=(
     ros-jazzy-robot-state-publisher ros-jazzy-rmw-fastrtps-cpp ros-jazzy-imu-filter-madgwick
     ros-jazzy-navigation2 ros-jazzy-nav2-bringup
     ros-jazzy-rtabmap-ros ros-jazzy-realsense2-camera ros-jazzy-depthimage-to-laserscan
+    # camera-ros drives the kit's OV5647 through libcamera (DEC-25, the head returns to the
+    # kit's sensors). realsense2-camera stays until the D435i launch path is retired (OQ-19).
+    ros-jazzy-camera-ros
     ros-jazzy-cv-bridge ros-jazzy-image-transport ros-jazzy-diagnostic-updater
     ros-jazzy-foxglove-bridge ros-jazzy-pcl-ros ros-jazzy-laser-geometry
     python3-gpiozero python3-lgpio python3-spidev python3-smbus python3-numpy python3-opencv python3-flask
@@ -91,7 +101,7 @@ run apt-get update -qq
 run apt-get install -y -qq --no-install-recommends "${APT_PACKAGES[@]}"
 
 # ---------------------------------------------------------------------------
-log "Step 4: udev rules (RealSense as non-root)"
+log "Step 5: udev rules (RealSense as non-root)"
 if [[ ! -f /etc/udev/rules.d/99-realsense-libusb.rules ]]; then
     run curl -sL -o /etc/udev/rules.d/99-realsense-libusb.rules \
         https://raw.githubusercontent.com/IntelRealSense/librealsense/master/config/99-realsense-libusb.rules
@@ -102,7 +112,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-log "Step 5: user groups for $ACTUAL_USER"
+log "Step 6: user groups for $ACTUAL_USER"
 for grp in i2c spi gpio dialout video plugdev; do
     if getent group "$grp" >/dev/null && ! id -nG "$ACTUAL_USER" | grep -qw "$grp"; then
         run usermod -aG "$grp" "$ACTUAL_USER"
@@ -112,22 +122,22 @@ done
 
 # ---------------------------------------------------------------------------
 if $SKIP_PIP; then
-    log "Step 6: pip packages skipped"
+    log "Step 7: pip packages skipped"
 else
-    log "Step 6: pip packages (system interpreter; dlib build takes ~20 min)"
+    log "Step 7: pip packages (system interpreter; dlib build takes ~20 min)"
     run sudo -u "$ACTUAL_USER" pip3 install --break-system-packages -r "$REPO_DIR/requirements.txt"
 fi
 
 # ---------------------------------------------------------------------------
-log "Step 7: rosdep"
+log "Step 8: rosdep"
 [[ -f /etc/ros/rosdep/sources.list.d/20-default.list ]] || run rosdep init
 run sudo -u "$ACTUAL_USER" rosdep update
 
 # ---------------------------------------------------------------------------
 if $SKIP_BUILD; then
-    log "Step 8: workspace build skipped"
+    log "Step 9: workspace build skipped"
 else
-    log "Step 8: build workspace"
+    log "Step 9: build workspace"
     run sudo -u "$ACTUAL_USER" bash -c "source /opt/ros/jazzy/setup.bash && cd '$REPO_DIR/ros2_ws' && \
         rosdep install --from-paths src --ignore-src -y -r && colcon build --symlink-install"
 fi
