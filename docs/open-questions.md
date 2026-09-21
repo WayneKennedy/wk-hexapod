@@ -170,6 +170,31 @@ owner deciding.
 
 ## Project
 
+- **OQ-20 — Reconcile the robot's checkout, and conform to the family startup rule.**
+  (2026-09-21, from a wk-robotics session on the workstation; proposals only, per
+  [`AGENTS.md`](../AGENTS.md#working-on-the-robot-itself).)
+  1. **The robot's checkout has diverged from `main`.** Commit `343638f` ("Sonar and head
+     stack replaces the D435i", 2026-09-19, 47 files, including a removed message type) is
+     what `hexapod.service` runs. It was never pushed, and is likely the code side of OQ-19.
+     `main` has six newer commits: docs and `scripts/ubuntu-setup.sh` only. Both sides
+     edited `decisions.md` around DEC-25/26, so expect conflicts there. The commit is now
+     preserved on GitHub as branch `robot/343638f-sonar-head`. Proposal: rebase it onto
+     `main` on the robot, resolve the decisions, push, then delete the branch.
+  2. **Startup deviations** from
+     [*Robot startup is familial*](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#robot-startup-is-familial)
+     (owner's rule, 2026-09-21). Proposals:
+     - Drop the ROS `Environment=` lines from `systemd/hexapod.service`; `launch.sh` owns
+       the environment (rule 2).
+     - In `scripts/launch.sh`, export `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION` and
+       `ROS_AUTOMATIC_DISCOVERY_RANGE` *before* sourcing ROS (rule 3). Jazzy's setup script
+       sets the discovery range to `SUBNET` if unset. To keep today's behaviour, set
+       `SUBNET` explicitly; the family's choice of range is still open.
+     - Pass `autonomy:=true` in one place only (rule 4). Today it is in both the unit and
+       `launch.sh`.
+     - List the host state that git does not hold in `AGENTS.md` (rule 8).
+     A behaviour check after the change: `ros2 node list` matches today's, and the dashboard
+     comes up.
+
 - **OQ-10 — Tracking the vendor code.** Resolved 2026-09-13 by [DEC-20](decisions.md):
   the snapshot is deleted and upstream is cloned sparse.
 
