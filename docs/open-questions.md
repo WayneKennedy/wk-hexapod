@@ -203,7 +203,8 @@ owner deciding.
   `/imu/data_raw`, for one. Linger was enabled on the Pi on 2026-09-21, and
   `systemd/install.sh` now enables it too. **Open: the restart.** The segments come back
   only when the stack restarts, and the unit starts autonomy. So the restart waits until the
-  robot is safe to explore, or is done with the servos relaxed. Resolves when, after a
+  robot is safe to explore. A manual `scripts/launch.sh` with the service stopped does not
+  explore (OQ-24), so it can test the fix first. Resolves when, after a
   restart, `/imu/data` and `/tf` arrive and keep arriving through SSH sessions.
 
 - **OQ-24 — Conform to the family startup rule.** Resolved 2026-09-21, from the workstation
