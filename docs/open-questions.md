@@ -194,19 +194,13 @@ owner deciding.
 
 ## Project
 
-- **OQ-24 — Reconcile the robot's checkout, and conform to the family startup rule.**
+- **OQ-24 — Conform to the family startup rule** (item 1, reconciling the checkout, done).
   (2026-09-21, from a wk-robotics session on the workstation. Since DEC-29 the same day,
   the work is the workstation's to do, over SSH.)
-  1. **The robot's checkout has diverged from `main`.** Commit `343638f` ("Sonar and head
-     stack replaces the D435i", 2026-09-19, 47 files, including a removed message type) is
-     what `hexapod.service` runs. It was never pushed, and is likely the code side of OQ-19.
-     `main` has six newer commits: docs and `scripts/ubuntu-setup.sh` only. Both sides
-     edited `decisions.md` around DEC-25/26, so expect conflicts there. The commit is now
-     preserved on GitHub as branch `robot/343638f-sonar-head`. Proposal: rebase it onto
-     `main` on the workstation, resolve the decisions, push, and update the robot's checkout. That
-     should change nothing it runs, except `scripts/ubuntu-setup.sh`. Then delete the branch.
-     Then switch the robot's remote to anonymous HTTPS, making it a read-only consumer like the
-     other hosts ([wk-robotics Host checkouts](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#host-checkouts)).
+  1. **Done 2026-09-21.** The robot's unpushed commit `343638f` was merged into `main` as
+     `c247f06` (renumbering and conflict resolution are in its message). `ros2_ws` is
+     byte-identical to what the robot ran. The robot's checkout now tracks `main` over
+     anonymous HTTPS, as a read-only consumer, and the branch is deleted.
   2. **Startup deviations** from
      [*Robot startup is familial*](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#robot-startup-is-familial)
      (owner's rule, 2026-09-21). Proposals:
