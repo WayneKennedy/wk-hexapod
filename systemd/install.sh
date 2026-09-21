@@ -25,6 +25,13 @@ sudo cp "$SCRIPT_DIR/time-wait-sync-timeout.conf" \
 sudo systemctl daemon-reload
 sudo systemctl enable systemd-time-wait-sync.service
 
+# Linger, so logind never counts the service user as logged out. Without it, RemoveIPC=yes
+# (Ubuntu's default) deletes the user's /dev/shm when the last SSH session closes, taking
+# Fast DDS's shared-memory transport with it: nodes keep running, same-host delivery stops.
+# wk-robotics docs/common.md, Robot startup is familial, rule 10 (2026-09-21).
+echo "Enabling linger for $RUN_USER"
+sudo loginctl enable-linger "$RUN_USER"
+
 echo "Installing hexapod.service (user=$RUN_USER, repo=$REPO_DIR)"
 sed -e "s|__USER__|$RUN_USER|g" \
     -e "s|__REPO_DIR__|$REPO_DIR|g" \
