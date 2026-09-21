@@ -11,12 +11,14 @@ User=__USER__
 Group=__USER__
 WorkingDirectory=__REPO_DIR__
 Environment=HOME=__HOME__
-Environment=ROS_DOMAIN_ID=0
-Environment=RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-Environment=GPIOZERO_PIN_FACTORY=lgpio
+# The ROS environment is set by launch.sh alone. autonomy:=true is passed here only: boot
+# explores, and a manual launch.sh does not unless asked (robot.launch.py defaults to false).
 ExecStart=__REPO_DIR__/scripts/launch.sh autonomy:=true
-# ros2 launch shuts its nodes down cleanly on SIGINT (servos relax)
+# ros2 launch shuts its nodes down cleanly on SIGINT (servos relax). KillMode=mixed sends it
+# to ros2 launch alone; the default (control-group) also signals every node directly, so
+# each got SIGINT twice (wk-robotics docs/common.md -> Robot startup is familial, rule 5).
 KillSignal=SIGINT
+KillMode=mixed
 TimeoutStopSec=30
 # Whatever happened above, leave servo power disabled (GPIO 4 high). The buzzer
 # pin is owned by hexapod-buzzer-guard.service and is not touched here.

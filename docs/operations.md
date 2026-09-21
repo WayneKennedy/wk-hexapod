@@ -52,15 +52,16 @@ robot on 2026-09-09 ([`test-log.md`](test-log.md)).
 ```bash
 sudo systemctl start|stop|status hexapod      # the boot stack
 journalctl -u hexapod -f
-scripts/launch.sh                              # same stack by hand (stop the service first)
-scripts/launch.sh autonomy:=false              # drivers + controllers only
+scripts/launch.sh autonomy:=true               # the boot stack by hand (stop the service first)
+scripts/launch.sh                              # drivers + controllers only
 scripts/launch.sh autonomy:=true camera:=false # skip the camera (it does not probe: OQ-23)
 scripts/launch.sh hardware.launch.py           # any hexapod_bringup launch file
 ```
 
-`scripts/launch.sh` sources ROS and the workspace, sets `ROS_DOMAIN_ID=0`, Fast DDS and
-the `lgpio` pin factory, and execs `ros2 launch hexapod_bringup <file>`, adding
-`autonomy:=true` for `robot.launch.py` unless told otherwise.
+`scripts/launch.sh` sets `ROS_DOMAIN_ID=0`, Fast DDS, discovery range `SUBNET` and the
+`lgpio` pin factory, *then* sources ROS and the workspace, and execs `ros2 launch
+hexapod_bringup <file>`. It adds no arguments. Since 2026-09-21 a manual run is drivers and
+controllers only; only `hexapod.service` passes `autonomy:=true`.
 
 **What the boot stack does** ([`architecture.md`](architecture.md#launch-structure)):
 drivers start; the startup sequence shows red on the rear LED for 2 s, snaps the legs to
@@ -71,11 +72,14 @@ mapping and frontier exploration. After an external mission ends it waits
 `mission_timeout` (60 s) for another before exploring again.
 
 **On the battery this means the robot stands and walks off on its own about 30 s after
-boot.** Start with `autonomy:=false`, or stop the service, when that is not wanted.
+boot.** Stop the service, or `sudo systemctl disable hexapod` before a reboot, when that is
+not wanted.
 
 Services: `hexapod-buzzer-guard.service` (holds GPIO 17 low; leave it enabled) and
 `hexapod.service` (runs `scripts/launch.sh autonomy:=true` as the owning user, stops the
-nodes with SIGINT so servos relax, and leaves servo power disabled afterwards). It starts
+nodes with SIGINT to `ros2 launch` alone (`KillMode=mixed`) so servos relax, and leaves
+servo power disabled afterwards). Both follow
+[*Robot startup is familial*](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#robot-startup-is-familial). It starts
 only after `time-sync.target`: `systemd-time-wait-sync.service` is enabled with a 90 s
 bound, so a boot with no network starts the stack 90 s late on the restored clock
 (DEC-21).

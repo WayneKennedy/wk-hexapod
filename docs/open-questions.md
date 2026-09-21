@@ -194,31 +194,14 @@ owner deciding.
 
 ## Project
 
-- **OQ-24 — Conform to the family startup rule** (item 1, reconciling the checkout, done).
-  (2026-09-21, from a wk-robotics session on the workstation. Since DEC-29 the same day,
-  the work is the workstation's to do, over SSH.)
-  1. **Done 2026-09-21.** The robot's unpushed commit `343638f` was merged into `main` as
-     `c247f06` (renumbering and conflict resolution are in its message). `ros2_ws` is
-     byte-identical to what the robot ran. The robot's checkout now tracks `main` over
-     anonymous HTTPS, as a read-only consumer, and the branch is deleted.
-  2. **Startup deviations** from
-     [*Robot startup is familial*](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#robot-startup-is-familial)
-     (owner's rule, 2026-09-21). Proposals:
-     - Drop the ROS `Environment=` lines from `systemd/hexapod.service`; `launch.sh` owns
-       the environment (rule 2).
-     - In `scripts/launch.sh`, export `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION` and
-       `ROS_AUTOMATIC_DISCOVERY_RANGE` *before* sourcing ROS (rule 3). Jazzy's setup script
-       sets the discovery range to `SUBNET` if unset. To keep today's behaviour, set
-       `SUBNET` explicitly; the family's choice of range is still open.
-     - Pass `autonomy:=true` in one place only (rule 4). Today it is in both the unit and
-       `launch.sh`.
-     - Add `KillMode=mixed` beside `KillSignal=SIGINT` (rule 5). With the default, systemd
-       signals every node as well as `ros2 launch`, so each node gets SIGINT twice. On the
-       Orin that interrupted a node's shutdown with a traceback. Whether it matters for the
-       servo relax path here is unverified.
-     - List the host state that git does not hold in `AGENTS.md` (rule 8).
-     A behaviour check after the change: `ros2 node list` matches today's, and the dashboard
-     comes up.
+- **OQ-24 — Conform to the family startup rule.** Resolved 2026-09-21, from the workstation
+  (DEC-29). The robot's diverged checkout was merged (`c247f06`) and now tracks `main` over
+  HTTPS. The startup now follows
+  [*Robot startup is familial*](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#robot-startup-is-familial):
+  the ROS environment is in `scripts/launch.sh` only, set before sourcing ROS, with
+  discovery range `SUBNET` stated explicitly. `autonomy:=true` is passed by the unit alone,
+  so a manual `launch.sh` no longer explores. The unit has `KillMode=mixed`. The host state
+  outside git is listed in `AGENTS.md`.
 
 - **OQ-10 — Tracking the vendor code.** Resolved 2026-09-13 by [DEC-20](decisions.md):
   the snapshot is deleted and upstream is cloned sparse.

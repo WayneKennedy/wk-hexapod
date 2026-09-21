@@ -127,6 +127,10 @@ the owner present (below).
 - The robot is usually on USB power during development: sensors and LEDs work, servos do
   not. Anything that moves a leg **or the head** needs the battery and the owner present,
   which is why the head's calibration is still open ([OQ-21](docs/open-questions.md)).
+- **State outside git, on the robot:** `~/.hexapod/face_recognition/` (the face gallery:
+  `encodings.pkl` and training images), `~/.hexapod/maps/` (empty since DEC-28), and
+  `~/.hexapod/servo_calibration.txt` if present, which overrides the checked-in calibration.
+  `~/.ros/rtabmap.db` is stale, left from the RTAB-Map stack that DEC-25 removed.
 
 ## Status
 
