@@ -168,10 +168,24 @@ curl -s localhost:8080/api/autonomy/state
 
 ## Development loop
 
+Authoring happens on the workstation, and the robot is driven over SSH ([DEC-28](decisions.md)).
+
 ```bash
-source /opt/ros/jazzy/setup.bash
-cd ros2_ws && colcon build --symlink-install && source install/setup.bash
+# workstation: commit and push, then on the robot
+ssh <robot> 'cd ~/Code/wk-hexapod && [ -z "$(git status --porcelain)" ] && git fetch && git reset --hard origin/main'
+ssh <robot> 'cd ~/Code/wk-hexapod/ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build --symlink-install'
+ssh <robot> 'sudo systemctl restart hexapod'     # one call; inspect in another
 ```
+
+- **Restart in one SSH call and inspect in another.** A cleanup that kills by pattern also
+  matches an SSH session whose command line names a node.
+- **Starting `scripts/launch.sh` in the background** (`setsid nohup ... &`): `$!` is the
+  wrapper shell, not `ros2 launch`, so killing it does nothing, and a relaunch starts a
+  second stack. Two stacks fight over I2C and GPIO 4: the second `servo_driver` cannot claim
+  servo power, and the robot behaves inexplicably (2026-09-15, twice). Find the real process
+  with `ps -eo pid,args | grep '^ *[0-9]* /usr/bin/python3 /opt/ros/jazzy/bin/ros2 launch
+  hexapod_bringup'`, SIGINT it, and confirm no node processes remain before relaunching.
+  Prefer `hexapod.service`.
 
 Python nodes are symlink-installed: restart the service after editing. Rebuild after
 changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (they are

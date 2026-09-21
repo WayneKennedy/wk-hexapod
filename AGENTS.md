@@ -102,11 +102,12 @@ distressed people in the house. Rules, all of which are enforced by the setup
 
 ## Working on the robot itself
 
-**The robot owns this repository for major changes** (owner, 2026-09-18). Code,
-configuration and anything that needs the hardware to verify are changed by a session
-running on the robot, where the change can be tested. A session elsewhere may record
-decisions, open questions and family links, and leaves code changes as proposals in
-[`docs/open-questions.md`](docs/open-questions.md) for the robot's session to pick up.
+**No assistant runs on the robot** ([DEC-28](docs/decisions.md), owner, 2026-09-21).
+Sessions run on the always-on workstation and operate the robot over SSH, as for the
+family's other ROS 2 hosts. Author code in the workstation's checkout and push it. Then
+update the robot's checkout from `origin/main` and test over SSH: the
+[development loop](docs/operations.md#development-loop). A change that moves a leg needs
+the owner present (below).
 
 - ROS is native: `source /opt/ros/jazzy/setup.bash && source ros2_ws/install/setup.bash`,
   or use `scripts/launch.sh`. The stack normally runs under `systemd` (`hexapod.service`);
