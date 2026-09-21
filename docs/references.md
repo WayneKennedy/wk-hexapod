@@ -18,7 +18,7 @@ versions verified on the robot on 2026-09-09.
   | File | What it proves |
   |---|---|
   | `servo.py`, `pca9685.py` | Channel-to-chip mapping (0x41 first), pulse range, relax |
-  | `home.py`, `stand.py` | The calibrated home pose and the smooth stand sequence |
+  | `home.py`, `stand.py` | The calibrated home pose and the smooth stand sequence. **Not upstream files** (corrected 2026-09-21): they were written in the old `fn-hexapod` snapshot (commit `926f538`, with a `CLAUDE.md` and the calibration now in `config/servo_calibration.txt`). The snapshot was deleted from the robot on 2026-09-21 per DEC-20. A full git bundle is kept outside any repo on the always-on workstation, at `~/Archive/fn-hexapod-2026-09-21.bundle` |
   | `control.py` | Body-centric IK, tripod and wave gaits, balance PID, calibration maths |
   | `imu.py`, `adc.py`, `buzzer.py`, `spi_ledpixel.py`, `ultrasonic.py` | Bus and pin usage for every shield peripheral |
 
