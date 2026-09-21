@@ -102,7 +102,7 @@ distressed people in the house. Rules, all of which are enforced by the setup
 
 ## Working on the robot itself
 
-**No assistant runs on the robot** ([DEC-28](docs/decisions.md), owner, 2026-09-21).
+**No assistant runs on the robot** ([DEC-29](docs/decisions.md), owner, 2026-09-21).
 Sessions run on the always-on workstation and operate the robot over SSH, as for the
 family's other ROS 2 hosts. Author code in the workstation's checkout and push it. Then
 update the robot's checkout from `origin/main` and test over SSH: the

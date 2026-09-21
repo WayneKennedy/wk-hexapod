@@ -168,7 +168,7 @@ curl -s localhost:8080/api/autonomy/state
 
 ## Development loop
 
-Authoring happens on the workstation, and the robot is driven over SSH ([DEC-28](decisions.md)).
+Authoring happens on the workstation, and the robot is driven over SSH ([DEC-29](decisions.md)).
 
 ```bash
 # workstation: commit and push, then on the robot

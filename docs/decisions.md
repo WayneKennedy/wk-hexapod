@@ -213,13 +213,12 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   custom hexapod more feasible than remaking this one
   ([wk-robotics `ideas.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/ideas.md#a-printed-hexapod)).
 
-- **DEC-28 — No assistant runs on the robot. Sessions run on the always-on workstation and
+- **DEC-29 — No assistant runs on the robot. Sessions run on the always-on workstation and
   operate the robot over SSH.** (Owner, 2026-09-21. Supersedes the 2026-09-18 rule that the
   robot owns this repository for major changes, from a session running on it.) This matches
   the family's other ROS 2 hosts, the Orin and the AI HAT+ 2 bench, which carry no
   assistant. Code is authored in the workstation's checkout and pushed. The robot's checkout
   is then updated from `origin/main` and the change is tested over SSH. Claude Code was
   removed from the robot the same day, and its data was archived off the robot, without
-  credentials. The robot's session left one unpushed commit, `343638f`; it is preserved as
-  branch `robot/343638f-sonar-head`, and merging it into `main` is now the workstation's job
-  (OQ-20). DEC-27 is taken inside that commit, so this is DEC-28.
+  credentials. The robot's session left one unpushed commit, `343638f`, which was merged
+  from the workstation the same day (OQ-24).

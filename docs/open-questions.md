@@ -170,8 +170,8 @@ owner deciding.
 
 ## Project
 
-- **OQ-20 — Reconcile the robot's checkout, and conform to the family startup rule.**
-  (2026-09-21, from a wk-robotics session on the workstation. Since DEC-28 the same day,
+- **OQ-24 — Reconcile the robot's checkout, and conform to the family startup rule.**
+  (2026-09-21, from a wk-robotics session on the workstation. Since DEC-29 the same day,
   the work is the workstation's to do, over SSH.)
   1. **The robot's checkout has diverged from `main`.** Commit `343638f` ("Sonar and head
      stack replaces the D435i", 2026-09-19, 47 files, including a removed message type) is
