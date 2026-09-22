@@ -330,6 +330,46 @@ and unexplained. Load average with the full stack up: **19–23** on four cores,
 with the leg controller at 51 % of a core and `head_controller` at 30 % before its update
 rate was lowered from 50 to 20 Hz ([OQ-02](open-questions.md)).
 
+### 2026-09-22 · First cold boot under the family startup rule; the linger fix confirmed
+
+**Conditions:** unplanned power cycle — the Pi had been off the network since about 22:00 on
+2026-09-21 and came back at **22:16 UTC** on 2026-09-22; no owner action at the robot after
+that. SBC on mains, **servo rails dead throughout**: `power_indicator` read LOAD 0.00 V and
+CTRL 0.00 V (BLUE/USB), so no leg could move whatever was commanded. `hexapod.service`
+enabled, started by systemd with `autonomy:=true`. Observed from the workstation over SSH.
+
+**Result — the unit came up unattended and needed no intervention.** This is the first cold
+boot since [OQ-24](open-questions.md) put the startup on the family rule:
+
+- Started **22:16:39**, the same second `systemd-time-wait-sync` finished (`Result=success`),
+  so the clock was right before the stack ran. `NRestarts=0`, still active when checked.
+- 29 launch entities started. **The buzzer stayed silent and said so**: `Buzzer DISABLED
+  (buzzer.enabled=false) - beep requests ignored`.
+- The startup sequence ran to completion against the dead rails — rear LED yellow while
+  waiting, warning, `home`, the 10 s place delay, `stand`, then `Phase 6: SAFE`.
+- Autonomy ran its own sequence: `look_around` (head survey, 146 ranges) → `mapping_mode` →
+  `exploring` → `exploration_complete` in 11 s, "Only frontiers within min_goal_distance
+  remain". Nothing beyond the two pose commands above was sent to the legs.
+- **`camera_ros` aborted 4 s in** (`std::runtime_error`, exit -6), and the kernel shows
+  `ov5647 10-0036: probe of 10-0036 failed with error -121` — the unchanged
+  [OQ-23](open-questions.md) signature, not a startup regression. The other 28 entities were
+  unaffected and `ros2 launch` did not exit, so systemd had nothing to restart.
+
+**The linger fix works ([OQ-25](open-questions.md) resolved).** `Linger=yes`, and `/dev/shm`
+held **226 `fastrtps_*` entries** when measured after four SSH sessions had opened and closed
+since boot — under the fault they were deleted when a session closed. From the workstation on
+the LAN (`ROS_DOMAIN_ID=0`, `SUBNET`, 10-sample windows): `/imu/data` **108 Hz**,
+`/imu/data_raw` **100 Hz**, `/tf` **50 Hz**, `/joint_states` **67 Hz**, `/ultrasonic/range`
+**15 Hz**. `/imu/data` and `/tf` are the two that delivered nothing under the fault.
+
+**Observed, not explained:** the *graph listing* from the workstation is incomplete while the
+*data* flows. `ros2 node list --no-daemon` over 25 s returned **one of the robot's 33 nodes**
+(`/autonomy_manager`) and `ros2 topic list` **8 of its 23**, while `ros2 topic hz` on the five
+topics above delivered at full rate. On the robot itself the same two commands list all 33 and
+23. Recorded at family level in
+[wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#ros-2-installs-are-familial)
+— it is the mirror image of the 2026-09-21 observation there, which had names without data.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

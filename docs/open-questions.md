@@ -194,18 +194,24 @@ owner deciding.
 
 ## Project
 
-- **OQ-25 — Restart the stack under linger (family startup rule 10).** (2026-09-21.) Observed
+- **OQ-25 — Restart the stack under linger (family startup rule 10).** **Resolved 2026-09-22**
+  by an unplanned power cycle, which gave the cold boot the question was waiting for
+  ([`test-log.md`](test-log.md)): `Linger=yes`, 226 `fastrtps_*` entries in `/dev/shm` after
+  four SSH sessions had opened and closed, and from the workstation `/imu/data` at 108 Hz and
+  `/tf` at 50 Hz — the two that delivered nothing under the fault — plus `/imu/data_raw`,
+  `/joint_states` and `/ultrasonic/range`. The stack was safe to let explore because the servo
+  rails were dead (SBC on mains, 0.00 V on both), so the explore concern below did not arise.
+  The original report, for the record. (2026-09-21.) Observed
   from the family's mission-planner hosts on the LAN: `/imu/data` and `/tf` delivered nothing,
   and `/joint_states` and `/ultrasonic/range` came and went, while `/imu/data_raw` kept
   arriving. On the Pi, `hexapod.service` had been active since 2026-09-20 with `Linger=no` and
   **no `fastrtps_*` segment in `/dev/shm`**. logind's `RemoveIPC` had deleted them when an SSH
   session closed, which breaks same-host Fast DDS delivery: `imu_filter` stops getting
   `/imu/data_raw`, for one. Linger was enabled on the Pi on 2026-09-21, and
-  `systemd/install.sh` now enables it too. **Open: the restart.** The segments come back
-  only when the stack restarts, and the unit starts autonomy. So the restart waits until the
-  robot is safe to explore. A manual `scripts/launch.sh` with the service stopped does not
-  explore (OQ-24), so it can test the fix first. Resolves when, after a
-  restart, `/imu/data` and `/tf` arrive and keep arriving through SSH sessions.
+  `systemd/install.sh` now enables it too. What was then open was the restart: the segments
+  come back only when the stack restarts, and the unit starts autonomy, so it had to wait
+  until the robot was safe to explore — which the power cycle above settled by cutting the
+  servo rails.
 
 - **OQ-24 — Conform to the family startup rule.** Resolved 2026-09-21, from the workstation
   (DEC-29). The robot's diverged checkout was merged (`c247f06`) and now tracks `main` over
