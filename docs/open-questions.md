@@ -62,8 +62,10 @@ owner deciding.
   before buying anything. **2026-09-23: the lidar route is chosen in principle, pending the
   owner's order** — a Slamtec RPLIDAR C1 (£57; datasheet facts and Jazzy driver status in
   [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#depth-which-kind-for-which-task)),
-  for this robot first. Stock and invoices held no 2D lidar. Open once it arrives: the mount
-  (a flat spot on the body; USB only, so no header conflict), `rplidar_ros` from apt,
+  for this robot first. Stock and invoices held no 2D lidar. Mount decided in principle:
+  [DEC-30](decisions.md), a plate on extended Pi standoffs — open: the standoff length (scan
+  plane clear of the head at full tilt and the coxa servos across their stroke), the tilt
+  cost of 110 g up high, the USB route. Then `rplidar_ros` from apt,
   `slam_toolbox` in place of gait-only odometry, and whether OQ-22's landmark route is
   still needed.
 

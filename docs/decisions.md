@@ -271,3 +271,15 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   removed from the robot the same day, and its data was archived off the robot, without
   credentials. The robot's session left one unpushed commit, `343638f`, which was merged
   from the workstation the same day (OQ-24).
+
+- **DEC-30 — The lidar mounts on a plate carried by extended Pi standoffs, on the Pi's own
+  hole pattern, so the same plate and lidar move between robots.** (Owner, 2026-09-23.)
+  The RPLIDAR C1 (RobotShop #1499979) sits above the Pi and shield stack on longer
+  standoffs; a printed adapter plate takes the Pi's 58 × 49 mm M2.5 pattern underneath and
+  the C1's 43 × 43 mm M2.5 pattern on top (four screws, **no deeper than 4 mm** into the
+  lidar; scan plane 29.8 mm above its base — datasheet v1.1 p. 18). Every Pi-carrying robot
+  in the family shares that lower pattern, so one lidar and plate can be swapped to the
+  Devastator; the second unit is loosely earmarked for koala-bot. *Open* (OQ-19): standoff
+  length, set by the clearance of the scan plane over the head at full tilt and the coxa
+  servos at the ends of their stroke; the effect of 110 g at the top of the stack on the
+  IMU-measured tilt; and the USB lead's route through the shield stack.
