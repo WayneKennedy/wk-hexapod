@@ -59,7 +59,13 @@ owner deciding.
   sweeps (doubtful with a 15° cone); or fit a cheap 2D lidar, which would make
   `slam_toolbox` viable. Weigh against [OQ-22](#perception-and-sensing), and check
   [wk-inventory](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md)
-  before buying anything.
+  before buying anything. **2026-09-23: the lidar route is chosen in principle, pending the
+  owner's order** — a Slamtec RPLIDAR C1 (£57; datasheet facts and Jazzy driver status in
+  [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#depth-which-kind-for-which-task)),
+  for this robot first. Stock and invoices held no 2D lidar. Open once it arrives: the mount
+  (a flat spot on the body; USB only, so no header conflict), `rplidar_ros` from apt,
+  `slam_toolbox` in place of gait-only odometry, and whether OQ-22's landmark route is
+  still needed.
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
