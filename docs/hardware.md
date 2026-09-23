@@ -35,6 +35,15 @@ were refitted** to the pan/tilt head (DEC-25). What the robot has to sense with:
 Neither is fixed to the body: both sit on the pan/tilt head, so **where the robot can see
 is a head-servo decision**, made by `head_controller` ([`architecture.md`](architecture.md)).
 
+**On order (2026-09-23): a Slamtec RPLIDAR C1 2D lidar** for the body, not the head —
+RobotShop #1499979, £47.76 ex VAT, product code RB-Rpk-35; one of two, the other is in
+[wk-inventory stock](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md).
+Datasheet facts and the Jazzy driver status are in
+[wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#depth-which-kind-for-which-task);
+what it is for, and what is open until it arrives, is [OQ-19](open-questions.md). Bench
+facts to record when it lands: Ø55.6 × 41.3 mm, 110 g, 5 V / 230 mA typical over USB, UART
+460800 through its adapter.
+
 **Echo timing.** DEC-02 removed the ultrasonic partly because a software-timed echo on a
 non-real-time kernel was unreliable. The driver now times the echo from the kernel's
 line-event timestamps (lgpio alerts) rather than Python wake-ups. Measured 2026-09-19 on
