@@ -132,6 +132,28 @@ owner deciding.
 
 ## Perception and sensing
 
+- **OQ-26 — Is the pan/tilt head redundant once the lidar is fitted?** (Owner, 2026-09-23,
+  "probably", with the body sweeping the sensor instead: `/body_pose` pitch and roll tilt the
+  scan plane, and the IMU reports the angle.) What the lidar replaces outright: the
+  ultrasonic's one 15° cone and the head-scanning behaviour behind the `sonar_layer` — 360°
+  at 10 Hz, 0.72° per point. What is not settled:
+  - **Mapping needs a level plane.** `slam_toolbox` matches scans as one horizontal slice; a
+    scan taken pitched sees a different wall height and, nearer in, the floor. Sweeps are for
+    looking, not mapping: gate mapping scans on the IMU, or hold the body level while the
+    map is being built.
+  - **A tilted scan sees the floor as a wall** unless points are projected through `tf` with
+    the body attitude and those below a height threshold are dropped. No such node exists;
+    the standard costmap layers assume a horizontal scan.
+  - **The low band.** The plane is ~30 mm above the plate (DEC-30), so level scans miss
+    anything lower than the plate; body pitch is a shallow sweep (range unrecorded — measure
+    it), reaching a low obstacle a metre out, not the floor at the feet. The ultrasonic
+    covered that band badly; the lidar does not cover it at all.
+  - **The camera.** It shares the head. Not working (OQ-23), but face recognition and
+    `head/look_at` are in the autonomy stack; removing the head means a body mount and a
+    body-yaw look-at, decided deliberately.
+  Gains if the head goes: two servos, the HC-SR04 and the camera's ribbon off the top of the
+  robot, and OQ-21 (the head's feedback-less joint states) closes with it.
+
 - **OQ-22 — What the mono camera is for.** (2026-09-19, [DEC-28](decisions.md).) The
   OV5647 feeds only the dashboard stream and optional face recognition; nothing in
   navigation uses it. It is the robot's only rich sensor, and every obvious use costs CPU
