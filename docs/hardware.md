@@ -46,7 +46,10 @@ facts still to record: mass as delivered, current over USB, the plate and scan-p
 **Dry fit, 2026-09-26 (owner's photo):** an old Pi VESA mount plate — Pi hole pattern
 underneath, honeycomb fill — on four brass standoffs above the Freenove shield, the lidar
 sitting loose on it (VESA holes do not match the C1's 43 mm square; the plate needs four
-M2.5 holes, ≤ 4 mm into the lidar). Seen in the photo, for OQ-19: the USB lead was coiled
+M2.5 holes, ≤ 4 mm into the lidar). **The replacement plate is designed:**
+[wk-robotics `tools/lidar-mount/`](https://github.com/WayneKennedy/wk-robotics/tree/main/tools/lidar-mount)
+(2026-09-26) — HAT outline on the Pi holes, 10 mm bosses, M2.5 × 8 from below, cable slot;
+scan plane 39.8 mm above the plate top. Unprinted; STL staged on the print host. Seen in the photo, for OQ-19: the USB lead was coiled
 beside the lidar *in* the scan plane (30 mm above the base) — route it down through the plate;
 the pan/tilt head tops out near the lidar's mid-height, so whether it crosses the plane
 depends on tilt — measure; a raised leg reaches the plane in swing, so a body-radius range
