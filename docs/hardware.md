@@ -35,14 +35,22 @@ were refitted** to the pan/tilt head (DEC-25). What the robot has to sense with:
 Neither is fixed to the body: both sit on the pan/tilt head, so **where the robot can see
 is a head-servo decision**, made by `head_controller` ([`architecture.md`](architecture.md)).
 
-**On order (2026-09-23): a Slamtec RPLIDAR C1 2D lidar** for the body, not the head —
+**Slamtec RPLIDAR C1 2D lidar, in hand and dry-fitted 2026-09-26** on the body, not the head —
 RobotShop #1499979, £47.76 ex VAT, product code RB-Rpk-35; one of two, the other is in
 [wk-inventory stock](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md).
 Datasheet facts and the Jazzy driver status are in
 [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#depth-which-kind-for-which-task);
 what it is for, and what is open until it arrives, is [OQ-19](open-questions.md). Bench
-facts to record when it lands: Ø55.6 × 41.3 mm, 110 g, 5 V / 230 mA typical over USB, UART
-460800 through its adapter.
+facts still to record: mass as delivered, current over USB, the plate and scan-plane heights.
+
+**Dry fit, 2026-09-26 (owner's photo):** an old Pi VESA mount plate — Pi hole pattern
+underneath, honeycomb fill — on four brass standoffs above the Freenove shield, the lidar
+sitting loose on it (VESA holes do not match the C1's 43 mm square; the plate needs four
+M2.5 holes, ≤ 4 mm into the lidar). Seen in the photo, for OQ-19: the USB lead was coiled
+beside the lidar *in* the scan plane (30 mm above the base) — route it down through the plate;
+the pan/tilt head tops out near the lidar's mid-height, so whether it crosses the plane
+depends on tilt — measure; a raised leg reaches the plane in swing, so a body-radius range
+mask on the scan is cheap insurance.
 
 **Echo timing.** DEC-02 removed the ultrasonic partly because a software-timed echo on a
 non-real-time kernel was unreliable. The driver now times the echo from the kernel's
