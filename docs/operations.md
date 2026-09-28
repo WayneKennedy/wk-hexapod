@@ -23,7 +23,8 @@ The setup script: enables I2C at 400 kHz and SPI, writes the safe GPIO defaults
 ([`hardware.md`](hardware.md#the-buzzer-hazard)) and the OV5647 camera overlay, adds the
 ROS 2 apt source, installs ROS 2 Jazzy plus Nav2, `camera_ros` (which brings libcamera
 with the Pi 5 PiSP pipeline), `imu_filter_madgwick` and the Python hardware libraries
-from apt, reports whether the camera probed, adds the user to the hardware groups,
+and `slam_toolbox` from apt, imports the source dependencies pinned in `ros2_ws/deps.repos`
+(the lidar driver, DEC-31) into `ros2_ws/src/external/`, reports whether the camera probed, adds the user to the hardware groups,
 pip-installs `requirements.txt` (only `face_recognition`/dlib builds from source, about
 20 minutes), initialises rosdep, and runs `colcon build --symlink-install`.
 
@@ -86,7 +87,20 @@ bound, so a boot with no network starts the stack 90 s late on the restored cloc
 
 ## Maps
 
-**Maps are not saved and cannot be reloaded** (DEC-28). The map is Nav2's global costmap,
+**Lidar SLAM, standalone** (DEC-31). With the boot stack stopped:
+
+```bash
+sudo systemctl stop hexapod
+setsid nohup scripts/launch.sh camera:=false > /tmp/robot.log 2>&1 < /dev/null &   # no Nav2
+source /opt/ros/jazzy/setup.bash && source ros2_ws/install/setup.bash
+ros2 launch hexapod_bringup slam.launch.py
+ros2 topic echo /map --once --field info        # grows as scans arrive
+```
+
+Stop both with SIGTERM to their `ros2 launch` processes (see the development loop below).
+Saving and reloading a SLAM map is not set up yet ([OQ-20](open-questions.md)).
+
+**The boot stack's map is not saved and cannot be reloaded** (DEC-28). The map is Nav2's global costmap,
 built from the head's sonar sweeps in a frame that is odometry, so it drifts with the gait
 and means nothing on the next boot. `scripts/save-map.sh` and the RTAB-Map database are
 gone; what replaces them is undecided ([OQ-20](open-questions.md)).
@@ -213,8 +227,15 @@ ssh <robot> 'sudo systemctl restart hexapod'     # one call; inspect in another
   second stack. Two stacks fight over I2C and GPIO 4: the second `servo_driver` cannot claim
   servo power, and the robot behaves inexplicably (2026-09-15, twice). Find the real process
   with `ps -eo pid,args | grep '^ *[0-9]* /usr/bin/python3 /opt/ros/jazzy/bin/ros2 launch
-  hexapod_bringup'`, SIGINT it, and confirm no node processes remain before relaunching.
-  Prefer `hexapod.service`.
+  hexapod_bringup'`, **SIGTERM** it, and confirm no node processes remain before
+  relaunching. Prefer `hexapod.service`.
+- **SIGINT does not stop a stack started this way** (2026-09-28): a background job of a
+  non-interactive shell starts with SIGINT ignored, and every node inherits that. SIGINT to
+  `ros2 launch` does nothing; SIGTERM makes `ros2 launch` exit but leaves the nodes running,
+  orphaned. SIGTERM the orphans by PID after checking GPIO 17 is held by `gpioset` (the
+  guard), not by a node: `gpioinfo gpiochip4 | grep 'line  17'` (read-only; never
+  `gpioget`). rclpy nodes exit cleanly on SIGTERM. `hexapod.service` is unaffected: systemd
+  starts it with default signal handling.
 
 Python nodes are symlink-installed: restart the service after editing. Rebuild after
 changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (they are
@@ -241,6 +262,10 @@ changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (th
 - **Collision monitor flaps "stop / continue".** Transform lag between the range source
   and `odom → base_link`; fixed by DEC-09 on 2026-09-09. If it recurs, check load
   ([OQ-02](open-questions.md)).
+- **No `/scan`.** `journalctl -u hexapod | grep sllidar` should show "health status : OK"
+  and "scan frequency:10.0 Hz". "Cannot start scan: 80008002" means apt's `rplidar_ros`, not
+  `sllidar_ros2`, is driving it (DEC-31). No `/dev/ttyUSB0`: check the USB lead
+  (`lsusb` shows `10c4:ea60`); the user needs the `dialout` group.
 - **The buzzer sounds.** Something released GPIO 17. `systemctl status hexapod-buzzer-guard`
   and [`hardware.md`](hardware.md#the-buzzer-hazard).
 - **A tool loops or hangs under load.** `ros2 topic hz` has been seen to hang at load

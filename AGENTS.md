@@ -29,8 +29,10 @@ hardware ceiling is the kit's: no accelerator, no bus servos (DEC-26). Full inte
 
 **Its sensing changed on 2026-09-19** (DEC-25): the Intel RealSense D435i went to the family's
 Orin Nano and the kit's OV5647 camera and HC-SR04 ultrasonic went back on the pan/tilt head.
-So there is **no depth and no SLAM**: one 15° sonar cone on a servo is the only range
-sensor, the head does the looking instead of the body (DEC-27), and the map is Nav2's
+**Update 2026-09-28 (DEC-31):** an RPLIDAR C1 now publishes `/scan`, and `slam.launch.py`
+maps from it on the bench, but it is not yet wired into navigation ([OQ-20](docs/open-questions.md)).
+Until it is, the boot stack still works as follows: one 15° sonar cone on a servo is the
+navigation's only range sensor, the head does the looking instead of the body (DEC-27), and the map is Nav2's
 sonar-fed global costmap anchored to odometry, lasting one run (DEC-28). Read those three
 decisions before changing anything in perception or navigation.
 

@@ -283,3 +283,17 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   length, set by the clearance of the scan plane over the head at full tilt and the coxa
   servos at the ends of their stroke; the effect of 110 g at the top of the stack on the
   IMU-measured tilt; and the USB lead's route through the shield stack.
+
+- **DEC-31 — The RPLIDAR C1 publishes `/scan` in the boot stack, and `slam_toolbox` maps
+  from it, standalone for now.** (Owner, 2026-09-28: "set up for SLAM".) The driver is
+  Slamtec's `sllidar_ros2`, built from source at a pinned commit (`ros2_ws/deps.repos`,
+  imported to the gitignored `ros2_ws/src/external/` by `ubuntu-setup.sh`), because apt's
+  `rplidar_ros` 2.1.0 bundles SDK 1.12, which reads the C1's info and then fails to start a
+  scan (`80008002`). `robot.launch.py` starts it by default (`lidar:=true`); the URDF carries
+  `laser_frame` at yaw π, z 0.16 m ([`hardware.md`](hardware.md#head-sensors) for how both
+  were found). `slam.launch.py` runs `slam_toolbox` (online async, `base_frame: base_link`,
+  `config/slam_params.yaml`) and publishes `/map` and `map → odom`. **It does not yet replace
+  DEC-28:** `navigation.launch.py` still publishes a static `map → odom`, so
+  SLAM runs only with `autonomy:=false`, and Nav2, the frontier explorer and the dashboard
+  still use the sonar costmap. Wiring SLAM into them supersedes DEC-28 and is
+  [OQ-20](open-questions.md)'s next step; it needs the battery and the owner to verify.

@@ -370,6 +370,37 @@ topics above delivered at full rate. On the robot itself the same two commands l
 [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#ros-2-installs-are-familial)
 — it is the mirror image of the 2026-09-21 observation there, which had names without data.
 
+### 2026-09-28 · RPLIDAR C1 on the printed plate, and slam_toolbox on the bench
+
+**Conditions:** plate printed and fitted the same day; USB power (both rails 0.00 V, read
+off the ADS7830 directly), legs limp; robot on a desk, stationary. Owner present for the
+yaw test.
+
+**Result:**
+
+1. **apt's `rplidar_ros` 2.1.0 cannot drive the C1.** SDK 1.12 read the serial number,
+   firmware 1.02, hardware rev 18 and health 0, then `Cannot start scan: '80008002'` and
+   `Failed to set scan mode`, at 460800 baud.
+2. **Slamtec's `sllidar_ros2` works** (commit `3430009`, SDK 2.1.0, `sllidar_c1_launch.py`
+   parameters): Standard mode, 5 kHz, **10.000 Hz** by `ros2 topic hz`, 720 beams, 628 with a
+   range, 0.29–6.7 m.
+3. **`slam_toolbox` 2.8.5 (online async) built a map** within seconds: 76 × 231 cells at
+   5 cm, `map → laser_frame` resolving through gait odometry. One "queue is full" drop at
+   start, none after. CPU at rest: `slam_toolbox` 4.5 %, `sllidar_node` 3.9 %, load average
+   ~5 without Nav2.
+4. **Laser yaw π**, from objects the owner placed and measured from the lidar centre:
+   boxes 500 mm dead ahead → 0.494–0.50 m at 180°; wall 270 mm behind → 0.274 m at 0°;
+   pole ~240 mm behind-left → 0.234 m at −50°, which rules out a mirrored scan. A
+   photo-based guess of −90° was wrong. Confirmed live after the change: `base_link →
+   laser_frame` z 0.160 m, yaw 180°.
+5. **A hand-started stack ignores SIGINT** (`setsid nohup … &`); SIGTERM to `ros2 launch`
+   orphaned the nodes, which then exited on SIGTERM by PID. GPIO 17 stayed held by the
+   guard throughout. Recorded in [`operations.md`](operations.md#development-loop).
+
+**What changed:** DEC-31; `ros2_ws/deps.repos`; `lidar:=true` in `robot.launch.py`;
+`laser_frame` in the URDF; `slam.launch.py` and `config/slam_params.yaml`. Not tested:
+anything walking, a leg or the head in the scan plane.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

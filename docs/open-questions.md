@@ -67,7 +67,16 @@ owner deciding.
   plane clear of the head at full tilt and the coxa servos across their stroke), the tilt
   cost of 110 g up high, the USB route. Then `rplidar_ros` from apt,
   `slam_toolbox` in place of gait-only odometry, and whether OQ-22's landmark route is
-  still needed.
+  still needed. **2026-09-28: the C1 is fitted and publishing, and `slam_toolbox` builds
+  `/map` from it on the bench** (DEC-31; apt's `rplidar_ros` could not drive the C1, so the
+  driver is `sllidar_ros2` from source). **Still open:** (1) wiring SLAM into the boot stack
+  — drop the static `map → odom`, give Nav2's global costmap `/map` as its static layer and
+  `/scan` as an obstacle source, point the frontier explorer at `/map`, move the collision
+  monitor to `/scan` (OQ-03), and decide what the sonar keeps (OQ-26); this supersedes
+  DEC-28; (2) saving and reloading maps (`slam_toolbox` serialisation, and localization
+  mode for `checking_map`/`localization_mode`); (3) whether gait odometry is good enough for
+  scan matching while walking — measured only stationary; (4) CPU: `slam_toolbox` ~4.5 % and
+  the driver ~4 % of a core at rest, load average ~5 without Nav2 (OQ-02).
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
@@ -78,6 +87,14 @@ owner deciding.
   clamp. Needs the battery and the owner: command known angles, watch the head, and check
   the dashboard's sonar fan against a target at a known bearing. Cheapest mitigation if the
   model proves poor: only trust readings taken while the head is settled.
+
+- **OQ-27 — `base_footprint` is a detached tree.** (Found 2026-09-28.) The URDF makes
+  `base_footprint` the parent of `base_link` (+0.03 m), while the controller publishes
+  `odom → base_link`; tf2 keeps one parent per frame, so `base_footprint` is its own root and
+  `odom → base_footprint` fails ("not part of the same tree"). Nothing uses it today —
+  `slam_params.yaml` sets `base_frame: base_link` for that reason, and no Nav2 parameter names
+  it. Fix when anything needs a ground-plane frame: invert the joint (`base_link →
+  base_footprint`, z −0.03).
 
 ## Compute
 
@@ -144,8 +161,9 @@ owner deciding.
   - **A tilted scan sees the floor as a wall** unless points are projected through `tf` with
     the body attitude and those below a height threshold are dropped. No such node exists;
     the standard costmap layers assume a horizontal scan.
-  - **The low band.** The plane is ~30 mm above the plate (DEC-30), so level scans miss
-    anything lower than the plate; body pitch is a shallow sweep (range unrecorded — measure
+  - **The low band.** The plane is ~190 mm above the floor with the body level (measured
+    2026-09-28, [`hardware.md`](hardware.md#head-sensors)), so level scans miss anything
+    lower than that; body pitch is a shallow sweep (range unrecorded — measure
     it), reaching a low obstacle a metre out, not the floor at the feet. The ultrasonic
     covered that band badly; the lidar does not cover it at all.
   - **The camera.** It shares the head. Not working (OQ-23), but face recognition and

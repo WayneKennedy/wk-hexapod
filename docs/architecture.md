@@ -38,6 +38,7 @@ once starved the odometry publisher), and a buzzer that floats on when its proce
 | Buzzer | GPIO 17 | `buzzer_controller` (disabled) / `hexapod-buzzer-guard.service` | held low |
 | HC-SR04 ultrasonic (head) | GPIO 27 trigger, GPIO 22 echo | `ultrasonic_driver` | 15 Hz |
 | OV5647 camera (head) | CSI CAM0, libcamera | `camera_ros` (`/camera/image_raw`) | on demand |
+| RPLIDAR C1 (plate over the Pi stack, DEC-30) | USB serial, `/dev/ttyUSB0`, 460800 | `sllidar_node` (`/scan`, frame `laser_frame`) | 10 Hz |
 
 ## Nodes and topics
 
@@ -104,10 +105,14 @@ The node runs on a multithreaded executor. Gait callbacks are mutually exclusive
 never overlap; odometry, joint-state and IMU callbacks run in a reentrant group so TF keeps
 flowing during a blocking gait cycle.
 
-### Mapping — there is no SLAM
+### Mapping — sonar costmap in the boot stack; lidar SLAM standalone
 
-The D435i is gone (DEC-25), so there is no depth, no visual odometry and no loop closure.
-What takes its place (DEC-28):
+**Since 2026-09-28 the lidar publishes `/scan` and `slam.launch.py` builds a real map from it**
+(DEC-31): `slam_toolbox` publishes `/map` and `map → odom`. It is not yet wired into
+navigation, so it runs only with `autonomy:=false`, and everything below still describes
+the boot stack ([OQ-20](open-questions.md)).
+
+The D435i is gone (DEC-25). What the boot stack maps with (DEC-28):
 
 - **The map is Nav2's global costmap**, a fixed 12 × 12 m grid at 5 cm whose only source is
   `nav2_costmap_2d::RangeSensorLayer` fed from `/ultrasonic/range`. The layer holds a
@@ -153,10 +158,11 @@ separately by `perception.launch.py`; it is not part of the boot stack.
 
 ## Frames
 
-`map → odom` (static identity) → `base_link` (controller odometry) → fixed
-`base_footprint`, `imu_link`; revolute `head_pan_joint` → `head_pan_link` →
+`map → odom` (static identity) → `base_link` (controller odometry) → fixed `imu_link`;
+`base_footprint` is **not** on this tree: the URDF makes it `base_link`'s parent, so it is a
+separate root ([OQ-27](open-questions.md)); revolute `head_pan_joint` → `head_pan_link` →
 `head_tilt_joint` → `head_tilt_link` → fixed `camera_link` → `camera_optical_frame`, and
-fixed `ultrasonic_link`. All from `hexapod_bringup/urdf/hexapod.urdf` via
+fixed `ultrasonic_link`; fixed `laser_frame` off `base_link` (yaw π, z 0.16 m; x, y unmeasured). All from `hexapod_bringup/urdf/hexapod.urdf` via
 `robot_state_publisher`, fed by the leg controller's `/joint_states` (legs) and
 `head_controller`'s (head). The head offsets in the URDF are estimates, not measured.
 
@@ -165,7 +171,7 @@ fixed `ultrasonic_link`. All from `hexapod_bringup/urdf/hexapod.urdf` via
 ```
 robot.launch.py                 (systemd: autonomy:=true)
 ├── robot_state_publisher, imu_driver, imu_filter, ultrasonic_driver, camera_ros
-│   (camera:=true), battery_monitor, servo_driver, led_controller, buzzer_controller,
+│   (camera:=true), sllidar_node (lidar:=true), battery_monitor, servo_driver, led_controller, buzzer_controller,
 │   power_indicator, startup_sequence, controller, head_controller
 └── autonomy.launch.py          (autonomy:=true)
     ├── navigation.launch.py       (nav:=true; Nav2 plus the static map → odom)
@@ -175,7 +181,8 @@ robot.launch.py                 (systemd: autonomy:=true)
 
 `hardware.launch.py` is the drivers alone; `controller.launch.py` is the leg controller
 alone with direct servo access (`test_ros.sh`); `perception.launch.py` adds face
-recognition.
+recognition; `slam.launch.py` adds `slam_toolbox`, and must not run alongside
+`navigation.launch.py` (both publish `map → odom`).
 
 ## Topic contract
 

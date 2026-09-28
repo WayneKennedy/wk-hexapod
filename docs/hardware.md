@@ -41,7 +41,8 @@ RobotShop #1499979, £47.76 ex VAT, product code RB-Rpk-35; one of two, the othe
 Datasheet facts and the Jazzy driver status are in
 [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#depth-which-kind-for-which-task);
 what it is for, and what is open until it arrives, is [OQ-19](open-questions.md). Bench
-facts still to record: mass as delivered, current over USB, the plate and scan-plane heights.
+facts still to record: mass as delivered, current over USB (datasheet: 230 mA typical at 5 V,
+so USB power suffices), and the lidar's x/y offset from the body centre.
 
 **Dry fit, 2026-09-26 (owner's photo):** an old Pi VESA mount plate — Pi hole pattern
 underneath, honeycomb fill — on four brass standoffs above the Freenove shield, the lidar
@@ -56,6 +57,23 @@ beside the lidar *in* the scan plane (30 mm above the base) — route it down th
 the pan/tilt head tops out near the lidar's mid-height, so whether it crosses the plane
 depends on tilt — measure; a raised leg reaches the plane in swing, so a body-radius range
 mask on the scan is cheap insurance.
+
+**Bench facts, 2026-09-28, USB power, legs limp** ([`test-log.md`](test-log.md)):
+
+- **Driver:** `sllidar_ros2` (SDK 2.1.0; DEC-31). The C1 reports firmware 1.02, hardware
+  rev 18, health OK; Standard mode, 5 kHz, **10.0 Hz, 720 points at 0.5°**, `/dev/ttyUSB0`
+  (CP2102N). apt's `rplidar_ros` 2.1.0 does not run it.
+- **Height:** scan plane ~155 mm above the belly, belly ~35 mm off the floor at stand
+  (owner's measurements), so **~190 mm above the floor** level; `laser_frame` z = 0.16 m
+  above `base_link`. Nothing lower than that is seen when the body is level.
+- **Yaw π.** The arrow on the C1's cap faces the robot's front, and the driver's 0° points
+  the other way. Found with objects at owner-measured positions from the lidar centre:
+  boxes 500 mm ahead read 0.494–0.50 m at 180°; a wall 270 mm behind read 0.274 m at 0°;
+  a pole ~240 mm behind-left read 0.234 m at −50°, which also shows the scan is not
+  mirrored.
+- **No self-hits at rest:** the nearest return with nothing placed near the robot was
+  0.29 m. `slam_params.yaml` drops returns under 0.25 m. Not checked: a leg in swing, and
+  the head at full tilt.
 
 **Echo timing.** DEC-02 removed the ultrasonic partly because a software-timed echo on a
 non-real-time kernel was unreliable. The driver now times the echo from the kernel's
