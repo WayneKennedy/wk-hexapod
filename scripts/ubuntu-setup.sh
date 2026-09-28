@@ -95,6 +95,8 @@ APT_PACKAGES=(
     ros-jazzy-camera-ros
     ros-jazzy-cv-bridge ros-jazzy-image-transport ros-jazzy-diagnostic-updater
     ros-jazzy-foxglove-bridge ros-jazzy-pcl-ros ros-jazzy-laser-geometry
+    # RPLIDAR C1 mapping (DEC-31). The C1 driver is built from source: ros2_ws/deps.repos.
+    ros-jazzy-slam-toolbox
     python3-gpiozero python3-lgpio python3-spidev python3-smbus python3-numpy python3-opencv python3-flask
     python3-pip python3-dev build-essential cmake libopenblas-dev liblapack-dev
     i2c-tools gpiod
@@ -139,6 +141,7 @@ if $SKIP_BUILD; then
 else
     log "Step 9: build workspace"
     run sudo -u "$ACTUAL_USER" bash -c "source /opt/ros/jazzy/setup.bash && cd '$REPO_DIR/ros2_ws' && \
+        mkdir -p src/external && vcs import --force src/external < deps.repos && \
         rosdep install --from-paths src --ignore-src -y -r && colcon build --symlink-install"
 fi
 

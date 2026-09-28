@@ -40,6 +40,12 @@ versions verified on the robot on 2026-09-09.
 | `ros-jazzy-imu-filter-madgwick` | 2.1.5 | `/imu/data` orientation |
 | `ros-jazzy-robot-state-publisher` | 3.3.4 | URDF → TF |
 | `ros-jazzy-foxglove-bridge` | 3.4.1 | Installed, not launched |
+| `ros-jazzy-slam-toolbox` | 2.8.5 | Lidar SLAM, `slam.launch.py` (DEC-31; installed before 2026-09-28) |
+
+**From source, pinned in `ros2_ws/deps.repos`:** Slamtec
+[`sllidar_ros2`](https://github.com/Slamtec/sllidar_ros2) at `34300099` (2024-06-17, v1.0.1,
+BSD), the RPLIDAR C1 driver (DEC-31). apt's `ros-jazzy-rplidar-ros` 2.1.0 was installed on
+the robot on 2026-09-28 during the test and cannot drive the C1; it is unused.
 
 Python from apt: `python3-gpiozero` 2.0.1, `python3-lgpio` (its edge timestamps are
 `CLOCK_MONOTONIC`; the ultrasonic driver times echoes with them), `python3-spidev`,

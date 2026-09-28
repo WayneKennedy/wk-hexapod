@@ -127,4 +127,18 @@
     <origin xyz="0.03 0 0" rpy="0 0 0"/>
   </joint>
 
+  <!--
+    RPLIDAR C1 on the plate over the Pi stack (DEC-30); frame of /scan.
+    z: the owner measured the scan plane ~155 mm above the belly, and put the belly
+    ~35 mm off the floor at stand (2026-09-28); base_link is 30 mm up, so ~0.16 m.
+    yaw pi: the driver's 0 deg points away from the C1's arrow, and the arrow faces
+    forward (bench test 2026-09-28, docs/hardware.md). x and y are NOT measured.
+  -->
+  <link name="laser_frame"/>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_frame"/>
+    <origin xyz="0 0 0.16" rpy="0 0 3.14159265"/>
+  </joint>
+
 </robot>
