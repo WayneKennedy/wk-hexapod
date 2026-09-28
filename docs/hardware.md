@@ -42,7 +42,7 @@ Datasheet facts and the Jazzy driver status are in
 [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#depth-which-kind-for-which-task);
 what it is for, and what is open until it arrives, is [OQ-19](open-questions.md). Bench
 facts still to record: mass as delivered, current over USB (datasheet: 230 mA typical at 5 V,
-so USB power suffices), and the lidar's x/y offset from the body centre.
+so USB power suffices).
 
 **Dry fit, 2026-09-26 (owner's photo):** an old Pi VESA mount plate — Pi hole pattern
 underneath, honeycomb fill — on four brass standoffs above the Freenove shield, the lidar
@@ -66,6 +66,8 @@ mask on the scan is cheap insurance.
 - **Height:** scan plane ~155 mm above the belly, belly ~35 mm off the floor at stand
   (owner's measurements), so **~190 mm above the floor** level; `laser_frame` z = 0.16 m
   above `base_link`. Nothing lower than that is seen when the body is level.
+- **Plan position:** lidar centre 10 mm forward of the body centre, centred side to side
+  (owner, 2026-09-28): `laser_frame` x = +0.010 m, y = 0.
 - **Yaw π.** The arrow on the C1's cap faces the robot's front, and the driver's 0° points
   the other way. Found with objects at owner-measured positions from the lidar centre:
   boxes 500 mm ahead read 0.494–0.50 m at 180°; a wall 270 mm behind read 0.274 m at 0°;

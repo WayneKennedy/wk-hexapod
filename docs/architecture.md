@@ -162,7 +162,7 @@ separately by `perception.launch.py`; it is not part of the boot stack.
 `base_footprint` is **not** on this tree: the URDF makes it `base_link`'s parent, so it is a
 separate root ([OQ-27](open-questions.md)); revolute `head_pan_joint` → `head_pan_link` →
 `head_tilt_joint` → `head_tilt_link` → fixed `camera_link` → `camera_optical_frame`, and
-fixed `ultrasonic_link`; fixed `laser_frame` off `base_link` (yaw π, z 0.16 m; x, y unmeasured). All from `hexapod_bringup/urdf/hexapod.urdf` via
+fixed `ultrasonic_link`; fixed `laser_frame` off `base_link` (x +0.010 m, yaw π, z 0.16 m). All from `hexapod_bringup/urdf/hexapod.urdf` via
 `robot_state_publisher`, fed by the leg controller's `/joint_states` (legs) and
 `head_controller`'s (head). The head offsets in the URDF are estimates, not measured.
 
