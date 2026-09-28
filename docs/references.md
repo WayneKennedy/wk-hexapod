@@ -44,8 +44,9 @@ versions verified on the robot on 2026-09-09.
 
 **From source, pinned in `ros2_ws/deps.repos`:** Slamtec
 [`sllidar_ros2`](https://github.com/Slamtec/sllidar_ros2) at `34300099` (2024-06-17, v1.0.1,
-BSD), the RPLIDAR C1 driver (DEC-31). apt's `ros-jazzy-rplidar-ros` 2.1.0 was installed on
-the robot on 2026-09-28 during the test and cannot drive the C1; it is unused.
+BSD), the RPLIDAR C1 driver (DEC-31). apt's `ros-jazzy-rplidar-ros` 2.1.0 cannot drive the C1;
+it was installed for the 2026-09-28 test and removed the same day. `slam_toolbox` is also a
+dependency of `nav2-bringup`; it is marked manual on the robot now that the script lists it.
 
 Python from apt: `python3-gpiozero` 2.0.1, `python3-lgpio` (its edge timestamps are
 `CLOCK_MONOTONIC`; the ultrasonic driver times echoes with them), `python3-spidev`,
