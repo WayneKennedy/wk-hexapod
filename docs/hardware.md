@@ -49,7 +49,9 @@ sitting loose on it (VESA holes do not match the C1's 43 mm square; the plate ne
 M2.5 holes, ≤ 4 mm into the lidar). **The replacement plate is designed:**
 [wk-robotics `tools/lidar-mount/`](https://github.com/WayneKennedy/wk-robotics/tree/main/tools/lidar-mount)
 (2026-09-26) — HAT outline on the Pi holes, 10 mm bosses, M2.5 × 8 from below, cable slot;
-scan plane 39.8 mm above the plate top. Unprinted; STL staged on the print host. Seen in the photo, for OQ-19: the USB lead was coiled
+scan plane 39.8 mm above the plate top. **Printed and fitted 2026-09-28** (owner: "success",
+with a photo). In that photo the USB lead leaves the back of the lidar and drops beside the stack,
+looping at about plate height, below the scan window; not measured. Seen in the 2026-09-26 dry-fit photo, for OQ-19: the USB lead was coiled
 beside the lidar *in* the scan plane (30 mm above the base) — route it down through the plate;
 the pan/tilt head tops out near the lidar's mid-height, so whether it crosses the plane
 depends on tilt — measure; a raised leg reaches the plane in swing, so a body-radius range
