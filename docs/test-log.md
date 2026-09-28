@@ -391,11 +391,18 @@ yaw test.
 4. **Laser yaw π**, from objects the owner placed and measured from the lidar centre:
    boxes 500 mm dead ahead → 0.494–0.50 m at 180°; wall 270 mm behind → 0.274 m at 0°;
    pole ~240 mm behind-left → 0.234 m at −50°, which rules out a mirrored scan. A
-   photo-based guess of −90° was wrong. Confirmed live after the change: `base_link →
-   laser_frame` z 0.160 m, yaw 180°.
+   photo-based guess of −90° was wrong. The first live check of the change (yaw 180°) was
+   luck: see 6. After the fix below, three consecutive reads gave x 0.010, y 0, z 0.160,
+   yaw 180°, once the owner's plan position (10 mm forward, centred) was added.
 5. **A hand-started stack ignores SIGINT** (`setsid nohup … &`); SIGTERM to `ros2 launch`
    orphaned the nodes, which then exited on SIGTERM by PID. GPIO 17 stayed held by the
    guard throughout. Recorded in [`operations.md`](operations.md#development-loop).
+6. **The cleanup missed two orphans**, because it matched only this repo's node paths:
+   `robot_state_publisher` (publishing the original URDF, laser yaw 0) and `imu_filter`
+   ran for ~50 min alongside `hexapod.service`, so `/tf_static` carried two conflicting
+   `base_link → laser_frame` and `/imu/data` had two publishers. No harm on USB power (the
+   controller fuses IMU yaw only while walking). SIGTERM by PID ended both; `/imu/data`
+   back to one publisher.
 
 **What changed:** DEC-31; `ros2_ws/deps.repos`; `lidar:=true` in `robot.launch.py`;
 `laser_frame` in the URDF; `slam.launch.py` and `config/slam_params.yaml`. Not tested:

@@ -234,7 +234,10 @@ ssh <robot> 'sudo systemctl restart hexapod'     # one call; inspect in another
   `ros2 launch` does nothing; SIGTERM makes `ros2 launch` exit but leaves the nodes running,
   orphaned. SIGTERM the orphans by PID after checking GPIO 17 is held by `gpioset` (the
   guard), not by a node: `gpioinfo gpiochip4 | grep 'line  17'` (read-only; never
-  `gpioget`). rclpy nodes exit cleanly on SIGTERM. `hexapod.service` is unaffected: systemd
+  `gpioget`). rclpy nodes exit cleanly on SIGTERM. **Find orphans by parent, not by name** —
+  `robot_state_publisher` and `imu_filter` live under `/opt/ros`, not `ros2_ws`, and were
+  missed once: `ps -eo pid,ppid,args | awk '$2==1' | grep -E '/opt/ros|ros2_ws'` must show
+  nothing but the service's own `ros2 launch`. `hexapod.service` is unaffected: systemd
   starts it with default signal handling.
 
 Python nodes are symlink-installed: restart the service after editing. Rebuild after
