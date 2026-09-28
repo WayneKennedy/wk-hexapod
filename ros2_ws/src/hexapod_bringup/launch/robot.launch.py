@@ -4,7 +4,7 @@ Main launch file for Hexapod Robot
 Starts all robot components:
 - Robot state publisher (URDF/TF)
 - Hardware drivers (servo, IMU + orientation filter, ultrasonic, battery, LED,
-  buzzer) and the Pi camera (camera_ros)
+  buzzer), the Pi camera (camera_ros) and the RPLIDAR C1 (sllidar_ros2, /scan)
 - Power indicator and startup sequence
 - Locomotion controller (legs) and head controller (pan/tilt, sonar scan)
 - Optionally: Autonomous behavior system (sonar mapping, Nav2, exploration,
@@ -65,11 +65,18 @@ def generate_launch_description():
         description='Start the OV5647 Pi camera (camera_ros)'
     )
 
+    lidar_arg = DeclareLaunchArgument(
+        'lidar',
+        default_value='true',
+        description='Start the RPLIDAR C1 (sllidar_ros2) on /scan'
+    )
+
     return LaunchDescription([
         use_sim_arg,
         autonomy_arg,
         mission_timeout_arg,
         camera_arg,
+        lidar_arg,
 
         # ===== Robot State Publisher (URDF/TF) =====
 
@@ -131,6 +138,25 @@ def generate_launch_description():
             }],
             output='screen',
             condition=IfCondition(LaunchConfiguration('camera')),
+        ),
+
+        # RPLIDAR C1 -> /scan (frame laser_frame). The only USB serial device on
+        # the robot, so ttyUSB0. Standard mode: 10 Hz, 720 points at 0.5 deg.
+        Node(
+            package='sllidar_ros2',
+            executable='sllidar_node',
+            name='sllidar_node',
+            parameters=[{
+                'channel_type': 'serial',
+                'serial_port': '/dev/ttyUSB0',
+                'serial_baudrate': 460800,
+                'frame_id': 'laser_frame',
+                'inverted': False,
+                'angle_compensate': True,
+                'scan_mode': 'Standard',
+            }],
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('lidar')),
         ),
 
         # Battery Monitor

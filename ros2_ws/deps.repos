@@ -1,0 +1,10 @@
+# Source dependencies not released for Jazzy on apt, imported into ros2_ws/src/external/
+# by scripts/ubuntu-setup.sh (vcs import). Pinned by commit.
+repositories:
+  sllidar_ros2:
+    # Slamtec's driver: the only one that runs the RPLIDAR C1. The apt rplidar_ros 2.1.0
+    # bundles SDK 1.12, which reads the C1's info and then fails to start a scan
+    # (80008002), 2026-09-28. BSD licence.
+    type: git
+    url: https://github.com/Slamtec/sllidar_ros2.git
+    version: 34300099fadfc772965962dec837bf436706188f
