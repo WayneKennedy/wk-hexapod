@@ -153,7 +153,7 @@ there is no `Spin`. `Spin` is not loaded in `behavior_server` either.
 | `autonomy_manager` | State machine: `waiting_for_startup → look_around → mapping_mode → exploring → exploration_complete / error`. The head survey is the first act of every run; `checking_map` and `localization_mode` are unreachable while there is no saved map | `/autonomy/state` (`AutonomyState`), `/robot/initialized` |
 | `frontier_explorer` | Frontier detection on `/global_costmap/costmap`, closest-first, Nav2 `navigate_to_pose` goals, blacklists unreachable goals, head survey on arrival, ignores frontiers nearer than `min_goal_distance` | `ExploreFrontiers` action |
 | `mission_server` | External missions: `explore`, `navigate`, `patrol`, `return_home` | `/mission/start` (`StartMission`), `/mission/stop` (`StopMission`); `/mission/command` |
-| `web_dashboard` (`hexapod_perception`) | Flask on port 8080: camera, **sonar fan** and map streams (what each panel can be trusted for: [OQ-33](open-questions.md)), battery, faces, mission control | `POST /api/mission/start`, `POST /api/mission/stop`, `GET /api/autonomy/state`, `GET /status` |
+| `web_dashboard` (`hexapod_perception`) | Flask on port 8080: camera, **lidar view** (the current scan, body frame) and map streams (what each panel can be trusted for: [OQ-33](open-questions.md)), battery, faces, mission control | `POST /api/mission/start`, `POST /api/mission/stop`, `GET /api/autonomy/state`, `GET /status` |
 
 `face_recognition_node` (`hexapod_perception`) consumes `/camera/image_raw` and is launched
 separately by `perception.launch.py`; it is not part of the boot stack.

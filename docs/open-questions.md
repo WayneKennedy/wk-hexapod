@@ -108,7 +108,8 @@ owner deciding.
   wrong bearing in the map. Also unverified: `pan_direction` (which way a rising servo
   angle turns the head) and the travel limits, kept at ±40° inside the vendor app's 50–180
   clamp. Needs the battery and the owner: command known angles, watch the head, and check
-  the dashboard's sonar fan against a target at a known bearing. Cheapest mitigation if the
+  `/ultrasonic/range` against a target at a known bearing (the dashboard's sonar fan went
+  on 2026-09-29). Cheapest mitigation if the
   model proves poor: only trust readings taken while the head is settled.
 
 - **OQ-28 — The startup sequence sends `home` before the controller is listening.**
@@ -157,7 +158,8 @@ owner deciding.
   `odom → base_footprint` fails ("not part of the same tree"). Nothing uses it today —
   `slam_params.yaml` sets `base_frame: base_link` for that reason, and no Nav2 parameter names
   it. Fix when anything needs a ground-plane frame: invert the joint (`base_link →
-  base_footprint`, z −0.03).
+  base_footprint`, z −0.08 at the 80 mm stand of [DEC-34](decisions.md); the URDF still
+  says 0.03).
 
 ## Compute
 
@@ -247,15 +249,17 @@ owner deciding.
   assessment, 2026-09-29; read from `web_dashboard.py` and compared with the robot's logs.)
   Faithful: the two voltages while `battery_monitor` publishes, the autonomy state and the
   mission fields (2 Hz from `autonomy_manager`), "No Camera Feed". Not faithful:
-  - **Nothing goes stale** except the sonar (2 s). Every other value is the last one
+  - **Nothing goes stale** except the scan (1 s) and the robot's pose on the map (2 s). Every other value is the last one
     received, for ever. With the I2C bus dead (OQ-32) `battery_monitor` published nothing
     and the page showed 0.0 V, which it labels "USB", on the battery.
-  - **Sonar fan:** each ping is drawn at `head_pan_joint`, which is a model (OQ-21) and
-    since OQ-30 a constant zero, while the head hangs limp. The range is real; the bearing
-    is not known. The panel's title says "head sweep".
-  - **Map:** titled "sonar"; it is the global costmap, so inflation (cost 1–99) is drawn in
-    the same red as obstacles and a room looks mostly blocked. No robot, goal, scale or
-    frontier is drawn. "Map: Active" means one costmap message was ever received.
+  - **Sonar fan: removed 2026-09-29** (owner). In its place the lidar view draws the
+    current scan in the body frame, robot facing up, and the status shows the nearest
+    return and its bearing.
+  - **Map: partly fixed 2026-09-29** (owner asked for the robot on it). It is still the
+    global costmap. Obstacles (100), inscribed cells (99) and inflation (1–98) now have
+    different colours, and the robot's radius and heading, the current scan and a 1 m
+    scale are drawn from TF. No goal or frontier is drawn. "Map: Active" still means one
+    costmap message was ever received.
   - **SLAM mode** is a constant set in `autonomy_manager`, not read from `slam_toolbox`. It
     said "mapping" under DEC-28, when there was no SLAM, and while SLAM produced no map.
   - **Exploration %** is frontiers reached × 10.

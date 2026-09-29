@@ -63,9 +63,11 @@ mask on the scan is cheap insurance.
 - **Driver:** `sllidar_ros2` (SDK 2.1.0; DEC-31). The C1 reports firmware 1.02, hardware
   rev 18, health OK; Standard mode, 5 kHz, **10.0 Hz, 720 points at 0.5°**, `/dev/ttyUSB0`
   (CP2102N). apt's `rplidar_ros` 2.1.0 does not run it.
-- **Height:** scan plane ~155 mm above the belly, belly ~35 mm off the floor at stand
-  (owner's measurements), so **~190 mm above the floor** level; `laser_frame` z = 0.16 m
-  above `base_link`. Nothing lower than that is seen when the body is level.
+- **Height:** scan plane ~155 mm above the belly, belly ~35 mm off the floor at the 30 mm
+  stand (owner's measurements, 2026-09-28), so ~190 mm above the floor then. **At the
+  80 mm stand ([DEC-34](decisions.md)) that is ~240 mm, by arithmetic, not measured.**
+  `laser_frame` z = 0.16 m above `base_link`. Nothing lower than the scan plane is seen
+  when the body is level.
 - **Plan position:** lidar centre 10 mm forward of the body centre, centred side to side
   (owner, 2026-09-28): `laser_frame` x = +0.010 m, y = 0.
 - **Yaw π.** The arrow on the C1's cap faces the robot's front, and the driver's 0° points
@@ -111,8 +113,9 @@ see [`operations.md`](operations.md#troubleshooting) and [OQ-32](open-questions.
 
 Link lengths coxa **33**, femur **90**, tibia **110 mm**. Leg mounting angles
 `[54, 0, −54, −126, 180, 126]°` and offsets `[94, 85, 94, 94, 85, 94] mm` from the body
-origin; default foot positions at `(±137.1, ±189.4)` and `(±225, 0)` mm; body height 30 mm
-above the home pose. All from the reference `control.py`; see
+origin; default foot positions at `(±137.1, ±189.4)` and `(±225, 0)` mm, all from the reference
+`control.py`. The stand raises the body 80 mm above the home pose
+([DEC-34](decisions.md)); the reference stands at 25 mm and its app offers 10–50. See
 `hexapod_controller/config/body_params.yaml` for the tunable subset.
 
 ## Power

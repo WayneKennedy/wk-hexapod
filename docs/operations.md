@@ -107,7 +107,8 @@ Stop both with SIGTERM to their `ros2 launch` processes (see the development loo
 `python3 scripts/scan-near.py` prints the lidar's nearest returns by body bearing, for
 finding returns from the robot itself ([OQ-31](open-questions.md)).
 
-To watch the map while the robot runs: the dashboard's map panel on port 8080, or
+To watch the map while the robot runs: the dashboard's map panel on port 8080, which
+draws the robot's radius and heading and the current scan on the global costmap, or
 
 ```bash
 ros2 topic echo /global_costmap/costmap --once --field info
@@ -164,8 +165,9 @@ ros2 topic echo /joint_states --once
 ros2 action send_goal /look_around hexapod_interfaces/action/LookAround "{sweeps: 1}"
 # 3. Slew rate. Time a full limit-to-limit sweep: 2 * (pan_limit_left + pan_limit_right)
 #    degrees over the sweep's duration, minus the dwells, is the rate. Set slew_rate.
-# 4. Bearing check. Put a box 1 m ahead and to one side, open the dashboard's sonar
-#    fan (port 8080) and confirm the echo appears at the right bearing.
+# 4. Bearing check. Put a box 1 m ahead and to one side and confirm that
+#    /ultrasonic/range reads it when head_pan_joint points at it. The dashboard no
+#    longer draws the sonar (2026-09-29); its lidar view shows where the box is.
 ```
 
 ### Movement calibration

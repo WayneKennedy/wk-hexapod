@@ -133,7 +133,7 @@ class HexapodController(Node):
         self.declare_parameters(namespace='', parameters=[
             ('body.leg_angles', [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]),
             ('body.leg_offsets', [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]),
-            ('body.default_height', 30.0),
+            ('body.default_height', 80.0),
             ('body.height_offset', 14.0),
             ('balance.enabled', False),
             ('balance.kp', 0.5),
@@ -727,7 +727,7 @@ class HexapodController(Node):
         if y is not None:
             self.body_position[1] = self._clamp(y, -40, 40)
         if z is not None:
-            self.body_position[2] = self._clamp(z, -50, 0)
+            self.body_position[2] = self._clamp(z, -100, 0)
         if roll is not None:
             self.body_orientation[0] = self._clamp(roll, -15, 15)
         if pitch is not None:

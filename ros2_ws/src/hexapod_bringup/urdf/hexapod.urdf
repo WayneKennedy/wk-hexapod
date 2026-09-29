@@ -130,7 +130,9 @@
   <!--
     RPLIDAR C1 on the plate over the Pi stack (DEC-30); frame of /scan.
     z: the owner measured the scan plane ~155 mm above the belly, and put the belly
-    ~35 mm off the floor at stand (2026-09-28); base_link is 30 mm up, so ~0.16 m.
+    ~35 mm off the floor at the 30 mm stand (2026-09-28); base_link is 30 mm up, so
+    ~0.16 m. The stand is 80 mm since DEC-34: the scan plane is ~0.24 m above the
+    floor, and base_footprint below is 50 mm out (unused, OQ-27).
     yaw pi: the driver's 0 deg points away from the C1's arrow, and the arrow faces
     forward (bench test 2026-09-28, docs/hardware.md). x, y: lidar centre 10 mm forward
     of the body centre, centred side to side (owner, 2026-09-28).

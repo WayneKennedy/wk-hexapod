@@ -4,8 +4,9 @@ Web Dashboard for Hexapod Robot
 
 Provides a lightweight web interface with:
 - MJPEG camera stream with face detection overlay
-- Sonar fan: recent ultrasonic ranges at the head pan they were taken at
-- Map display (Nav2's global costmap, built from the sonar)
+- Lidar view: the current 360 degree scan around the robot, in the body frame
+- Map display: Nav2's global costmap (slam_toolbox's map plus live lidar
+  obstacles, DEC-32) with the robot, its heading and the current scan drawn on it
 - Robot status display
 
 Access at http://<robot-ip>:8080
@@ -15,7 +16,10 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from sensor_msgs.msg import Image, JointState, Range
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.time import Time
+from sensor_msgs.msg import Image, LaserScan
+from tf2_ros import Buffer, TransformListener
 from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PoseStamped
@@ -24,7 +28,6 @@ import cv2
 import math
 import threading
 import time
-from collections import deque
 from flask import Flask, Response, render_template_string, request
 import json
 
@@ -55,22 +58,23 @@ class WebDashboard(Node):
         self.declare_parameter('quality', 80)
         self.declare_parameter('image_topic', '/camera/image_raw')
         self.declare_parameter('map_topic', '/global_costmap/costmap')
-        self.declare_parameter('sonar_history_sec', 6.0)
+        self.declare_parameter('lidar_view_range', 3.0)  # m, radius of the lidar view
+        # Drawn on the map; the figure Nav2 plans with (nav2_params.yaml)
+        self.declare_parameter('robot_radius', 0.24)
+        self.robot_radius = self.get_parameter('robot_radius').value
         self.port = self.get_parameter('port').value
         self.quality = self.get_parameter('quality').value
-        self.sonar_history = self.get_parameter('sonar_history_sec').value
+        self.lidar_view_range = self.get_parameter('lidar_view_range').value
 
         # State
         self.current_frame = None
-        # Sonar pings: (monotonic time, head pan rad, range m, max range m)
-        self.sonar_pings = deque(maxlen=400)
-        self.head_pan = 0.0
         self.current_map = None
+        self.map_info = None      # (frame, resolution, origin x, origin y, height in cells)
+        self.latest_scan = None   # (monotonic time received, LaserScan)
         self.current_faces = []
         self.battery_voltages = [0.0, 0.0]
         self.autonomy_state = None
         self.frame_lock = threading.Lock()
-        self.sonar_lock = threading.Lock()
         self.map_lock = threading.Lock()
         self.autonomy_lock = threading.Lock()
 
@@ -82,19 +86,21 @@ class WebDashboard(Node):
             10
         )
 
-        # Ultrasonic ranges and the head pan they were taken at
-        self.range_sub = self.create_subscription(
-            Range, '/ultrasonic/range', self.range_callback, 10)
-        self.joint_sub = self.create_subscription(
-            JointState, '/joint_states', self.joint_callback, 10)
-
-        # Map (Nav2 global costmap from the sonar)
+        # Map (Nav2 global costmap, DEC-32)
         self.map_sub = self.create_subscription(
             OccupancyGrid,
             self.get_parameter('map_topic').value,
             self.map_callback,
             10
         )
+
+        # The robot's pose and the current scan, drawn on the map and in the
+        # lidar view. The scan is only stored here; it is converted when a
+        # frame is drawn.
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.scan_sub = self.create_subscription(
+            LaserScan, '/scan', self.scan_callback, qos_profile_sensor_data)
 
         # Subscribe to face detection
         if FACE_MSGS_AVAILABLE:
@@ -167,16 +173,6 @@ class WebDashboard(Node):
         except Exception as e:
             self.get_logger().warn(f'Failed to process image: {e}')
 
-    def joint_callback(self, msg):
-        """Track the head pan from head_controller's joint states"""
-        if 'head_pan_joint' in msg.name:
-            self.head_pan = msg.position[msg.name.index('head_pan_joint')]
-
-    def range_callback(self, msg):
-        """Record a ping at the current head pan"""
-        with self.sonar_lock:
-            self.sonar_pings.append((time.monotonic(), self.head_pan, msg.range, msg.max_range))
-
     def map_callback(self, msg):
         """Convert occupancy grid to image"""
         try:
@@ -185,27 +181,107 @@ class WebDashboard(Node):
             height = msg.info.height
             data = np.array(msg.data, dtype=np.int8).reshape((height, width))
 
-            # Create RGB image
-            # -1 (unknown) -> gray, 0 (free) -> white, 100 (occupied) -> black
+            # BGR. Costmap values: -1 unknown, 0 free, 1-98 inflation,
+            # 99 inscribed (the body would touch), 100 an obstacle itself.
             map_img = np.zeros((height, width, 3), dtype=np.uint8)
-
-            # Unknown = dark gray
             map_img[data == -1] = [40, 40, 40]
-            # Free = light gray/white
             map_img[data == 0] = [200, 200, 200]
-            # Occupied = colored based on certainty
-            occupied_mask = data > 0
-            map_img[occupied_mask, 0] = 0  # B
-            map_img[occupied_mask, 1] = 0  # G
-            map_img[occupied_mask, 2] = np.clip(data[occupied_mask] * 2.5, 0, 255).astype(np.uint8)  # R
+            inflated = (data > 0) & (data < 99)
+            f = data[inflated].astype(np.float32)[:, None] / 98.0
+            map_img[inflated] = (200 * (1 - f) + np.array([90, 190, 240]) * f).astype(np.uint8)
+            map_img[data == 99] = [60, 130, 250]
+            map_img[data == 100] = [0, 0, 200]
 
             # Flip vertically (ROS maps have origin at bottom-left)
             map_img = cv2.flip(map_img, 0)
 
             with self.map_lock:
                 self.current_map = map_img
+                self.map_info = (msg.header.frame_id, msg.info.resolution,
+                                 msg.info.origin.position.x, msg.info.origin.position.y,
+                                 height)
         except Exception as e:
             self.get_logger().warn(f'Failed to process map: {e}')
+
+    def scan_callback(self, msg):
+        self.latest_scan = (time.monotonic(), msg)
+
+    def _pose_in(self, frame, child):
+        """(x, y, yaw, age in s) of child in frame from TF, or None"""
+        try:
+            t = self.tf_buffer.lookup_transform(frame, child, Time())
+        except Exception:
+            return None
+        q = t.transform.rotation
+        yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+        age = (self.get_clock().now() - Time.from_msg(t.header.stamp)).nanoseconds * 1e-9
+        return t.transform.translation.x, t.transform.translation.y, yaw, age
+
+    def _scan_points(self, frame):
+        """The current scan as (x, y) arrays in frame, or None without a fresh scan or TF"""
+        scan = self.latest_scan
+        if scan is None or time.monotonic() - scan[0] > 1.0:
+            return None
+        laser = self._pose_in(frame, scan[1].header.frame_id)
+        if laser is None:
+            return None
+        lx, ly, lyaw, _ = laser
+        m = scan[1]
+        r = np.asarray(m.ranges, dtype=np.float32)
+        a = m.angle_min + np.arange(len(r)) * m.angle_increment + lyaw
+        ok = np.isfinite(r) & (r > m.range_min)
+        return lx + r[ok] * np.cos(a[ok]), ly + r[ok] * np.sin(a[ok])
+
+    @staticmethod
+    def _draw_points(img, u, v, colour, size):
+        """Draw points at pixel columns u and rows v as squares of size pixels"""
+        u = u.astype(np.int32)
+        v = v.astype(np.int32)
+        ok = (u >= 0) & (u < img.shape[1]) & (v >= 0) & (v < img.shape[0])
+        mask = np.zeros(img.shape[:2], dtype=np.uint8)
+        mask[v[ok], u[ok]] = 1
+        if size > 1:
+            mask = cv2.dilate(mask, np.ones((size, size), np.uint8))
+        img[mask > 0] = colour
+
+    def _draw_robot(self, img, info, k):
+        """Draw the scale, the current scan and the robot on a map image of k pixels per cell"""
+        frame, res, ox, oy, height = info
+
+        def px(x, y):
+            return int((x - ox) / res * k), int((height - (y - oy) / res) * k)
+
+        # Scale bar: 1 m
+        bar = int(1.0 / res * k)
+        y0 = img.shape[0] - 10
+        cv2.line(img, (10, y0), (10 + bar, y0), (255, 255, 255), 2)
+        cv2.putText(img, '1 m', (14, y0 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+
+        # The scan as the lidar sees it now
+        points = self._scan_points(frame)
+        if points is not None:
+            self._draw_points(img, (points[0] - ox) / res * k,
+                              (height - (points[1] - oy) / res) * k,
+                              (255, 255, 0), max(2, k // 2))
+
+        # The robot: its planning radius and its heading
+        pose = self._pose_in(frame, 'base_link')
+        if pose is None:
+            cv2.putText(img, 'robot pose unknown', (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
+            return
+        x, y, yaw, age = pose
+        stale = age > 2.0
+        colour = (150, 150, 150) if stale else (0, 220, 0)
+        radius = self.robot_radius / res * k
+        centre = px(x, y)
+        cv2.circle(img, centre, int(radius), colour, 2)
+        tip = (int(centre[0] + 1.8 * radius * math.cos(yaw)),
+               int(centre[1] - 1.8 * radius * math.sin(yaw)))
+        cv2.arrowedLine(img, centre, tip, colour, 2, tipLength=0.35)
+        if stale:
+            cv2.putText(img, f'robot pose {age:.0f} s old', (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
 
     def face_callback(self, msg):
         """Store detected faces for overlay"""
@@ -311,40 +387,39 @@ class WebDashboard(Node):
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         return frame
 
-    def get_sonar_frame(self):
-        """Fan view: the robot at bottom centre, forward up, left to the left.
-
-        Red dots are echoes; grey ticks at the rim are pings with no echo
-        within max range. Older pings fade.
-        """
-        w, h = 640, 400
-        frame = np.zeros((h, w, 3), dtype=np.uint8)
-        cx, cy = w // 2, h - 20
-        now = time.monotonic()
-        with self.sonar_lock:
-            pings = [p for p in self.sonar_pings if now - p[0] < self.sonar_history]
-            head_pan = self.head_pan
-        max_range = pings[-1][3] if pings else 2.0
-        scale = (h - 40) / max_range
-        for r in np.arange(0.5, max_range + 1e-6, 0.5):
-            cv2.circle(frame, (cx, cy), int(r * scale), (60, 60, 60), 1)
-            cv2.putText(frame, f'{r:.1f} m', (cx + 4, cy - int(r * scale) + 14),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (90, 90, 90), 1)
-        for stamp, pan, rng, rmax in pings:
-            fade = 1.0 - (now - stamp) / self.sonar_history
-            x = int(cx - math.sin(pan) * rng * scale)
-            y = int(cy - math.cos(pan) * rng * scale)
-            if rng >= rmax:
-                cv2.circle(frame, (x, y), 2, (int(120 * fade),) * 3, -1)
-            else:
-                cv2.circle(frame, (x, y), 4, (0, 0, int(80 + 175 * fade)), -1)
-        end = (int(cx - math.sin(head_pan) * max_range * scale),
-               int(cy - math.cos(head_pan) * max_range * scale))
-        cv2.line(frame, (cx, cy), end, (0, 120, 0), 1)
-        if not pings:
-            cv2.putText(frame, 'No Sonar Data', (220, 200),
+    def get_lidar_frame(self):
+        """The current scan around the robot: body frame, forward up, left to the left."""
+        size = 600
+        frame = np.zeros((size, size, 3), dtype=np.uint8)
+        c = size // 2
+        scale = (c - 10) / self.lidar_view_range      # pixels per metre
+        for r in np.arange(0.5, self.lidar_view_range + 1e-6, 0.5):
+            cv2.circle(frame, (c, c), int(r * scale), (60, 60, 60), 1)
+            if abs(r - round(r)) < 1e-6:
+                cv2.putText(frame, f'{r:.0f} m', (c + 4, c - int(r * scale) + 14),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (110, 110, 110), 1)
+        points = self._scan_points('base_link')
+        if points is None:
+            cv2.putText(frame, 'No Lidar Data', (190, 200),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        else:
+            # base_link: x forward, y left
+            self._draw_points(frame, c - points[1] * scale, c - points[0] * scale,
+                              (255, 255, 0), 3)
+        radius = int(self.robot_radius * scale)
+        cv2.circle(frame, (c, c), radius, (0, 220, 0), 2)
+        cv2.arrowedLine(frame, (c, c), (c, c - int(1.8 * radius)), (0, 220, 0), 2,
+                        tipLength=0.35)
         return frame
+
+    def _nearest_return(self):
+        """(range m, body bearing deg, + left) of the nearest return, or None"""
+        points = self._scan_points('base_link')
+        if points is None or len(points[0]) == 0:
+            return None
+        d = np.hypot(points[0], points[1])
+        i = int(np.argmin(d))
+        return float(d[i]), math.degrees(math.atan2(points[1][i], points[0][i]))
 
     def get_map_frame(self):
         """Get the occupancy map image"""
@@ -356,7 +431,13 @@ class WebDashboard(Node):
                 cv2.putText(frame, '(Nav2 global costmap not published)', (40, 240),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (80, 80, 80), 1)
                 return frame
-            return self.current_map.copy()
+            img = self.current_map.copy()
+            info = self.map_info
+        # Enlarge so that the overlay has pixels to be drawn in
+        k = max(1, 640 // max(img.shape[:2]))
+        img = cv2.resize(img, None, fx=k, fy=k, interpolation=cv2.INTER_NEAREST)
+        self._draw_robot(img, info, k)
+        return img
 
     def generate_mjpeg(self, frame_getter):
         """Generator for MJPEG stream"""
@@ -381,9 +462,7 @@ class WebDashboard(Node):
         with self.map_lock:
             has_map = self.current_map is not None
 
-        with self.sonar_lock:
-            last = self.sonar_pings[-1] if self.sonar_pings else None
-        has_sonar = last is not None and time.monotonic() - last[0] < 2.0
+        nearest = self._nearest_return()
 
         # Autonomy state
         autonomy_info = {
@@ -422,8 +501,9 @@ class WebDashboard(Node):
             },
             'slam': {
                 'map_available': has_map,
-                'sonar_available': has_sonar,
-                'sonar_range': round(last[2], 3) if has_sonar else None
+                'scan_available': nearest is not None,
+                'scan_nearest': round(nearest[0], 3) if nearest else None,
+                'scan_nearest_bearing': round(nearest[1]) if nearest else None
             },
             'autonomy': autonomy_info
         }
@@ -568,8 +648,8 @@ HTML_TEMPLATE = '''
                 <img src="/stream/color" alt="Camera Feed">
             </div>
             <div class="panel video-panel">
-                <div class="panel-header">Sonar (head sweep)</div>
-                <img src="/stream/sonar" alt="Sonar View">
+                <div class="panel-header">Lidar (360&deg;, robot facing up)</div>
+                <img src="/stream/lidar" alt="Lidar View">
             </div>
             <div class="panel status-panel">
                 <div class="stat">
@@ -585,8 +665,8 @@ HTML_TEMPLATE = '''
                     <span class="stat-value" id="ctrl-voltage">--</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">Sonar</span>
-                    <span class="stat-value" id="sonar-status">--</span>
+                    <span class="stat-label">Nearest return</span>
+                    <span class="stat-value" id="scan-status">--</span>
                 </div>
                 <div class="stat">
                     <span class="stat-label">Map</span>
@@ -598,14 +678,14 @@ HTML_TEMPLATE = '''
                 </div>
                 <div class="faces" id="recognized-faces"></div>
                 <div class="legend">
-                    <strong>Sonar Legend:</strong>
+                    <strong>Lidar view:</strong>
                     <div class="legend-item">
-                        <span class="legend-color" style="background: #f00;"></span>
-                        <span>Echo (fades with age)</span>
+                        <span class="legend-color" style="background: #0ff;"></span>
+                        <span>Return in the current scan</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-color" style="background: #888;"></span>
-                        <span>No echo within range</span>
+                        <span class="legend-color" style="background: #00dc00;"></span>
+                        <span>The robot, 0.24 m radius, facing up</span>
                     </div>
                 </div>
             </div>
@@ -641,8 +721,15 @@ HTML_TEMPLATE = '''
                 </div>
             </div>
             <div class="panel video-panel" style="grid-column: span 1;">
-                <div class="panel-header">Map (sonar)</div>
+                <div class="panel-header">Map (lidar)</div>
                 <img src="/stream/map" alt="SLAM Map" style="width: 100%; height: auto;">
+                <div style="padding: 8px 12px; font-size: 0.8em; color: #888;">
+                    <span style="color: #00dc00;">Green</span>: the robot (circle 0.24 m, the radius Nav2 plans with) and its heading.
+                    <span style="color: #00ffff;">Cyan</span>: what the lidar sees now.
+                    <span style="color: #c80000;">Red</span>: obstacle.
+                    <span style="color: #fa823c;">Orange</span>: too close to one for the body to pass.
+                    Light grey: free. Dark: unknown.
+                </div>
             </div>
         </div>
     </div>
@@ -673,9 +760,11 @@ HTML_TEMPLATE = '''
                     }
 
                     // SLAM status
-                    const sonarEl = document.getElementById('sonar-status');
-                    sonarEl.textContent = data.slam.sonar_available ? data.slam.sonar_range.toFixed(2) + ' m' : 'No Data';
-                    sonarEl.className = 'stat-value ' + (data.slam.sonar_available ? 'good' : '');
+                    const scanEl = document.getElementById('scan-status');
+                    scanEl.textContent = data.slam.scan_available
+                        ? data.slam.scan_nearest.toFixed(2) + ' m at ' + data.slam.scan_nearest_bearing + '\u00b0'
+                        : 'No Data';
+                    scanEl.className = 'stat-value ' + (data.slam.scan_available ? 'good' : '');
 
                     const mapEl = document.getElementById('map-status');
                     mapEl.textContent = data.slam.map_available ? 'Active' : 'Not Running';
@@ -783,9 +872,9 @@ def stream_color():
     return Response(dashboard_node.generate_mjpeg(dashboard_node.get_frame_with_overlay),
                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/stream/sonar')
-def stream_sonar():
-    return Response(dashboard_node.generate_mjpeg(dashboard_node.get_sonar_frame),
+@app.route('/stream/lidar')
+def stream_lidar():
+    return Response(dashboard_node.generate_mjpeg(dashboard_node.get_lidar_frame),
                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/stream/map')
