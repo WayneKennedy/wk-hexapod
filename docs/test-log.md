@@ -560,5 +560,3 @@ From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the own
 - Collision monitor behaviour against a real obstacle, now that the source is the lidar
   (OQ-03).
 - `/imu/data` yaw sign when the robot is turned by hand (OQ-13).
-- A battery run of the full stack after that: does Nav2 reach a frontier on sonar alone,
-  and does the head lead the turns (DEC-27)?
