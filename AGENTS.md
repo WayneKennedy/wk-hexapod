@@ -137,24 +137,23 @@ run `scripts/sync-check.sh`. A change that moves a leg needs the owner present (
 
 ## Status
 
-**The lidar stack has run on the battery and has not yet walked to a frontier**
-(2026-09-29). `slam_toolbox` maps, both costmaps and the collision monitor read `/scan`,
-and the planner plans to nearby points, but no frontier was reachable where the robot
-stood ([OQ-34](docs/open-questions.md)). The startup race that left the legs uninitialised
-is fixed (OQ-28). **The I2C bus failed in the last run and was freed afterwards without a
-power cycle; why it failed is unknown** ([OQ-32](docs/open-questions.md)), and **the stack
-has not run since**. No leg command reached a servo in that last run. All of it is in
-[`docs/test-log.md`](docs/test-log.md). The camera does not probe
-([OQ-23](docs/open-questions.md)). Load average 9–16 on four cores with everything up
-([OQ-02](docs/open-questions.md)).
+**The lidar stack runs on the battery and has not yet walked to a frontier** (2026-09-29).
+The robot stands, maps and plans. Twice it stood in a pocket the planner could not leave
+([OQ-34](docs/open-questions.md)), and started within 0.3 m of an object the collision
+monitor holds it still. **The I2C bus failed once, was freed without a power cycle and
+held through two runs; why it failed is unknown** ([OQ-32](docs/open-questions.md)).
+**The robot stands at 80 mm since [DEC-34](docs/decisions.md); it has not walked at that
+height.** SLAM, odometry and the IMU disagree on heading by tens of degrees
+([OQ-36](docs/open-questions.md)). All of it is in [`docs/test-log.md`](docs/test-log.md).
+The camera does not probe ([OQ-23](docs/open-questions.md)). Load average 9–16 on four
+cores with everything up ([OQ-02](docs/open-questions.md)).
 
-**As left on 2026-09-29, 13:05 UTC:** the stack stopped, servo power disabled, the I2C bus
-answering, both checkouts in sync at `origin/main`, `hexapod.service` still enabled, so
-**the next boot on the battery stands and explores**. The battery was last read at LOAD
-7.47 V, CTRL 7.59 V.
+**As left:** see the last entry of [`docs/test-log.md`](docs/test-log.md).
+`hexapod.service` is enabled, so **a boot on the battery stands and explores**.
 
-**Frontier:** a start in open floor with the owner watching, to see the stack run on the
-recovered bus (OQ-32) and a frontier reached on the lidar (OQ-34); then the collision
-monitor against real obstacles (OQ-03) and the dashboard
+**Frontier:** a start at least 0.6 m from anything, with the owner watching, to see a
+frontier reached (OQ-34) and the legs in the scan while walking
+([OQ-31](docs/open-questions.md)); then the headings (OQ-36, OQ-13), the collision monitor
+against real obstacles (OQ-03) and the rest of the dashboard
 ([OQ-33](docs/open-questions.md)). Saving and reloading a map
 ([OQ-20](docs/open-questions.md)) blocks milestone 2.

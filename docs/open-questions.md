@@ -138,7 +138,12 @@ owner deciding.
   standing and walking. **Standing, 2026-09-29: none.** Two 3–5 s samples, 720 beams at
   10 Hz: the nearest return was 0.34 m, behind the robot, and every other 30° sector was
   beyond 0.70 m ([`test-log.md`](test-log.md)). What stood 0.34 m behind was not
-  identified; it read the same in both runs. **Walking: not measured.**
+  identified; it read the same in both runs. **Standing, 13:18 and 13:29: none again.**
+  Every near return lay on a straight edge 0.28–0.36 m astern, at the same ranges with
+  the body at 30 mm and at 80 mm. **Walking: not measured.** The owner suspects the knees
+  show in the gait and raised the stand for it ([DEC-34](decisions.md)). The dashboard's
+  lidar view is in the body frame, so a return from the robot stays put in it while the
+  room moves.
 
 - **OQ-34 — No frontier was reachable from where the robot stood.** (2026-09-29,
   [`test-log.md`](test-log.md).) With the map reset at the standing pose the planner
@@ -149,8 +154,30 @@ owner deciding.
   every sector. **Unknown:** whether the robot was boxed in by furniture and feet, which
   the 0.24 m robot radius then closes, or whether some returns are not obstacles (a tilted
   scan plane meeting the floor, OQ-26). Test in open floor with the owner describing the
-  room. **Also open:** three failed goals end exploration in `error`
-  (`max_nav_failures`), where waiting and retrying would suit a room people move in.
+  room. **Second occurrence, 13:14 the same day:** a pocket of 0.37 m² with the robot's
+  own cell at cost 96, while `/map` alone left 3.21 m² reachable and 284 cells beside
+  unknown space. An edge stood 0.30 m astern, a wall 0.55 m to the left and objects 0.6 m
+  to the right, so the returns were obstacles. **What closes the pocket is not
+  established:** the 0.24 m radius in a passage that narrow, or obstacles marked while
+  the heading was wrong ([OQ-36](#locomotion-and-navigation)); the costmap held 430 lethal
+  cells against `/map`'s 278. `scripts/costmap-reach.py` reports the pocket. **Started
+  within `PolygonStop` of anything, the robot does not move at all** (13:28). **Also
+  open:** three failed goals end exploration in `error` (`max_nav_failures`), where
+  waiting and retrying would suit a room people move in.
+
+- **OQ-36 — Three headings, three answers.** (2026-09-29, 13:26 UTC,
+  [`test-log.md`](test-log.md).) After one `backup` of about 0.2 m and nothing else
+  commanded: `slam_toolbox` put the robot at −27.9° in the map, gait odometry said −48.9°
+  and `/imu/data` +4.4°. SLAM's is the one checked against the room: the live scan lay on
+  its map to within 0.5°. **Unknown:** how far the robot turned (the owner saw it; nobody
+  measured), so which of odometry and the IMU is further out. The IMU's yaw sign is
+  unverified (OQ-13), `odometry.turn_scale` was measured on a rubber mat at 0.3 rad/s, and
+  the part may not be the one its library was written for
+  ([OQ-35](#perception-and-sensing)). **Why it matters:** `slam_toolbox` corrects
+  `map → odom` only when it takes a scan, every 0.2 m or 0.3 rad of odometry; between
+  corrections the costmaps mark what the lidar sees at the odometry's heading. Test: the
+  movement calibration in [`operations.md`](operations.md#movement-calibration), then the
+  three headings again after a turn of known size.
 
 - **OQ-27 — `base_footprint` is a detached tree.** (Found 2026-09-28.) The URDF makes
   `base_footprint` the parent of `base_link` (+0.03 m), while the controller publishes

@@ -587,14 +587,63 @@ workstation. Nothing moved a leg. Robot's checkout `489fbe9`, then `40a234b`. Ti
 guard, [DEC-33](decisions.md), OQ-32 rewritten, OQ-35 opened. **Not shown:** why
 arbitration was lost, the stack running on the recovered bus, anything walking.
 
+### 2026-09-29 · The stack on the recovered bus: it stands at 30 and 80 mm, and an object behind holds it still
+
+**Conditions:** same boot and battery, owner present and watching the dashboard, robot on
+the floor where the owner had put it; the room was not described to the session. Two
+starts of the service, each from stopped with the checkouts in sync (DEC-33): 13:14:05 at
+`829bc83` (30 mm stand) and 13:28:09 at `e8ec3ed` (80 mm stand, DEC-34). LOAD 7.41–7.53 V,
+CTRL 7.29–7.41 V standing; load average 9.6–10.1. Times UTC.
+
+**Result:**
+
+1. **The bus held through both runs.** No kernel I2C message, no `servo_driver` error,
+   `Servos relaxed` from both nodes at the 13:27 stop. No undervoltage on either start
+   (OQ-29).
+2. **13:14, 30 mm: stood, `SAFE` at 13:14:32, reached no frontier.** Goals (1.02, 1.01),
+   (−1.11, 1.15) and (−1.69, 0.23) each failed with `no valid path found`; `error` by
+   13:16. `backup` ran once, 13:14:40–44, and odometry went from (0.02, −0.03) to
+   (−0.09, 0.09); every later `backup` ended in `Collision Ahead`.
+3. **13:15:58, `scripts/costmap-reach.py`:** the planner could reach 147 cells, 0.37 m²,
+   none beside unknown space; the robot's own cell cost 96; the goals' cells cost −1, 99
+   and −1. The costmap held 430 lethal and 3650 inscribed cells against 1237 passable.
+   **`/map` alone, 13:17:** 278 occupied cells, the robot's cell free, 3.21 m² reachable
+   over free cells with 284 of them beside unknown space.
+4. **13:18, the scan in the body frame, standing:** straight edges only. One 0.55 m to the
+   left, 1.3 m long; one 0.30 m astern running 0.75 m to the right, nearest 0.277 m at
+   −140°. Lying at 13:04 the nearest return astern was 0.55 m: the robot had backed
+   towards it.
+5. **13:26:39, three headings** ([OQ-36](open-questions.md)): `map → base_link` −27.9°,
+   `/odom` −48.9°, `/imu/data` +4.4°. 552 of 586 scan points lay on `/map`'s occupied
+   cells as TF placed them; the best fit over ±90° and ±0.4 m was 571 points at +0.5°.
+6. **The dashboard's new map and lidar panels** were run beside the stack on port 8081 at
+   13:24 from `/tmp`, then deployed in `e8ec3ed`. The camera node died at both starts:
+   `no cameras available` (OQ-23).
+7. **13:28, 80 mm: `Standing (raising body 80.0mm)` at 13:28:34, `STAND position set` at
+   13:28:35, `SAFE` at 13:28:36.** LOAD 7.41 V after it. How the stance looked and
+   sounded is the owner's to say.
+8. **The collision monitor held it from 13:28:38 and did not release.** A path to
+   (−1.48, 0.08) was found; `Failed to make progress` every 30 s from 13:29:08.
+   `scripts/scan-near.py`, 200 scans from 13:29:12: nearest 0.283 m at −140°, in every
+   scan, which is the point (−0.22, −0.18) inside `PolygonStop`. The ranges astern were
+   the same at 30 mm and at 80 mm, 0.28–0.36 m: **not a knee, and taller than 0.24 m.**
+9. **Returns from the legs while walking (OQ-31): still not measured.** The robot did not
+   walk at 80 mm, and no scan was recorded during the 0.2 m it backed at 30 mm.
+
+**What changed:** DEC-34; the dashboard; `scripts/costmap-reach.py`; OQ-34 and OQ-31
+updated, OQ-36 opened. **Not shown:** a frontier reached, the robot walking at 80 mm, the
+map against the room.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
 
-- The stack on the recovered I2C bus, and whether the bus fails again (OQ-32).
-- A run in open floor on the lidar: a frontier reached, and the map against the room
-  (OQ-34).
+- Whether the I2C bus fails again (OQ-32).
+- A run in open floor on the lidar, started at least 0.6 m from anything: a frontier
+  reached, and the map against the room (OQ-34).
+- The three headings after a measured turn (OQ-36, OQ-13).
 - `scripts/scan-near.py` while walking (OQ-31).
 - Collision monitor behaviour against a real obstacle, now that the source is the lidar
   (OQ-03).
 - `/imu/data` yaw sign when the robot is turned by hand (OQ-13).
+- The stance at 80 mm: servo load, battery drain, the gait (DEC-34).
