@@ -23,8 +23,10 @@ def generate_launch_description():
     slam_params = os.path.join(
         get_package_share_directory('hexapod_bringup'), 'config', 'slam_params.yaml')
 
+    # Not 'params_file': launch configurations are shared with the including
+    # file, and navigation.launch.py uses that name for the Nav2 parameters.
     params_file_arg = DeclareLaunchArgument(
-        'params_file',
+        'slam_params_file',
         default_value=slam_params,
         description='Full path to the slam_toolbox params file'
     )
@@ -34,7 +36,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(os.path.join(
             get_package_share_directory('slam_toolbox'), 'launch', 'online_async_launch.py')),
         launch_arguments={
-            'slam_params_file': LaunchConfiguration('params_file'),
+            'slam_params_file': LaunchConfiguration('slam_params_file'),
             'use_sim_time': 'false',
         }.items(),
     )
