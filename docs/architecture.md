@@ -69,6 +69,11 @@ slots of `/joint_commands`, and nothing else publishes `/head_command`.
 | Out | `/head_command` (servo degrees), `/joint_states` (`head_pan_joint`, `head_tilt_joint`) |
 | Action | `/look_around` (`LookAround`): full-width pan sweeps with the body still |
 
+**The head is disabled since 2026-09-29** ([OQ-30](open-questions.md)): `enabled: false`
+in `body_params.yaml` and `servos.head_enabled: false` in `hardware.yaml`. Nothing is
+published on `/head_command`, `/look_around` goals are rejected, the head joints are
+published at zero, and `servo_driver` never writes the two channels.
+
 Behaviours, highest priority first: the **survey** (the `LookAround` action), a **look_at**
 gaze held for a few seconds, and otherwise a continuous **scan** — the pan sweeps a ±30°
 sector in 10° steps, centred on Nav2's carrot while it is fresh, else on the direction of

@@ -118,6 +118,8 @@ class ServoDriver(Node):
         # Head servo channels (from fn-hexapod server.py CMD_CAMERA handler: channels 0,1)
         self.declare_parameter('servos.head_channels.pan', 0)
         self.declare_parameter('servos.head_channels.tilt', 1)
+        # False: the head channels are never written, so both servos stay limp
+        self.declare_parameter('servos.head_enabled', True)
 
         # Get parameters
         bus = self.get_parameter('i2c.bus').value
@@ -129,6 +131,9 @@ class ServoDriver(Node):
         power_gpio = self.get_parameter('servos.power_gpio').value
         self.head_pan_channel = self.get_parameter('servos.head_channels.pan').value
         self.head_tilt_channel = self.get_parameter('servos.head_channels.tilt').value
+        self.head_enabled = self.get_parameter('servos.head_enabled').value
+        if not self.head_enabled:
+            self.get_logger().warn('Head servos DISABLED: pan and tilt are not driven')
 
         # Initialize servo power control (GPIO 4)
         # Reference: control.py:21-22 - OutputDevice(4), off() to enable
@@ -404,6 +409,8 @@ class ServoDriver(Node):
         # Head servos (last 2 values). NaN means the sender does not own the
         # head: the controller sends NaN and head_controller drives the head
         # through /head_command, so gait steps never re-centre it.
+        if not self.head_enabled:
+            return
         if not math.isnan(msg.data[18]):
             self.set_servo_angle(self.head_pan_channel, msg.data[18])
         if not math.isnan(msg.data[19]):
@@ -438,7 +445,7 @@ class ServoDriver(Node):
 
     def head_callback(self, msg):
         """Handle head pan/tilt command [pan, tilt] in degrees"""
-        if len(msg.data) < 2:
+        if len(msg.data) < 2 or not self.head_enabled:
             return
 
         self.set_servo_angle(self.head_pan_channel, msg.data[0])

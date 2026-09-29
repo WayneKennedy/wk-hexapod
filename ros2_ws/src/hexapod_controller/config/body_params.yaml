@@ -47,6 +47,11 @@ hexapod_controller:
 
 head_controller:
   ros__parameters:
+    # false since 2026-09-29: the tilt servo's gears slip (OQ-30). Nothing is
+    # commanded, look_around is rejected, and the head joints are published at
+    # zero. Keep in step with servo_driver's `servos.head_enabled` in
+    # hexapod_hardware hardware.yaml, which is what keeps the servos limp.
+    enabled: false
     # Servo degrees at straight ahead / level, and the sign that turns a
     # relative angle (+ left, + up) into servo degrees. Unverified on the
     # robot: check the pan sign with the owner present (docs/operations.md).

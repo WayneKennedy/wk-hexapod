@@ -85,6 +85,19 @@ owner deciding.
   `/scan` publishing and unused ([`test-log.md`](test-log.md)); wiring `/scan` into the
   costmaps and the collision monitor is the same step.
 
+- **OQ-30 — The head tilt servo's gears slip; the head is disabled.** (Owner, 2026-09-29:
+  the servo could be heard trying to lower with the gears jumping, during the battery runs
+  in [`test-log.md`](test-log.md).) Pan and tilt are both off by the owner's instruction:
+  `head_controller` `enabled: false` and `servo_driver` `servos.head_enabled: false`, two
+  switches that must agree. **Consequences:** the servos are limp, so where the sonar and
+  camera point is wherever the head rests, while TF places them at pan 0, tilt 0; the
+  costmaps and the collision monitor read a fixed cone of unknown direction; the startup
+  survey is rejected and the state machine explores without it. **Open:** the cause
+  (stripped gear, or a load the servo cannot hold) and the remedy: replace the servo
+  (check [wk-inventory](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md)
+  first), fix the head level mechanically, or remove the head (OQ-26). The lidar as the
+  range source ([OQ-20](#locomotion-and-navigation)) removes the dependence either way.
+
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
   default 300 °/s, unmeasured), and that model is what places `ultrasonic_link` on the TF

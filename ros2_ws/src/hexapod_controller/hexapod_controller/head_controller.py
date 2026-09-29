@@ -22,6 +22,10 @@ not the command, so the ultrasonic frame's TF is where the sensor was.
 
 The head is only driven between a home/stand and a relax: it goes quiet on
 /pose_command 'relax' or /servo_relax true, like the legs.
+
+With `enabled` false the head is never driven: nothing goes out on
+/head_command, look_around goals are rejected, and the joints are published at
+zero so the sensor frames stay in TF. Where the head then points is not known.
 """
 
 import math
@@ -49,6 +53,7 @@ class HeadController(Node):
         super().__init__('head_controller')
 
         # Servo geometry. Servo degrees; relative angles are + left / + up.
+        self.declare_parameter('enabled', True)
         self.declare_parameter('pan_center', 90.0)
         self.declare_parameter('tilt_center', 90.0)
         self.declare_parameter('pan_direction', 1.0)
@@ -71,6 +76,7 @@ class HeadController(Node):
         self.declare_parameter('update_rate', 20.0)
 
         gp = lambda n: self.get_parameter(n).value  # noqa: E731
+        self.enabled = gp('enabled')
         self.pan_center = gp('pan_center')
         self.tilt_center = gp('tilt_center')
         self.pan_dir = gp('pan_direction')
@@ -133,6 +139,9 @@ class HeadController(Node):
             callback_group=self.cb_group)
 
         self.timer = self.create_timer(1.0 / update_rate, self._tick)
+        if not self.enabled:
+            self.get_logger().warn('Head DISABLED: pan and tilt are not driven')
+            return
         self.get_logger().info(
             f'Head controller started: pan {self.pan_min:+.0f}..{self.pan_max:+.0f} deg, '
             f'scan +/-{self.half_width:.0f} deg in {self.step:.0f} deg steps')
@@ -143,7 +152,7 @@ class HeadController(Node):
         cmd = msg.data.lower().strip()
         with self._lock:
             if cmd in ('home', 'stand'):
-                if not self.active:
+                if self.enabled and not self.active:
                     self.active = True
                     self._command(self.pan_target, self.tilt_target)
             elif cmd == 'relax':
@@ -274,6 +283,9 @@ class HeadController(Node):
     # ----- LookAround action: the survey -----
 
     def _survey_goal(self, _goal):
+        if not self.enabled:
+            self.get_logger().warn('Rejecting look_around: head is disabled')
+            return GoalResponse.REJECT
         with self._lock:
             if self.surveying:
                 self.get_logger().warn('Rejecting look_around: a survey is running')

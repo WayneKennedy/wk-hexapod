@@ -31,6 +31,9 @@
       head_channels:
         pan: 0    # Channel 0 on PCA9685 @ 0x41
         tilt: 1   # Channel 1 on PCA9685 @ 0x41
+      # false since 2026-09-29: the tilt servo's gears slip (OQ-30). Keep in step
+      # with head_controller's `enabled` in hexapod_controller body_params.yaml.
+      head_enabled: false
       # Link lengths in mm (for IK)
       link_lengths:
         coxa: 33
