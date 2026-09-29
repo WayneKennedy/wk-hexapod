@@ -35,6 +35,10 @@ owner deciding.
   obstacle**, and the sonar brings its own blind spots: one cone wherever the head points,
   nothing below its height, and specular loss on angled or soft surfaces. Measure the
   stopping distance at 0.05 m/s on the floor, then tune inflation against it.
+  **2026-09-29, first contact on the sonar:** the robot walked into a TV stand while
+  exploring; the monitor did issue stops, then flickered between stop and slowdown at a
+  sonar range of 0.29–0.31 m, the edge of the 0.32 m stop polygon
+  ([`test-log.md`](test-log.md)). The lidar's `/scan` is not a source yet (OQ-20).
 
 - **OQ-05 — Return-to-home and semantic waypoints.** `return_home` exists as a mission
   type; the home pose is the map origin. No named places, no docking (Nav2's docking server
@@ -77,6 +81,9 @@ owner deciding.
   mode for `checking_map`/`localization_mode`); (3) whether gait odometry is good enough for
   scan matching while walking — measured only stationary; (4) CPU: `slam_toolbox` ~4.5 % and
   the driver ~4 % of a core at rest, load average ~5 without Nav2 (OQ-02).
+  **2026-09-29:** the first battery run with the lidar fitted walked into a TV stand with
+  `/scan` publishing and unused ([`test-log.md`](test-log.md)); wiring `/scan` into the
+  costmaps and the collision monitor is the same step.
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
@@ -94,7 +101,8 @@ owner deciding.
   robot safe without checking the result. `/pose_command` is volatile, so a controller that
   starts late never sees `home`, refuses `stand`, and ignores `/cmd_vel` for the rest of the
   run while the autonomy stack explores on paper. Three of the five starts in the robot's
-  journal lost the race. **Fix written 2026-09-29:** the sequence waits, before its
+  journal lost the race. **Resolved 2026-09-29** (commit `a077db8`; one battery boot,
+  [`test-log.md`](test-log.md); the timeout paths are untested): the sequence waits, before its
   warning, until `hexapod_controller` and `servo_driver` both subscribe to `/pose_command`
   (`startup.controller_timeout`, 60 s); the controller publishes `/hexapod/initialized`;
   and the sequence goes on from `home` only once that is true (`startup.confirm_timeout`,
@@ -222,6 +230,15 @@ owner deciding.
   deviation from Freenove's design would mean printing and building another hexapod rather
   than modifying this one. Not examined; the shield's charge circuit and rail topology
   would need reading from the vendor schematic first.
+
+- **OQ-29 — Undervoltage reset when the stack restarts on the battery.** (Found
+  2026-09-29, [`test-log.md`](test-log.md).) `systemctl restart hexapod` with LOAD 7.76 V
+  and CTRL 8.06 V was followed 7 s later by `hwmon: Undervoltage detected!` and a reset of
+  the Pi. The cold boot 9 min earlier started the same stack without one. **Unknown:** what
+  drew the rail down, and whether it repeats. Candidates, none examined: the servo rail
+  being re-enabled while every node starts, the lidar motor spinning up, the SSD. Until it
+  is known, a restart on the battery can cost a reboot. Family layer:
+  [wk-robotics `common.md`](https://github.com/WayneKennedy/wk-robotics/blob/main/docs/common.md#power-integrity).
 
 - **OQ-11 — Low-voltage behaviour and a watchdog.** Nothing cuts the servo rail on a low
   pack, and if the Pi dies the servos hold their last pose under load until the battery

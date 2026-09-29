@@ -446,8 +446,43 @@ robot and reported the head moving and no walking.
    HC-SR04` warnings in the first 2 min; one `Failed to read ADC: [Errno 121]` from
    `battery_monitor`.
 
-**What changed:** nothing on the robot. Opened [OQ-28](open-questions.md). This run does
-not count as the battery run expected below.
+**What changed:** opened [OQ-28](open-questions.md); the fix is the next entry.
+
+### 2026-09-29 · The startup fix on the battery: it stood, walked, and hit a TV stand
+
+**Conditions:** same session and battery, commit `a077db8` deployed by the
+[development loop](operations.md#development-loop), `hexapod_hardware` and
+`hexapod_controller` rebuilt. LOAD 7.76 V, CTRL 8.06 V before the restart. Robot on the
+floor of a furnished room, owner present. Logs read over SSH; contact reported by the owner.
+
+**Result:**
+
+1. **`systemctl restart hexapod` ended in a reset.** The old stack relaxed the servos at
+   12:16:13 and the new one began starting at 12:16:16. The kernel logged
+   `hwmon hwmon4: Undervoltage detected!` at 12:16:20.83, the journal's last line; the Pi
+   came back as a fresh boot with the stack starting at 12:17:35. Whether the owner touched
+   the power switch was not asked; what drew the rail down is unknown
+   ([OQ-29](open-questions.md)).
+2. **The fix held on that boot.** The sequence began at 12:17:44.15 and waited 2.7 s for
+   both subscribers (controller ready 12:17:47.19). `home` at 12:17:48.86 was executed by
+   the controller 12 ms later and confirmed within 0.1 s; `stand` at 12:17:59.47 was
+   accepted; `SAFE` at 12:18:00.97. One boot; the timeout paths (red LED) were not
+   exercised.
+3. **It walked.** `look_around` → `exploring` at 12:18:12. `/odom` x read 0.514 m, then
+   0.558 m some 10–15 s later (~12:19:00). `Gait cycle took 1.76s against a nominal 1.00s`
+   (logged once). The first frontier (1.29, 0.39) ended in `Goal failed` at 12:19:15 after
+   two successful `backup` recoveries; the second (1.53, 0.81) logged `Failed to make
+   progress` at 12:19:50.
+4. **It walked into a TV stand** (owner; time not recorded). The collision monitor's first
+   `Robot to stop due to PolygonStop` is at 12:19:20.83; from 12:19:31 it alternated
+   between stop and 50 % slowdown several times a second, with the sonar reading
+   0.29–0.31 m. Whether the first stop preceded the contact is unknown.
+5. **The lidar did not take part.** `sllidar_node` published `/scan`; `slam_toolbox` was
+   not running and nothing in Nav2 subscribes to `/scan`, as DEC-31 states. Costmaps and
+   collision monitor saw the sonar only.
+
+**What changed:** OQ-28 resolved; OQ-29 opened; OQ-03 and OQ-20 carry the collision. This
+run is not the sonar battery run expected below: no map was checked against the room.
 
 ## Next entries expected
 
