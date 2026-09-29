@@ -146,6 +146,10 @@ fixed (OQ-28). **The run ended with the I2C bus not answering**
 ([OQ-23](docs/open-questions.md)). Load average 9–16 on four cores with everything up
 ([OQ-02](docs/open-questions.md)).
 
+**As left on 2026-09-29:** the stack stopped by hand, the robot's checkout clean at
+`origin/main`, `hexapod.service` still enabled, so **the next boot on the battery stands
+and explores**. The battery was last read at LOAD 7.06 V, CTRL 7.82 V.
+
 **Frontier:** the I2C bus (OQ-32), then a run in open floor to see a frontier reached on
 the lidar (OQ-34), then the collision monitor against real obstacles (OQ-03) and the
 dashboard ([OQ-33](docs/open-questions.md)). Saving and reloading a map
