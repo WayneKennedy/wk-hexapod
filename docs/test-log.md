@@ -484,6 +484,29 @@ floor of a furnished room, owner present. Logs read over SSH; contact reported b
 **What changed:** OQ-28 resolved; OQ-29 opened; OQ-03 and OQ-20 carry the collision. This
 run is not the sonar battery run expected below: no map was checked against the room.
 
+### 2026-09-29 · Head disabled: the robot stands and finds no frontier
+
+**Conditions:** same session and battery, commit `b8f82b2`, after the owner heard the tilt
+servo's gears jumping ([OQ-30](open-questions.md)). The stack was stopped at 12:21:33 UTC
+(servos relaxed), the two packages rebuilt, and the service started at 12:23:07, not
+restarted. LOAD 7.82 V, CTRL 8.00 V before the stop; 7.59 V and 7.94 V standing afterwards.
+
+**Result:**
+
+1. **Both switches took.** `head_controller` and `servo_driver` each logged the head as
+   disabled; `look_around` was rejected. Whether the servos are silent is the owner's to
+   confirm.
+2. **The startup fix held a second time**, on a service start: `home` and `stand` accepted,
+   `SAFE` at 12:23:35.65. No undervoltage was logged (OQ-29: one reset in three starts
+   today).
+3. **No exploration.** `frontier_explorer` reported `No frontiers detected` 2 ms after it
+   began, and the state machine went to `exploration_complete` at 12:23:37.37. With no
+   survey the map holds one sonar cone; the sonar read 0.147 m, its direction unknown with
+   the head limp. The robot stands in place.
+
+**What changed:** OQ-30 opened. Autonomous exploration now waits on the lidar as the range
+source ([OQ-20](open-questions.md)) or on a repaired head.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
