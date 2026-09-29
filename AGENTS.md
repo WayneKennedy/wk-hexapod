@@ -148,8 +148,13 @@ height.** SLAM, odometry and the IMU disagree on heading by tens of degrees
 The camera does not probe ([OQ-23](docs/open-questions.md)). Load average 9–16 on four
 cores with everything up ([OQ-02](docs/open-questions.md)).
 
-**As left:** see the last entry of [`docs/test-log.md`](docs/test-log.md).
-`hexapod.service` is enabled, so **a boot on the battery stands and explores**.
+**As left on 2026-09-29:** switched off by the owner when the LED ring showed the LOAD
+batteries red; it was not shut down. **Before the next run:** charge the LOAD batteries,
+check the file systems, read that boot's LOAD readings, and bring the robot's checkout to
+`origin/main` (DEC-33). All four are in the last entry of
+[`docs/test-log.md`](docs/test-log.md). `hexapod.service` is enabled, so **a boot on the
+battery stands and explores before anyone can do any of that**: boot on USB power, where
+the servos are dead ([`docs/hardware.md`](docs/hardware.md#power)).
 
 **Frontier:** a start at least 0.6 m from anything, with the owner watching, to see a
 frontier reached (OQ-34) and the legs in the scan while walking

@@ -630,9 +630,22 @@ CTRL 7.29–7.41 V standing; load average 9.6–10.1. Times UTC.
 9. **Returns from the legs while walking (OQ-31): still not measured.** The robot did not
    walk at 80 mm, and no scan was recorded during the 0.2 m it backed at 30 mm.
 
+10. **The LOAD batteries ran down with the robot standing still.** 7.41 V at 13:28:26, 7.12 V
+    at 13:31:49, the stack still running and the robot held by the collision monitor.
+    **The owner switched the robot off when the LED ring showed the LOAD batteries
+    red**, which `power_indicator` shows below 6.5 V. When is not recorded: the
+    robot did not answer at 22:26. The journal of that boot holds `power_indicator`'s
+    readings every 10 s up to the switch-off; they are the discharge at the 80 mm stance
+    and have not been read.
+
+**How it was left:** switched off, not shut down, so the file systems were not unmounted
+([`operations.md`](operations.md#troubleshooting), *After an unclean power-off*). The
+LOAD batteries are discharged. The robot's checkout is at `9fa34b5`; what `origin/main` has
+since is documentation. `hexapod.service` is enabled.
+
 **What changed:** DEC-34; the dashboard; `scripts/costmap-reach.py`; OQ-34 and OQ-31
-updated, OQ-36 opened. **Not shown:** a frontier reached, the robot walking at 80 mm, the
-map against the room.
+updated, OQ-36 opened; OQ-11 has its first case. **Not shown:** a frontier reached, the
+robot walking at 80 mm, the map against the room.
 
 ## Next entries expected
 
@@ -646,4 +659,7 @@ From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the own
 - Collision monitor behaviour against a real obstacle, now that the source is the lidar
   (OQ-03).
 - `/imu/data` yaw sign when the robot is turned by hand (OQ-13).
-- The stance at 80 mm: servo load, battery drain, the gait (DEC-34).
+- The stance at 80 mm: servo load, battery drain, the gait (DEC-34). Read the LOAD
+  readings of the 2026-09-29 boot first: `journalctl -b -1 -u hexapod | grep 'LOAD:'`
+  (the boot's number may differ).
+- The file systems after the 2026-09-29 switch-off.

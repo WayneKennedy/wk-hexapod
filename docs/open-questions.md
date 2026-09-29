@@ -378,7 +378,11 @@ owner deciding.
 - **OQ-11 — Low-voltage behaviour and a watchdog.** Nothing cuts the servo rail on a low
   pack, and if the Pi dies the servos hold their last pose under load until the battery
   sags. `battery_monitor` only publishes voltages. Battery-aware return-to-home is on the
-  roadmap; a hardware cutoff is not designed.
+  roadmap; a hardware cutoff is not designed. **First case, 2026-09-29:** standing, held
+  by the collision monitor, the LOAD rail went from 7.41 V to below 6.5 V and nothing
+  acted on it; the owner saw the LED ring red and switched the robot off
+  ([`test-log.md`](test-log.md)). The stance was the 80 mm of [DEC-34](decisions.md),
+  whose drain is unmeasured.
 
 - **OQ-18 — 5 V budget with the SSD enclosure and the AI HAT+ 2.** Resolved 2026-09-18 by
   [DEC-24](decisions.md): neither goes on this robot. Kept for the record. Both
