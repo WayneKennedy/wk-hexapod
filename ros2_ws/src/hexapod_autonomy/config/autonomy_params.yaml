@@ -4,7 +4,8 @@ autonomy_manager:
   ros__parameters:
     # Time to wait for external mission before auto-exploring
     mission_timeout_sec: 60.0
-    # Head survey (LookAround, head_controller) before exploring: sweeps
+    # Head survey (LookAround, head_controller) before exploring: sweeps.
+    # Rejected while the head is disabled (OQ-30); the state machine goes on.
     survey_sweeps: 2
     # State publish rate
     state_publish_rate_hz: 2.0
@@ -24,10 +25,14 @@ frontier_explorer:
     free_threshold: 50
     # Maximum navigation failures before aborting
     max_nav_failures: 3
-    # The map: Nav2's global costmap, built from the sonar (nav2_params.yaml)
+    # The map: Nav2's global costmap, which is slam_toolbox's /map plus live
+    # lidar obstacles and inflation (nav2_params.yaml, DEC-32)
     map_topic: "/global_costmap/costmap"
-    # Head survey at each reached frontier; 0 disables
-    survey_sweeps: 1
+    # How long a first map with no frontier counts as "not ready yet"
+    initial_map_timeout_sec: 60.0
+    # Head survey at each reached frontier; 0 disables. The head is disabled
+    # (OQ-30), so the survey is skipped.
+    survey_sweeps: 0
     # Ignore frontiers nearer than this (m): the unseen cells beside the body
     min_goal_distance: 0.4
 

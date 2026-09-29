@@ -125,6 +125,14 @@ owner deciding.
   uninitialised** is `/robot/safe_startup`, which reruns the sequence; the robot walks off
   when it completes.
 
+- **OQ-31 — Does the lidar see the robot itself?** (2026-09-29, opened by
+  [DEC-32](decisions.md).) The scan plane is 0.16 m above `base_link`; the 2026-09-28 bench
+  test had the legs limp and never tested a leg or the head in the plane. SLAM and the
+  costmaps drop returns nearer than 0.25 m. The collision monitor drops nothing, and its
+  stop polygon covers the body, so one return from a knee or the head would hold the robot
+  stopped. `scripts/scan-near.py` reports the nearest returns by body bearing; run it
+  standing and walking.
+
 - **OQ-27 — `base_footprint` is a detached tree.** (Found 2026-09-28.) The URDF makes
   `base_footprint` the parent of `base_link` (+0.03 m), while the controller publishes
   `odom → base_link`; tf2 keeps one parent per frame, so `base_footprint` is its own root and

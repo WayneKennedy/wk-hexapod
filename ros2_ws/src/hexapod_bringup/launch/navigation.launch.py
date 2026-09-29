@@ -3,14 +3,11 @@ Navigation launch file for Hexapod Robot
 
 Starts the Nav2 navigation servers (planner, controller, behaviors, BT
 navigator, waypoint follower, velocity smoother, collision monitor) with
-hexapod-specific parameters. Nav2's map server and AMCL are not started: there
-is no saved map and nothing to localize against.
+hexapod-specific parameters, and slam_toolbox (slam.launch.py), which builds
+/map from the lidar and publishes map -> odom (DEC-32). Nav2's map server and
+AMCL are not started: there is no saved map and nothing to localize against.
 
-The map is the global costmap, built from the head's ultrasonic sweeps, in a
-map frame that is odometry: map -> odom is a static identity published here.
-Odometry drift is therefore map drift; there is no loop closure (DEC-25).
-
-Requires robot.launch.py to be running.
+Requires robot.launch.py to be running with lidar:=true.
 
 Usage:
   ros2 launch hexapod_bringup navigation.launch.py
@@ -20,7 +17,6 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -60,18 +56,16 @@ def generate_launch_description():
         }.items()
     )
 
-    map_to_odom = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='map_to_odom',
-        arguments=['--frame-id', 'map', '--child-frame-id', 'odom'],
-        output='screen',
+    slam = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(bringup_pkg, 'launch', 'slam.launch.py')
+        )
     )
 
     return LaunchDescription([
         use_sim_time_arg,
         params_file_arg,
         autostart_arg,
-        map_to_odom,
+        slam,
         nav2_navigation,
     ])

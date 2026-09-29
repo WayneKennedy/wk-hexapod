@@ -1,11 +1,11 @@
 """
 SLAM launch file for Hexapod Robot: slam_toolbox (online async) on the lidar.
 
-Builds /map from /scan and gait odometry and publishes map -> odom. Standalone
-for now (DEC-31): it must NOT run alongside navigation.launch.py, which still
-publishes a static map -> odom of its own (DEC-28).
+Builds /map from /scan and gait odometry and publishes map -> odom. Included
+by navigation.launch.py (DEC-32), so it is part of the boot stack; run it by
+hand only against a stack started with autonomy:=false.
 
-Requires robot.launch.py (lidar:=true, autonomy:=false) to be running.
+Requires robot.launch.py (lidar:=true) to be running.
 
 Usage:
   ros2 launch hexapod_bringup slam.launch.py

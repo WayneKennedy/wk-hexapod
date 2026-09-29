@@ -3,8 +3,7 @@
 Autonomous Behavior Launch File for Hexapod Robot
 
 Launches the autonomy nodes plus navigation:
-- Nav2 navigation servers; the global costmap, built from the head's sonar
-  sweeps, is the map (navigation.launch.py)
+- Nav2 navigation servers and slam_toolbox on the lidar (navigation.launch.py)
 - frontier_explorer: Frontier-based exploration
 - mission_server: External mission command interface
 - autonomy_manager: Central state machine coordinator
@@ -54,8 +53,7 @@ def generate_launch_description():
         description='Launch Nav2 (required for exploration and navigate missions)'
     )
 
-    # Nav2 navigation servers (planner, controller, behaviors) and the static
-    # map -> odom identity
+    # Nav2 navigation servers (planner, controller, behaviors) and slam_toolbox
     navigation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             bringup_pkg, '/launch/navigation.launch.py'

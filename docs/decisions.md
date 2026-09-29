@@ -245,8 +245,8 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   the battery and the owner present.
 
 - **DEC-28 — The map is Nav2's global costmap, built from the sonar and anchored to
-  odometry. There is no SLAM.** (2026-09-19, implementing the owner's request to see what
-  the primitive sensors can still do.) A single 15° cone at 15 Hz cannot support scan
+  odometry. There is no SLAM.** **Superseded 2026-09-29 by DEC-32.** (2026-09-19,
+  implementing the owner's request to see what the primitive sensors can still do.) A single 15° cone at 15 Hz cannot support scan
   matching or loop closure, and the mono camera cannot be trusted for either on this CPU
   (OQ-22), so rather than pretend: `nav2_costmap_2d::RangeSensorLayer` on
   `/ultrasonic/range` fills a fixed 12 × 12 m global costmap, `map → odom` is a static
@@ -297,3 +297,18 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   SLAM runs only with `autonomy:=false`, and Nav2, the frontier explorer and the dashboard
   still use the sonar costmap. Wiring SLAM into them supersedes DEC-28 and is
   [OQ-20](open-questions.md)'s next step; it needs the battery and the owner to verify.
+
+- **DEC-32 — The lidar is the range sensor and `slam_toolbox` is the map. Supersedes
+  DEC-28; completes DEC-31.** (Owner, 2026-09-29, after the robot walked into a TV stand on
+  the sonar and the head was disabled, [OQ-30](open-questions.md).) `navigation.launch.py`
+  includes `slam.launch.py` in place of the static `map → odom`, so SLAM runs in the boot
+  stack. The global costmap is a static layer on `/map`, an obstacle layer on `/scan` and
+  inflation; the local costmap is the obstacle layer and inflation; the collision monitor's
+  only source is `/scan`. **The sonar is no source of anything:** with the head limp its
+  direction is unknown. The driver still publishes `/ultrasonic/range`. Returns nearer than
+  0.25 m are dropped by SLAM and the costmaps as the robot's own; the collision monitor
+  drops nothing ([OQ-31](open-questions.md)). The frontier explorer and the dashboard still
+  read `/global_costmap/costmap`; the explorer now waits up to `initial_map_timeout_sec`
+  (60 s) for a first frontier instead of declaring the room explored. The behaviour trees
+  are unchanged. Maps still do not survive a run: `slam_toolbox` can save and reload one,
+  and nothing here does yet ([OQ-20](open-questions.md)).

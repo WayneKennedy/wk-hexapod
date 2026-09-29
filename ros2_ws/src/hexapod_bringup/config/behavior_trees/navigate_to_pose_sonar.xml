@@ -1,11 +1,10 @@
 <!--
   Nav2's navigate_to_pose_w_replanning_and_recovery.xml (Jazzy, Apache-2.0),
-  changed for a sonar-mapped hexapod:
-  - The global costmap is the map (its RangeSensorLayer holds everything the
-    sonar has seen), so nothing here clears it. Only the local costmap is
-    cleared.
-  - No Spin recovery: turning eighteen servos in place to look around is
-    what the head is for; head_controller keeps scanning during the Wait.
+  changed for the sonar-mapped hexapod of DEC-28 and kept unchanged under the
+  lidar (DEC-32), file name included:
+  - Only the local costmap is cleared. Clearing the global one was fatal when
+    it was the map; it no longer is (the static layer reloads /map).
+  - No Spin recovery: the lidar sees all round, so a turn shows nothing new.
   - BackUp at the gait's pace (0.14 m/s ceiling, DEC-22).
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">

@@ -3,8 +3,8 @@
 Frontier Explorer Node for Hexapod Robot
 
 Implements frontier-based exploration:
-1. Subscribe to the map (map_topic: Nav2's global costmap, built from the
-   head's sonar sweeps)
+1. Subscribe to the map (map_topic: Nav2's global costmap, which carries
+   slam_toolbox's /map from the lidar)
 2. Detect frontier cells (unknown adjacent to free)
 3. Cluster frontiers and filter by size
 4. Select closest frontier as navigation goal
@@ -61,6 +61,7 @@ class FrontierExplorer(Node):
         self.declare_parameter('map_topic', '/global_costmap/costmap')
         self.declare_parameter('survey_sweeps', 1)
         self.declare_parameter('min_goal_distance', 0.4)
+        self.declare_parameter('initial_map_timeout_sec', 60.0)
 
         self.min_frontier_size = self.get_parameter('min_frontier_size').value
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
@@ -393,6 +394,7 @@ class FrontierExplorer(Node):
         result = ExploreFrontiers.Result()
 
         start_time = time.monotonic()
+        initial_map_timeout = self.get_parameter('initial_map_timeout_sec').value
 
         self.get_logger().info('Starting frontier exploration')
 
@@ -423,6 +425,15 @@ class FrontierExplorer(Node):
 
                 # Detect frontiers
                 frontier_cells, info = self.detect_frontiers(self.current_map)
+
+                # At the start the costmap can arrive before SLAM's first map
+                # and hold no free cell yet: that is "not ready", not "done".
+                if (len(frontier_cells) == 0 and self.frontiers_explored == 0
+                        and self.nav_failures == 0 and elapsed < initial_map_timeout):
+                    self.get_logger().info(
+                        'No frontiers yet, waiting for the map...', throttle_duration_sec=5.0)
+                    await self._sleep(1.0)
+                    continue
 
                 if len(frontier_cells) == 0:
                     self.get_logger().info('No frontiers detected, exploration complete')

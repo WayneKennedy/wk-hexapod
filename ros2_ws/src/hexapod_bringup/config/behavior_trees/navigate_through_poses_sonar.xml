@@ -1,8 +1,7 @@
 <!--
   Nav2's navigate_through_poses_w_replanning_and_recovery.xml (Jazzy,
-  Apache-2.0), changed the same way as navigate_to_pose_sonar.xml: the global
-  costmap is the map, so nothing clears it, and there is no Spin recovery
-  (the head does the looking).
+  Apache-2.0), changed the same way as navigate_to_pose_sonar.xml: only the
+  local costmap is cleared, and there is no Spin recovery.
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">

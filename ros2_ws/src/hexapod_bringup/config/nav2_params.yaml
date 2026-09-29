@@ -1,8 +1,8 @@
 # Nav2 Parameters for Hexapod Robot
-# Tuned for a slow-moving hexapod. The only range sensor is the HC-SR04 on the
-# head (/ultrasonic/range), swept by head_controller. The global costmap is
-# the map: a fixed 12 x 12 m grid in the map frame, which is odometry (a static
-# map -> odom identity, navigation.launch.py). There is no loop closure.
+# Tuned for a slow-moving hexapod. The range sensor is the RPLIDAR C1 (/scan,
+# 360 deg at 10 Hz). slam_toolbox builds /map from it and publishes map -> odom
+# (DEC-32); the global costmap is /map plus live obstacles and inflation. The
+# head's sonar is not a source: the head is disabled (OQ-30).
 
 bt_navigator:
   ros__parameters:
@@ -68,9 +68,8 @@ controller_server:
       regulated_linear_scaling_min_speed: 0.02
       use_fixed_curvature_lookahead: false
       curvature_lookahead_dist: 0.25
-      # Turn to face a path before walking it: the sonar only sees ahead of
-      # the head, and head_controller aims the head at the carrot
-      # (/lookahead_point) first, so the turn is into space already scanned.
+      # Turn to face a path before walking it. Kept from the sonar stack; the
+      # lidar sees all round, so strafing instead is open (OQ-16).
       use_rotate_to_heading: true
       rotate_to_heading_min_angle: 0.5
       max_angular_accel: 1.0
@@ -91,16 +90,25 @@ local_costmap:
       # Foot tips reach 0.225 m from the body centre at the default stance
       # (hardware.md, leg geometry); the old 0.15 was the body alone.
       robot_radius: 0.24
-      plugins: ["sonar_layer", "inflation_layer"]
-      sonar_layer:
-        plugin: "nav2_costmap_2d::RangeSensorLayer"
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        topics: ["/ultrasonic/range"]
-        input_sensor_type: "VARIABLE"
-        # ultrasonic_driver reports "no echo within max_range" as max_range
-        clear_on_max_reading: True
-        clear_threshold: 0.2
-        mark_threshold: 0.8
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          marking: True
+          clearing: True
+          max_obstacle_height: 2.0
+          # Nearer returns are the robot itself (slam_params.yaml uses the same
+          # figure); 0.25 m is inside robot_radius either way.
+          obstacle_min_range: 0.25
+          # Short of the C1's 12 m: the scan plane tilts with the gait, and at
+          # 0.19 m above the floor a 3 deg pitch meets the floor at 3.6 m.
+          obstacle_max_range: 3.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 3.5
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -117,23 +125,34 @@ global_costmap:
       use_sim_time: false
       robot_radius: 0.24
       resolution: 0.05
-      # Fixed grid centred on the boot pose; this is the map the frontier
-      # explorer and dashboard read (/global_costmap/costmap).
+      # Sized by the static layer from slam_toolbox's /map, and grows with it.
+      # The frontier explorer and the dashboard read /global_costmap/costmap;
+      # unknown cells stay unknown, which is what makes a frontier.
       rolling_window: false
-      width: 12
-      height: 12
-      origin_x: -6.0
-      origin_y: -6.0
       track_unknown_space: true
-      plugins: ["sonar_layer", "inflation_layer"]
-      sonar_layer:
-        plugin: "nav2_costmap_2d::RangeSensorLayer"
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: /map
+        map_subscribe_transient_local: True
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        topics: ["/ultrasonic/range"]
-        input_sensor_type: "VARIABLE"
-        clear_on_max_reading: True
-        clear_threshold: 0.2
-        mark_threshold: 0.8
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          marking: True
+          clearing: True
+          max_obstacle_height: 2.0
+          # Nearer returns are the robot itself (slam_params.yaml uses the same
+          # figure); 0.25 m is inside robot_radius either way.
+          obstacle_min_range: 0.25
+          # Short of the C1's 12 m: the scan plane tilts with the gait, and at
+          # 0.19 m above the floor a 3 deg pitch meets the floor at 3.6 m.
+          obstacle_max_range: 3.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 3.5
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -229,8 +248,8 @@ collision_monitor:
     source_timeout: 3.0
     base_shift_correction: True
     stop_pub_timeout: 2.0
-    # The sonar's minimum range is 0.03 m, so both polygons can reach past the
-    # feet (0.225 m). The head sweeps, so a reading lands wherever it points.
+    # Both polygons reach past the feet (0.225 m). The lidar covers them all
+    # round; returns from the robot itself would hold it stopped (OQ-31).
     polygons: ["PolygonStop", "PolygonSlow"]
     PolygonStop:
       type: "polygon"
@@ -249,11 +268,10 @@ collision_monitor:
       visualize: True
       polygon_pub_topic: "polygon_slowdown"
       enabled: True
-    observation_sources: ["sonar"]
-    sonar:
-      type: "range"
-      topic: "/ultrasonic/range"
-      obstacles_angle: 0.035
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "/scan"
       enabled: True
 
 docking_server:
