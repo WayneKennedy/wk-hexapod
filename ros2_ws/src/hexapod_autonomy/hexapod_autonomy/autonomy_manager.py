@@ -32,6 +32,14 @@ from enum import IntEnum
 import time
 import threading
 
+# The map is reset when the robot stands (DEC-32); without these it is not
+try:
+    from slam_toolbox.srv import Reset as SlamReset
+    from nav2_msgs.srv import ClearEntireCostmap
+    MAP_RESET_AVAILABLE = True
+except ImportError:
+    MAP_RESET_AVAILABLE = False
+
 
 class State(IntEnum):
     """Autonomy states matching AutonomyState.msg constants."""
@@ -107,6 +115,18 @@ class AutonomyManager(Node):
         self._look_around_in_progress = False
         self._exploration_in_progress = False
         self._current_goal_handle = None
+        self._map_reset_started = False
+
+        # Map reset clients
+        self.slam_reset_client = None
+        self.clear_costmap_clients = []
+        if MAP_RESET_AVAILABLE:
+            self.slam_reset_client = self.create_client(
+                SlamReset, '/slam_toolbox/reset', callback_group=self.callback_group)
+            self.clear_costmap_clients = [
+                self.create_client(ClearEntireCostmap, name, callback_group=self.callback_group)
+                for name in ('/global_costmap/clear_entirely_global_costmap',
+                             '/local_costmap/clear_entirely_local_costmap')]
 
         # Action clients
         self.look_around_client = ActionClient(
@@ -211,6 +231,30 @@ class AutonomyManager(Node):
             )
             self.current_state = new_state
             self.set_led_for_state()
+
+    def _reset_map(self):
+        """Start the map from the pose the robot stands in.
+
+        slam_toolbox takes its first scan when it starts, which is before the
+        robot has been placed on the floor and has stood: that scan anchors the
+        map to a pose the robot is no longer in (test-log 2026-09-29).
+        """
+        if self.slam_reset_client is None or \
+                not self.slam_reset_client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().warn('slam_toolbox reset not available; keeping its map')
+            self._clear_costmaps()
+            return
+        self.get_logger().info('Resetting the SLAM map at the standing pose')
+        future = self.slam_reset_client.call_async(SlamReset.Request())
+        future.add_done_callback(lambda _: self._clear_costmaps())
+
+    def _clear_costmaps(self):
+        for client in self.clear_costmap_clients:
+            if client.wait_for_service(timeout_sec=2.0):
+                client.call_async(ClearEntireCostmap.Request())
+            else:
+                self.get_logger().warn(f'{client.srv_name} not available')
+        self.transition_to(State.LOOK_AROUND)
 
     def _send_look_around_goal(self):
         """Send look around goal and set up callbacks."""
@@ -342,7 +386,12 @@ class AutonomyManager(Node):
 
         if self.current_state == State.WAITING_FOR_STARTUP:
             if self.robot_initialized:
-                self.transition_to(State.LOOK_AROUND)
+                # Transition handled in _clear_costmaps
+                with self._action_lock:
+                    start = not self._map_reset_started
+                    self._map_reset_started = True
+                if start:
+                    self._reset_map()
 
         elif self.current_state == State.LOOK_AROUND:
             # Look around is async - triggered once when entering this state
