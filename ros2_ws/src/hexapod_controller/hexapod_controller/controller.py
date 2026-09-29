@@ -266,6 +266,8 @@ class HexapodController(Node):
         self.joint_cmd_pub = self.create_publisher(
             Float64MultiArray, 'joint_commands', 10)
         self.relax_pub = self.create_publisher(Bool, 'servo_relax', 10)
+        # startup_sequence waits for this before it declares the robot safe
+        self.initialized_pub = self.create_publisher(Bool, 'hexapod/initialized', 10)
 
         # TF Broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -313,6 +315,8 @@ class HexapodController(Node):
         # non-zero cmd_vel is held. Default (mutually exclusive) group, so it
         # never overlaps a pose command or the MoveDistance action.
         self.gait_timer = self.create_timer(0.05, self._gait_tick)
+        self.initialized_timer = self.create_timer(
+            1.0, self._publish_initialized, callback_group=self.state_cb_group)
 
         self.get_logger().info('Hexapod controller started (NOT initialized)')
         self.get_logger().info('Call /hexapod/initialize service when robot is safe')
@@ -1130,6 +1134,9 @@ class HexapodController(Node):
             while self.odom_yaw < -math.pi:
                 self.odom_yaw += 2 * math.pi
 
+    def _publish_initialized(self):
+        self.initialized_pub.publish(Bool(data=self.is_initialized))
+
     def pose_command_callback(self, msg):
         """Handle string pose commands"""
         cmd = msg.data.lower().strip()
@@ -1138,6 +1145,7 @@ class HexapodController(Node):
             # Don't reset odometry when homing via topic (might be during nav)
             self.home(reset_odom=False)
             self.is_initialized = True  # Ready for stand/walk after home
+            self._publish_initialized()
         elif cmd == 'stand':
             if self.is_initialized:
                 self.stand()
@@ -1162,6 +1170,7 @@ class HexapodController(Node):
             self.stand()
 
             self.is_initialized = True
+            self._publish_initialized()
             response.success = True
             response.message = 'Initialized: home -> stand'
             self.get_logger().info('=== INIT COMPLETE ===')

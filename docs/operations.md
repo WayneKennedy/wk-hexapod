@@ -65,9 +65,10 @@ hexapod_bringup <file>`. It adds no arguments. Since 2026-09-21 a manual run is 
 controllers only; only `hexapod.service` passes `autonomy:=true`.
 
 **What the boot stack does** ([`architecture.md`](architecture.md#launch-structure)):
-drivers start; the startup sequence shows red on the rear LED for 2 s, snaps the legs to
-home, shows cyan for 10 s so the robot can be placed on the floor, then stands and shows
-green. Nav2 and the autonomy nodes come up alongside. The head then makes a two-sweep
+drivers start; the startup sequence waits for the controller and the servo driver to listen
+(up to 60 s, rear LED yellow; [OQ-28](open-questions.md)), shows red on the rear LED for
+2 s, snaps the legs to home, shows cyan for 10 s so the robot can be placed on the floor,
+then stands and shows green. Nav2 and the autonomy nodes come up alongside. The head then makes a two-sweep
 survey standing still (`look_around`), which seeds the map, and the state machine goes to
 mapping and frontier exploration. After an external mission ends it waits
 `mission_timeout` (60 s) for another before exploring again.

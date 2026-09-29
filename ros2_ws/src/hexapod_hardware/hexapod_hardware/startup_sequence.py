@@ -4,12 +4,18 @@ Startup Sequence Node for Hexapod Robot
 Manages safe servo initialization with visual/audio warnings
 
 Sequence:
+0. Wait until hexapod_controller and servo_driver subscribe to pose_command.
+   The topic is volatile: a command sent earlier is lost (OQ-28).
 1. YELLOW (rear LED) - System ready, waiting to initialize
 2. RED + beeping - Warning: servos about to snap to home
 3. HOME + CYAN - Legs snap to home, place robot on floor now
 4. Beep - Warning: robot about to stand
 5. STAND - Robot stands up
 6. GREEN - Safe, robot ready
+
+HOME must be confirmed by the controller (hexapod/initialized) before the
+sequence goes on. A timeout in step 0 or an unconfirmed HOME ends the sequence
+on RED, and /robot/initialized is not published.
 
 The sequence can be triggered:
 - Automatically at boot (if auto_start enabled)
@@ -38,22 +44,32 @@ class StartupSequence(Node):
         self.declare_parameter('startup.warning_duration', 2.0)  # seconds
         self.declare_parameter('startup.beep_interval', 0.5)  # seconds
         self.declare_parameter('startup.place_delay', 10.0)  # seconds between home and stand
+        self.declare_parameter('startup.controller_timeout', 60.0)  # seconds to wait for subscribers
+        self.declare_parameter('startup.confirm_timeout', 5.0)  # seconds to wait for home confirmation
 
         # Get parameters
         self.auto_start = self.get_parameter('startup.auto_start').value
         self.warning_duration = self.get_parameter('startup.warning_duration').value
         self.beep_interval = self.get_parameter('startup.beep_interval').value
         self.place_delay = self.get_parameter('startup.place_delay').value
+        self.controller_timeout = self.get_parameter('startup.controller_timeout').value
+        self.confirm_timeout = self.get_parameter('startup.confirm_timeout').value
 
         # State tracking
         self.sequence_running = False
         self.initialized = False
+        self.controller_initialized = False
 
         # Publishers
         self.led_pub = self.create_publisher(String, 'leds/zone', 10)
         self.buzzer_pub = self.create_publisher(Bool, 'buzzer/state', 10)
         self.pose_pub = self.create_publisher(String, 'pose_command', 10)
         self.initialized_pub = self.create_publisher(Bool, '/robot/initialized', 10)
+
+        # Subscribers
+        self.controller_init_sub = self.create_subscription(
+            Bool, 'hexapod/initialized', self._controller_initialized_callback, 10,
+            callback_group=self.callback_group)
 
         # Service to trigger startup sequence
         self.startup_srv = self.create_service(
@@ -113,6 +129,42 @@ class StartupSequence(Node):
         self.pose_pub.publish(msg)
         self.get_logger().info(f'Sent pose command: {command}')
 
+    def _controller_initialized_callback(self, msg):
+        self.controller_initialized = msg.data
+
+    def _wait_for_pose_subscribers(self):
+        """Block until the nodes that act on pose_command subscribe to it."""
+        needed = {'hexapod_controller', 'servo_driver'}
+        deadline = time.monotonic() + self.controller_timeout
+        while True:
+            present = {info.node_name for info in
+                       self.get_subscriptions_info_by_topic(self.pose_pub.topic_name)}
+            missing = needed - present
+            if not missing:
+                return True
+            if time.monotonic() >= deadline:
+                self.get_logger().error(
+                    f'No pose_command subscription from {sorted(missing)} '
+                    f'after {self.controller_timeout}s')
+                return False
+            self._sleep(0.2)
+
+    def _wait_for_home_confirmed(self):
+        """Block until the controller reports it is initialized."""
+        deadline = time.monotonic() + self.confirm_timeout
+        while not self.controller_initialized:
+            if time.monotonic() >= deadline:
+                self.get_logger().error(
+                    f'Controller did not confirm home within {self.confirm_timeout}s')
+                return False
+            self._sleep(0.1)
+        return True
+
+    def _abort(self, message):
+        self.set_rear_led('red')
+        self.sequence_running = False
+        return False, message
+
     def _publish_initialized(self):
         """Publish initialization status (called periodically after init)"""
         msg = Bool()
@@ -148,6 +200,10 @@ class StartupSequence(Node):
         self.get_logger().info('Starting safe startup sequence...')
 
         try:
+            # Phase 0: the warning must directly precede the snap, so wait first
+            if not self._wait_for_pose_subscribers():
+                return self._abort('Controller or servo driver not listening')
+
             # Phase 1: Warning - RED + beeping
             self.get_logger().info(f'Phase 1: WARNING - servos will snap in {self.warning_duration}s')
             self.set_rear_led('red')
@@ -163,7 +219,8 @@ class StartupSequence(Node):
             # Phase 2: HOME - legs snap to home position
             self.get_logger().info('Phase 2: HOME - legs snapping to home position')
             self.send_pose_command('home')
-            self._sleep(0.5)  # Brief pause for command to execute
+            if not self._wait_for_home_confirmed():
+                return self._abort('Home not confirmed by controller')
 
             # Phase 3: Place delay - CYAN indicates "place robot on floor now"
             self.get_logger().info(f'Phase 3: PLACE ON FLOOR - {self.place_delay}s to position robot')

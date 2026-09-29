@@ -408,6 +408,47 @@ yaw test.
 `laser_frame` in the URDF; `slam.launch.py` and `config/slam_params.yaml`. Not tested:
 anything walking, a leg or the head in the scan plane.
 
+### 2026-09-29 · Cold boot on the battery: the head surveyed, the legs never initialised
+
+**Conditions:** cold boot on 2× 18650, `hexapod.service`, checkout `fba11e8` (the first
+battery boot with `sllidar_node` in the stack). LOAD 7.47 V, CTRL 8.18 V at 12:08:01 UTC;
+7.29 V and 8.06 V at 12:10:55 (dashboard `/status`). `throttled=0x0`, 59 °C, load average
+12.7 at 2 min. Inspected over SSH from the workstation, read-only; the owner watched the
+robot and reported the head moving and no walking.
+
+**Result:**
+
+1. **The `home` pose command was lost, so the controller stayed uninitialised.**
+   `startup_sequence` published `home` on `/pose_command` at 12:07:53.65; `hexapod_controller`
+   finished starting at 12:07:55.47, 1.8 s later. `stand` at 12:08:04.66 was refused:
+   `Not initialized - send home first`. With `is_initialized` false `_gait_tick` returns
+   before reading `/cmd_vel`, so nothing walks. The leg state was not observed from the
+   workstation.
+2. **Nothing noticed.** `startup_sequence` logged `Phase 6: SAFE - robot ready`, showed
+   green and published `/robot/initialized`; it never checks the controller. The state
+   machine ran `look_around` (survey: 31 of 34 ranges) → `mapping_mode` → `exploring`, and
+   the explorer chose a frontier at (1.26, 0.18). Nav2 then logged `Failed to make progress`
+   every 30 s (12:08:47, 12:09:17, 12:09:53, 12:10:24), one planner failure to that goal,
+   and a failed `backup` recovery. Dashboard state at 12:10:55: `exploring`, progress 0.0.
+3. **The race is not new and not the lidar's.** The journal on the robot holds five starts
+   with both lines:
+
+   | Start (UTC) | `home` sent relative to `controller started` | `stand` |
+   |---|---|---|
+   | 2026-09-19 11:34 | 4.3 s before | refused |
+   | 2026-09-19 14:44 | 0.4 s before | accepted |
+   | 2026-09-19 16:12 | 2.9 s before | refused |
+   | 2026-09-23 10:04 | 0.9 s after | accepted |
+   | 2026-09-29 12:07 | 1.8 s before | refused |
+
+   The two earlier refusals were on USB power, where dead servos hid them.
+4. **Also in the log:** `camera_node` died at start (exit −6, OQ-23); 64 `No echo pulse from
+   HC-SR04` warnings in the first 2 min; one `Failed to read ADC: [Errno 121]` from
+   `battery_monitor`.
+
+**What changed:** nothing on the robot. Opened [OQ-28](open-questions.md). This run does
+not count as the battery run expected below.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

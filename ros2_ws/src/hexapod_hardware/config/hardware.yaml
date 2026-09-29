@@ -95,6 +95,8 @@
       warning_duration: 2.0   # seconds of warning before servo snap
       beep_interval: 0.5      # seconds between warning beeps
       place_delay: 10.0       # seconds to place robot on floor after home
+      controller_timeout: 60.0  # seconds to wait for pose_command subscribers (OQ-28)
+      confirm_timeout: 5.0    # seconds for the controller to confirm home
 
     # PCB/Hardware Version
     pcb_version: 2          # V2.0 connector (SPI for LEDs)

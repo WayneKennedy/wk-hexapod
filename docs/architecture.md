@@ -54,7 +54,7 @@ once starved the odometry publisher), and a buzzer that floats on when its proce
 | `led_controller` | `/leds/zone` (`zone:r,g,b`; zones r1–r3, l1–l3, rear, left, right, front, back, mid, all) | — |
 | `buzzer_controller` | `/buzzer/state` | `buzzer/beep` service. **Disabled by default** (DEC-10): requests are logged and dropped |
 | `power_indicator` | `/battery/voltages` | `/leds/zone` (left = LOAD rail, right = CTRL rail; blue below 0.5 V means USB) |
-| `startup_sequence` | — | `/leds/zone`, `/buzzer/state`, `/pose_command`, `/robot/initialized`; `/robot/safe_startup` service |
+| `startup_sequence` | `/hexapod/initialized` | `/leds/zone`, `/buzzer/state`, `/pose_command`, `/robot/initialized`; `/robot/safe_startup` service. Waits for `hexapod_controller` and `servo_driver` to subscribe to `/pose_command` before it starts, and for the controller to confirm `home`; red and no `/robot/initialized` otherwise ([OQ-28](open-questions.md)) |
 
 ### Looking (`hexapod_controller/head_controller`)
 
@@ -89,7 +89,7 @@ writes them.
 | Direction | Topic / interface |
 |---|---|
 | In | `/cmd_vel` (`Twist`), `/pose_command` (`home`, `stand`, `relax`), `/imu/data`, body pose command |
-| Out | `/joint_commands` (per gait sub-step; head slots NaN), `/joint_states` (50 Hz, legs only), `/odom` (20 Hz), TF `odom → base_link`, `/servo_relax` |
+| Out | `/joint_commands` (per gait sub-step; head slots NaN), `/joint_states` (50 Hz, legs only), `/odom` (20 Hz), TF `odom → base_link`, `/servo_relax`, `/hexapod/initialized` (`Bool`, 1 Hz and on change; true once `home` has run) |
 | Services | `hexapod/initialize` (home then stand), `hexapod/enable_balance`, `hexapod/reset_odometry` |
 | Action | `hexapod/move_distance` (`hexapod_interfaces/MoveDistance`) |
 

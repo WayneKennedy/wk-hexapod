@@ -88,6 +88,22 @@ owner deciding.
   the dashboard's sonar fan against a target at a known bearing. Cheapest mitigation if the
   model proves poor: only trust readings taken while the head is settled.
 
+- **OQ-28 — The startup sequence sends `home` before the controller is listening.**
+  (Found 2026-09-29, [`test-log.md`](test-log.md).) `startup_sequence` publishes `home` and
+  `stand` on `/pose_command` on a fixed schedule, 4 s after it starts, and declares the
+  robot safe without checking the result. `/pose_command` is volatile, so a controller that
+  starts late never sees `home`, refuses `stand`, and ignores `/cmd_vel` for the rest of the
+  run while the autonomy stack explores on paper. Three of the five starts in the robot's
+  journal lost the race. **Fix written 2026-09-29:** the sequence waits, before its
+  warning, until `hexapod_controller` and `servo_driver` both subscribe to `/pose_command`
+  (`startup.controller_timeout`, 60 s); the controller publishes `/hexapod/initialized`;
+  and the sequence goes on from `home` only once that is true (`startup.confirm_timeout`,
+  5 s). Either timeout ends on a red rear LED with `/robot/initialized` unpublished, so the
+  autonomy stack stays in `waiting_for_startup`. `hardware.launch.py` runs the sequence
+  with no controller and therefore now ends red after 60 s. **Recovery on a robot left
+  uninitialised** is `/robot/safe_startup`, which reruns the sequence; the robot walks off
+  when it completes.
+
 - **OQ-27 — `base_footprint` is a detached tree.** (Found 2026-09-28.) The URDF makes
   `base_footprint` the parent of `base_link` (+0.03 m), while the controller publishes
   `odom → base_link`; tf2 keeps one parent per frame, so `base_footprint` is its own root and
