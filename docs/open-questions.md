@@ -179,6 +179,26 @@ owner deciding.
   movement calibration in [`operations.md`](operations.md#movement-calibration), then the
   three headings again after a turn of known size.
 
+- **OQ-37 — Hold the scan plane level while walking, from the IMU.** (Owner, 2026-09-29:
+  can tilt measured by the IMU correct all the legs during the gait, with the lidar's
+  height and plane as a high-priority goal?) **What exists** (`controller.py`, read, never
+  run: no entry in [`test-log.md`](test-log.md)): an incremental PID on roll and pitch that
+  writes `body_orientation`, clamped to ±15°, and the gait applies `body_orientation` to
+  every foot in each of its 64 frames per cycle. **What stops it working while walking:**
+  the balance timer shares the gait's mutually exclusive callback group, and a gait cycle
+  blocks that group for its whole second, so the loop runs only between cycles; it also
+  writes the servos itself; and `balance.enabled: true` sets a flag without starting the
+  timer, which only `/hexapod/enable_balance` does. **Height is not the IMU's to hold:**
+  it measures tilt, not height, and on a flat floor the body's height is what the leg
+  kinematics command. **Unknown, and first:** how much the body pitches and rolls in the
+  gait, at what frequency, at 30 mm and at 80 mm (log `/imu/data` during a walk); and the
+  sign of roll and pitch (OQ-13), since a loop with the sign wrong tips the robot further.
+  **Limits to expect, none measured here:** the servos take a new pulse at 50 Hz and
+  report nothing, and the Madgwick filter lags. If the rocking repeats with the gait
+  phase, a correction keyed to the phase may do more than feedback. **Cheaper
+  complement:** drop scans taken while the IMU reads a tilt above a threshold
+  ([OQ-26](#perception-and-sensing)).
+
 - **OQ-27 — `base_footprint` is a detached tree.** (Found 2026-09-28.) The URDF makes
   `base_footprint` the parent of `base_link` (+0.03 m), while the controller publishes
   `odom → base_link`; tf2 keeps one parent per frame, so `base_footprint` is its own root and
