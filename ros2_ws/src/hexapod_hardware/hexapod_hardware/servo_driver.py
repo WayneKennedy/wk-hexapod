@@ -15,6 +15,7 @@ from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray, Bool, String
 from std_srvs.srv import Trigger
+import functools
 import math
 import os
 import time
@@ -31,6 +32,25 @@ try:
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
+
+
+def bus_guarded(callback):
+    """Log a failed I2C transfer and drop the command, so the node outlives it (OQ-32).
+
+    The rest of the command is abandoned: on a dead bus every transfer takes the
+    kernel's 1 s timeout, and a command is up to 80 of them.
+    """
+    @functools.wraps(callback)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return callback(self, *args, **kwargs)
+        except OSError as e:
+            self.bus_failures += 1
+            self.get_logger().error(
+                f'I2C transfer failed in {callback.__name__}, command dropped: {e} '
+                f'({self.bus_failures} failed since start)',
+                throttle_duration_sec=5.0)
+    return wrapper
 
 
 class PCA9685:
@@ -236,6 +256,7 @@ class ServoDriver(Node):
 
         # Track initialization state
         self.is_initialized = False
+        self.bus_failures = 0  # commands dropped by bus_guarded
 
         self.get_logger().info('Servo driver started (NOT initialized - call /servo_driver/initialize when safe)')
 
@@ -392,6 +413,7 @@ class ServoDriver(Node):
             for joint_idx in range(3):
                 self.set_servo_angle(channels[joint_idx], angles[joint_idx])
 
+    @bus_guarded
     def joint_callback(self, msg):
         """Handle raw joint position commands (20 angles in degrees)"""
         if len(msg.data) < 20:
@@ -416,6 +438,7 @@ class ServoDriver(Node):
         if not math.isnan(msg.data[19]):
             self.set_servo_angle(self.head_tilt_channel, msg.data[19])
 
+    @bus_guarded
     def leg_positions_callback(self, msg):
         """Handle leg position commands (18 values: x,y,z per leg)"""
         if len(msg.data) < 18:
@@ -429,6 +452,7 @@ class ServoDriver(Node):
 
         self.set_leg_angles()
 
+    @bus_guarded
     def leg_callback(self, msg):
         """Handle single leg command [leg_id, coxa, femur, tibia] in degrees"""
         if len(msg.data) < 4:
@@ -443,6 +467,7 @@ class ServoDriver(Node):
         for joint_idx in range(3):
             self.set_servo_angle(channels[joint_idx], msg.data[1 + joint_idx])
 
+    @bus_guarded
     def head_callback(self, msg):
         """Handle head pan/tilt command [pan, tilt] in degrees"""
         if len(msg.data) < 2 or not self.head_enabled:
@@ -451,6 +476,7 @@ class ServoDriver(Node):
         self.set_servo_angle(self.head_pan_channel, msg.data[0])
         self.set_servo_angle(self.head_tilt_channel, msg.data[1])
 
+    @bus_guarded
     def relax_callback(self, msg):
         """Relax all servos (disable PWM)"""
         if msg.data:
@@ -513,6 +539,7 @@ class ServoDriver(Node):
 
         self.get_logger().info('STAND position set')
 
+    @bus_guarded
     def pose_callback(self, msg):
         """Handle pose commands - only relax (home/stand via controller's joint_commands)"""
         command = msg.data.lower().strip()
@@ -560,7 +587,10 @@ class ServoDriver(Node):
 
     def destroy_node(self):
         # Relax servos on shutdown
-        self.relax_servos()
+        try:
+            self.relax_servos()
+        except OSError as e:
+            self.get_logger().error(f'Servos NOT relaxed on shutdown, I2C transfer failed: {e}')
         super().destroy_node()
 
 
