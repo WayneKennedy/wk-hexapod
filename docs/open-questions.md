@@ -84,6 +84,9 @@ owner deciding.
   **2026-09-29:** the first battery run with the lidar fitted walked into a TV stand with
   `/scan` publishing and unused ([`test-log.md`](test-log.md)); wiring `/scan` into the
   costmaps and the collision monitor is the same step.
+  **2026-09-29, done ([DEC-32](decisions.md)):** `/scan` feeds both costmaps and the
+  collision monitor and `slam_toolbox` runs in the boot stack. **Still open:** saving a map
+  and localizing against it on the next boot, which milestone 2 needs.
 
 - **OQ-30 — The head tilt servo's gears slip; the head is disabled.** (Owner, 2026-09-29:
   the servo could be heard trying to lower with the gears jumping, during the battery runs
@@ -131,7 +134,22 @@ owner deciding.
   costmaps drop returns nearer than 0.25 m. The collision monitor drops nothing, and its
   stop polygon covers the body, so one return from a knee or the head would hold the robot
   stopped. `scripts/scan-near.py` reports the nearest returns by body bearing; run it
-  standing and walking.
+  standing and walking. **Standing, 2026-09-29: none.** Two 3–5 s samples, 720 beams at
+  10 Hz: the nearest return was 0.34 m, behind the robot, and every other 30° sector was
+  beyond 0.70 m ([`test-log.md`](test-log.md)). What stood 0.34 m behind was not
+  identified; it read the same in both runs. **Walking: not measured.**
+
+- **OQ-34 — No frontier was reachable from where the robot stood.** (2026-09-29,
+  [`test-log.md`](test-log.md).) With the map reset at the standing pose the planner
+  reached points 0.3–0.5 m away, and every frontier goal failed with "no valid path
+  found". In the global costmap the cells reachable from the robot were a pocket of
+  0.79 m² (1.15 × 1.30 m) closed on all sides by inscribed cells, with no unknown cell on
+  its edge; 156 of 1437 free cells were inside it. Returns stood within 0.73–1.22 m in
+  every sector. **Unknown:** whether the robot was boxed in by furniture and feet, which
+  the 0.24 m robot radius then closes, or whether some returns are not obstacles (a tilted
+  scan plane meeting the floor, OQ-26). Test in open floor with the owner describing the
+  room. **Also open:** three failed goals end exploration in `error`
+  (`max_nav_failures`), where waiting and retrying would suit a room people move in.
 
 - **OQ-27 — `base_footprint` is a detached tree.** (Found 2026-09-28.) The URDF makes
   `base_footprint` the parent of `base_link` (+0.03 m), while the controller publishes
@@ -217,6 +235,30 @@ owner deciding.
   Gains if the head goes: two servos, the HC-SR04 and the camera's ribbon off the top of the
   robot, and OQ-21 (the head's feedback-less joint states) closes with it.
 
+- **OQ-33 — The dashboard shows values it cannot vouch for.** (Owner asked for an
+  assessment, 2026-09-29; read from `web_dashboard.py` and compared with the robot's logs.)
+  Faithful: the two voltages while `battery_monitor` publishes, the autonomy state and the
+  mission fields (2 Hz from `autonomy_manager`), "No Camera Feed". Not faithful:
+  - **Nothing goes stale** except the sonar (2 s). Every other value is the last one
+    received, for ever. With the I2C bus dead (OQ-32) `battery_monitor` published nothing
+    and the page showed 0.0 V, which it labels "USB", on the battery.
+  - **Sonar fan:** each ping is drawn at `head_pan_joint`, which is a model (OQ-21) and
+    since OQ-30 a constant zero, while the head hangs limp. The range is real; the bearing
+    is not known. The panel's title says "head sweep".
+  - **Map:** titled "sonar"; it is the global costmap, so inflation (cost 1–99) is drawn in
+    the same red as obstacles and a room looks mostly blocked. No robot, goal, scale or
+    frontier is drawn. "Map: Active" means one costmap message was ever received.
+  - **SLAM mode** is a constant set in `autonomy_manager`, not read from `slam_toolbox`. It
+    said "mapping" under DEC-28, when there was no SLAM, and while SLAM produced no map.
+  - **Exploration %** is frontiers reached × 10.
+  - **Faces: 0** with the camera dead means "no data", not "nobody".
+  - **Absent:** whether the controller is initialised (OQ-28 showed `exploring` with limp
+    legs), the head being disabled, the lidar, the collision monitor's state, planner and
+    controller failures, `AutonomyState.error_message`, driver I/O errors, undervoltage.
+  Wanted: an age on every value with "no data" past a limit, the map drawn from `/map`
+  with the robot and goal on it, the fan replaced or relabelled, and a health row from the
+  nodes' own reports.
+
 - **OQ-22 — What the mono camera is for.** (2026-09-19, [DEC-28](decisions.md).) The
   OV5647 feeds only the dashboard stream and optional face recognition; nothing in
   navigation uses it. It is the robot's only rich sensor, and every obvious use costs CPU
@@ -251,6 +293,18 @@ owner deciding.
   deviation from Freenove's design would mean printing and building another hexapod rather
   than modifying this one. Not examined; the shield's charge circuit and rail topology
   would need reading from the vendor schematic first.
+
+- **OQ-32 — The I2C bus stopped answering.** (2026-09-29, [`test-log.md`](test-log.md).)
+  From 12:39:58 UTC, 12 s into the day's seventh start of the stack, the kernel logged
+  `i2c_designware 1f00074000.i2c: controller timed out` 231 times by 12:43:54;
+  `battery_monitor` and `imu_driver` failed every read with `[Errno 110]`, and with the
+  stack stopped `i2cdetect -y 1` found no device and timed out at each address. The ADC,
+  the IMU and both PCA9685 servo drivers are on that bus. `servo_driver` logged no error,
+  so **whether the legs moved in that run is unknown**; the controller reported `home` and
+  `stand` as done. One read got through at 12:40:05 (LOAD 7.06 V, CTRL 7.82 V). Cause
+  unknown: a line held low by a device, a connector disturbed, or the shield losing
+  power. The owner heard the head tilt servo straining earlier the same session (OQ-30).
+  Not tried: a power cycle. `servo_driver` should report a failed write.
 
 - **OQ-29 — Undervoltage reset when the stack restarts on the battery.** (Found
   2026-09-29, [`test-log.md`](test-log.md).) `systemctl restart hexapod` with LOAD 7.76 V

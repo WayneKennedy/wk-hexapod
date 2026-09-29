@@ -88,7 +88,11 @@ bound, so a boot with no network starts the stack 90 s late on the restored cloc
 
 ## Maps
 
-**Lidar SLAM, standalone** (DEC-31). With the boot stack stopped:
+**The map is `slam_toolbox`'s, built from the lidar in the boot stack** (DEC-32), and it
+starts when the robot stands. **It is not saved and cannot be reloaded yet**
+([OQ-20](open-questions.md)).
+
+Without Nav2, with the boot stack stopped (DEC-31):
 
 ```bash
 sudo systemctl stop hexapod
@@ -99,12 +103,9 @@ ros2 topic echo /map --once --field info        # grows as scans arrive
 ```
 
 Stop both with SIGTERM to their `ros2 launch` processes (see the development loop below).
-Saving and reloading a SLAM map is not set up yet ([OQ-20](open-questions.md)).
 
-**The boot stack's map is not saved and cannot be reloaded** (DEC-28). The map is Nav2's global costmap,
-built from the head's sonar sweeps in a frame that is odometry, so it drifts with the gait
-and means nothing on the next boot. `scripts/save-map.sh` and the RTAB-Map database are
-gone; what replaces them is undecided ([OQ-20](open-questions.md)).
+`python3 scripts/scan-near.py` prints the lidar's nearest returns by body bearing, for
+finding returns from the robot itself ([OQ-31](open-questions.md)).
 
 To watch the map while the robot runs: the dashboard's map panel on port 8080, or
 
@@ -260,9 +261,13 @@ changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (th
 - **The head does not move.** It is only driven between a home/stand and a relax, like the
   legs, and it needs the battery: the servo rail is dead on USB power. Check
   `ros2 topic echo /head_command` — if commands are flowing, the fault is power or wiring.
-- **The map does not grow.** It only grows where the sonar has looked. Confirm the head is
-  scanning (`/head_command`), that `base_link → ultrasonic_link` resolves, and that
-  readings are arriving; a stationary robot with a still head maps one cone and no more.
+- **The map does not grow.** `slam_toolbox` adds a scan every 0.2 m or 0.3 rad of travel,
+  so a robot that does not move keeps its first scan. `Failed to compute odom pose` on
+  every scan means it is running on default parameters (`base_frame: base_footprint`,
+  OQ-27): check `ros2 param get /slam_toolbox base_frame`.
+- **Every plan fails with "no valid path found".** Check that a plan to a point 0.3 m away
+  succeeds (`ros2 action send_goal /compute_path_to_pose …`); if it does, the frontiers are
+  unreachable, not the planner broken ([OQ-34](open-questions.md)).
 - **Collision monitor flaps "stop / continue".** Transform lag between the range source
   and `odom → base_link`; fixed by DEC-09 on 2026-09-09. If it recurs, check load
   ([OQ-02](open-questions.md)).

@@ -15,31 +15,31 @@ servos unpowered.
 **Exit met:** 36 nodes up, a 5 cm occupancy grid produced from the camera, Nav2 planning
 paths to frontiers. Not met on purpose: nothing walked.
 
-## Milestone 1 — It explores a room *(current, restarted on sonar)*
+## Milestone 1 — It explores a room *(current, restarted on the lidar)*
 
 The movement calibration was done on 2026-09-15 and the robot reached a frontier on the
-battery. The sensor change of 2026-09-19 (DEC-25) put the perception half back to the
-start: everything below is on the sonar and the head.
+battery. The sensor changes of 2026-09-19 (DEC-25) and 2026-09-29 (DEC-32) put the
+perception half back to the start twice: everything below is on the lidar, with the head
+disabled (OQ-30).
 
-1. Head calibration with the battery and the owner present: pan sign, limits, slew rate
-   (OQ-21), and the sonar fan checked against a target at a known bearing.
-2. A stationary head survey that matches the room, then a walking one (DEC-28).
-3. Tune the collision monitor and costmaps against real obstacles, now that the source is
-   the sonar (OQ-03).
-4. Verify the IMU filter conventions with the robot turning (OQ-13).
-5. Bring the CPU load down to where the loops keep their rates (OQ-02).
+1. The I2C bus answers again (OQ-32).
+2. A frontier reached on the lidar, in open floor (OQ-34).
+3. The lidar does not see the robot itself while it walks (OQ-31).
+4. Tune the collision monitor and costmaps against real obstacles (OQ-03).
+5. Verify the IMU filter conventions with the robot turning (OQ-13).
+6. Bring the CPU load down to where the loops keep their rates (OQ-02).
+7. The dashboard shows what is true (OQ-33).
 
-**Exit:** the robot maps a room unattended, on sonar, and Nav2 reaches frontiers in it
-without the body turning to look.
+**Exit:** the robot maps a room unattended, on the lidar, and Nav2 reaches frontiers in it.
 
 ## Milestone 2 — It localizes and takes missions
 
-**Blocked on a decision, not on work.** Localization against a saved map went with
-RTAB-Map (DEC-25), and sonar alone cannot replace it: a map that drifts and dies with the
-run has nothing to localize against (OQ-20). Decide first how the robot is to know where
-it is — landmarks for the mono camera (OQ-22), a 2D lidar, or accepting single-run maps.
+The route is the lidar (DEC-32). What is missing is a map that survives the run:
+`slam_toolbox` can serialize a map and localize against it, and nothing here does yet
+(OQ-20).
 
-1. Whatever OQ-20 decides, then: boot, know where you are, wait for a mission.
+1. Save a map and localize against it on the next boot; then: boot, know where you are,
+   wait for a mission.
 2. `navigate` and `return_home` missions from a remote machine via `scripts/mission.sh`.
 3. Decide what an approved planner is and how it authenticates (OQ-04).
 

@@ -11,9 +11,10 @@ sensing: the Intel RealSense D435i was reassigned to another robot and the kit's
 camera and HC-SR04 ultrasonic went back on the pan/tilt head (DEC-25,
 [`hardware.md`](hardware.md)).
 
-That makes the robot's only range sensor **one 15° cone on a servo**. Depth, visual
-odometry and loop closure went with the D435i, so the robot maps with swept sonar in an
-odometry-anchored frame and the head, not the body, does the looking (DEC-27, DEC-28).
+That made the robot's only range sensor **one 15° cone on a servo**, and from 2026-09-19 it
+mapped with swept sonar in an odometry-anchored frame (DEC-27, DEC-28). **Since 2026-09-29
+an RPLIDAR C1 on the body is the range sensor and `slam_toolbox` the map** (DEC-31,
+DEC-32), and the head is disabled ([OQ-30](open-questions.md)).
 
 Everything hangs directly off the Pi: servos on two I2C PWM chips, IMU and battery ADC on
 I2C, LEDs on SPI, buzzer, servo-power enable and the ultrasonic on GPIO, the camera on
@@ -23,9 +24,8 @@ CSI. There is no microcontroller and therefore no reflex tier
 ## What it is for
 
 1. **Autonomous exploration and mapping of the local area.** The robot boots, stands,
-   surveys with the head, builds a sonar map and explores frontiers with Nav2 on its own.
-   Since DEC-28 the map lasts one run and drifts with odometry
-   ([OQ-20](open-questions.md)).
+   builds a lidar map and explores frontiers with Nav2 on its own (DEC-32). The map lasts
+   one run ([OQ-20](open-questions.md)).
 2. **Missions from an approved external planner take priority.** When a planner is
    reachable it directs the robot; when it is not, the robot falls back to exploring. Today
    the planner interface is an HTTP API on the robot driven from another machine

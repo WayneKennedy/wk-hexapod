@@ -110,44 +110,41 @@ The node runs on a multithreaded executor. Gait callbacks are mutually exclusive
 never overlap; odometry, joint-state and IMU callbacks run in a reentrant group so TF keeps
 flowing during a blocking gait cycle.
 
-### Mapping — sonar costmap in the boot stack; lidar SLAM standalone
+### Mapping — lidar SLAM in the boot stack
 
-**Since 2026-09-28 the lidar publishes `/scan` and `slam.launch.py` builds a real map from it**
-(DEC-31): `slam_toolbox` publishes `/map` and `map → odom`. It is not yet wired into
-navigation, so it runs only with `autonomy:=false`, and everything below still describes
-the boot stack ([OQ-20](open-questions.md)).
+Since 2026-09-29 ([DEC-32](decisions.md), superseding DEC-28):
 
-The D435i is gone (DEC-25). What the boot stack maps with (DEC-28):
-
-- **The map is Nav2's global costmap**, a fixed 12 × 12 m grid at 5 cm whose only source is
-  `nav2_costmap_2d::RangeSensorLayer` fed from `/ultrasonic/range`. The layer holds a
-  probability per cell and only calls a cell free or occupied once readings cross its
-  thresholds, so unseen space stays unknown and the frontier explorer has something to aim
-  at. It is published as `/global_costmap/costmap`.
-- **`map` is odometry.** `map → odom` is a static identity published by
-  `navigation.launch.py`. Gait odometry drift is therefore map drift, uncorrected, and a
-  map is only meaningful within one run: nothing is saved and nothing is localized against
-  ([OQ-20](open-questions.md)).
+- **`slam_toolbox` (online async) builds `/map` from `/scan` and gait odometry** and
+  publishes `map → odom`. `navigation.launch.py` includes `slam.launch.py`; the parameters
+  are `config/slam_params.yaml`, passed as `slam_params_file` (not `params_file`, which is
+  Nav2's and is shared between the two launch files).
+- **The map starts when the robot stands.** `slam_toolbox` takes its first scan at start,
+  before the robot has been placed and has stood, so `autonomy_manager` calls
+  `/slam_toolbox/reset` and clears both costmaps before it leaves `waiting_for_startup`.
+- **The frontier explorer and the dashboard read `/global_costmap/costmap`**, which is
+  `/map` plus live obstacles and inflation. Unknown cells stay unknown.
+- **Nothing is saved and nothing is localized against** ([OQ-20](open-questions.md)).
+- **The sonar feeds nothing**: the head is disabled and its direction unknown
+  ([OQ-30](open-questions.md)).
 - **The camera feeds no part of navigation.** `camera_ros` publishes `/camera/image_raw`
   for the dashboard and face recognition only ([OQ-22](open-questions.md)).
 
 ### Navigation (`hexapod_bringup/launch/navigation.launch.py`)
 
-Nav2's `navigation_launch.py` only — planner, controller (regulated pure pursuit),
-smoother, behaviours, BT navigator, waypoint follower, velocity smoother, collision
-monitor, docking server (no docks). Nav2's map server and AMCL are not started (DEC-06):
-there is nothing to load or localize against.
+`slam.launch.py` and Nav2's `navigation_launch.py` — planner (Smac 2D), controller
+(regulated pure pursuit), smoother, behaviours, BT navigator, waypoint follower, velocity
+smoother, collision monitor, docking server (no docks). Nav2's map server and AMCL are not
+started (DEC-06): there is nothing to load or localize against.
 
-Both costmaps take obstacles from the sonar through a `RangeSensorLayer`; the local costmap
-is a 3 m rolling window and the global one is the map above. The robot radius is **0.24 m**,
-the reach of the foot tips, not the 0.15 m body radius used until 2026-09-19. The collision
-monitor watches `/ultrasonic/range` directly, with a stop polygon 0.32 m ahead and a
-slowdown polygon at 0.50 m ([OQ-03](open-questions.md)).
+Both costmaps take obstacles from `/scan` through an `ObstacleLayer` that drops returns
+nearer than 0.25 m and marks out to 3 m; the global one adds a `StaticLayer` on `/map`. The
+local costmap is a 3 m rolling window. The robot radius is **0.24 m**, the reach of the
+foot tips. The collision monitor watches `/scan`, with a stop polygon 0.32 m ahead and a
+slowdown polygon at 0.50 m ([OQ-03](open-questions.md), [OQ-31](open-questions.md)).
 
-**The behaviour trees are this repository's** (`hexapod_bringup/config/behavior_trees/`),
-not Nav2's packaged defaults, for two reasons: the defaults clear the global costmap in
-recovery, which here would erase the map, and their `Spin` recovery turns eighteen servos
-to look around, which is the head's job. `Spin` is not loaded in `behavior_server` either.
+**The behaviour trees are this repository's** (`hexapod_bringup/config/behavior_trees/`,
+the `_sonar` files, unchanged by DEC-32): only the local costmap is cleared in recovery and
+there is no `Spin`. `Spin` is not loaded in `behavior_server` either.
 
 ### Autonomy (`hexapod_autonomy`)
 
@@ -156,14 +153,14 @@ to look around, which is the head's job. `Spin` is not loaded in `behavior_serve
 | `autonomy_manager` | State machine: `waiting_for_startup → look_around → mapping_mode → exploring → exploration_complete / error`. The head survey is the first act of every run; `checking_map` and `localization_mode` are unreachable while there is no saved map | `/autonomy/state` (`AutonomyState`), `/robot/initialized` |
 | `frontier_explorer` | Frontier detection on `/global_costmap/costmap`, closest-first, Nav2 `navigate_to_pose` goals, blacklists unreachable goals, head survey on arrival, ignores frontiers nearer than `min_goal_distance` | `ExploreFrontiers` action |
 | `mission_server` | External missions: `explore`, `navigate`, `patrol`, `return_home` | `/mission/start` (`StartMission`), `/mission/stop` (`StopMission`); `/mission/command` |
-| `web_dashboard` (`hexapod_perception`) | Flask on port 8080: camera, **sonar fan** and map streams, battery, faces, mission control | `POST /api/mission/start`, `POST /api/mission/stop`, `GET /api/autonomy/state`, `GET /status` |
+| `web_dashboard` (`hexapod_perception`) | Flask on port 8080: camera, **sonar fan** and map streams (what each panel can be trusted for: [OQ-33](open-questions.md)), battery, faces, mission control | `POST /api/mission/start`, `POST /api/mission/stop`, `GET /api/autonomy/state`, `GET /status` |
 
 `face_recognition_node` (`hexapod_perception`) consumes `/camera/image_raw` and is launched
 separately by `perception.launch.py`; it is not part of the boot stack.
 
 ## Frames
 
-`map → odom` (static identity) → `base_link` (controller odometry) → fixed `imu_link`;
+`map → odom` (`slam_toolbox`) → `base_link` (controller odometry) → fixed `imu_link`;
 `base_footprint` is **not** on this tree: the URDF makes it `base_link`'s parent, so it is a
 separate root ([OQ-27](open-questions.md)); revolute `head_pan_joint` → `head_pan_link` →
 `head_tilt_joint` → `head_tilt_link` → fixed `camera_link` → `camera_optical_frame`, and
@@ -186,8 +183,8 @@ robot.launch.py                 (systemd: autonomy:=true)
 
 `hardware.launch.py` is the drivers alone; `controller.launch.py` is the leg controller
 alone with direct servo access (`test_ros.sh`); `perception.launch.py` adds face
-recognition; `slam.launch.py` adds `slam_toolbox`, and must not run alongside
-`navigation.launch.py` (both publish `map → odom`).
+recognition; `slam.launch.py` is `slam_toolbox` alone, which `navigation.launch.py`
+includes.
 
 ## Topic contract
 

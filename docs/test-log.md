@@ -507,15 +507,58 @@ restarted. LOAD 7.82 V, CTRL 8.00 V before the stop; 7.59 V and 7.94 V standing 
 **What changed:** OQ-30 opened. Autonomous exploration now waits on the lidar as the range
 source ([OQ-20](open-questions.md)) or on a repaired head.
 
+### 2026-09-29 · Lidar and slam_toolbox in the boot stack: maps, plans nearby, reaches no frontier
+
+**Conditions:** same session and battery, head disabled, robot on the floor of a furnished
+room, owner present; the room was not described to the session. Four starts of the
+service, each after a stop. LOAD 7.65–7.88 V and CTRL 7.88–7.94 V on the first three; load
+average 9–16. Times UTC.
+
+**Result:**
+
+1. **12:30, `4c93b5c`: `slam_toolbox` ran on its defaults.** `Failed to compute odom pose`
+   on every scan (271 in 40 s), no `/map`. `base_frame` read `base_footprint` (OQ-27):
+   included from `navigation.launch.py`, `slam.launch.py`'s `params_file` argument
+   resolved to Nav2's file. `/scan`, `/odom` and TF were healthy (10.1, 20.1, 20.0 Hz;
+   received at most 0.39 s after their stamps). Fixed in `6fb3027`.
+2. **12:32, `6fb3027`: a map, and no plan.** `/map` 74 × 153 cells within 13 s. NavFn
+   failed every plan, including one to a clear point 0.6 m ahead, with `Failed to create a
+   plan from potential when a legal potential was found`. Start cell cost 79–82 of 100.
+3. **12:35, `dbcbff3`: Smac 2D also found no path.** `/map` and a live scan had the same
+   outline at an offset: 146 occupied cells in the map, 296 cells hit by the last ten
+   scans, 16 in common. `slam_toolbox` had taken its first scan before the robot was
+   placed and stood. Fixed in `8bbc417` by resetting SLAM and both costmaps on `SAFE`.
+4. **12:39, `8bbc417`: plans to nearby points succeed; frontiers do not.** Plans to
+   (0.30, 0.15) and (0.35, 0.40) succeeded. Frontiers at (0.54, 1.52), (−0.88, −2.39) and
+   (−1.26, −2.39) each failed with `no valid path found`, and the state machine went to
+   `error` at 12:41:06 after three. The reachable pocket was 0.79 m²
+   ([OQ-34](open-questions.md)). `backup` was refused each time: the nearest return was
+   0.34 m behind the robot.
+5. **The lidar did not see the robot standing** (OQ-31): nearest returns by 30° sector,
+   clockwise from dead astern, 0.34, 0.38, 1.03, 0.73, 0.83, 1.11 m (ahead), 0.95, 1.22,
+   0.85, 0.97, 0.85, 0.36 m.
+6. **The collision monitor on `/scan`** logged one stop and release, 0.1 s apart, in the
+   12:35 run and none in the others. It was not tested against an obstacle.
+7. **The I2C bus stopped answering at 12:39:58** and had not recovered when the stack was
+   stopped at 12:44 ([OQ-32](open-questions.md)). Whether the legs moved in the 12:39 run
+   is unknown; its results above come from the lidar and the costmaps, which do not use
+   that bus.
+8. **No undervoltage** was logged on any of the four starts (OQ-29: one in seven today).
+
+**What changed:** DEC-32; Smac 2D; the explorer's `initial_map_timeout_sec`;
+`scripts/scan-near.py`; OQ-31 to OQ-34. **Not shown:** the robot walking on the lidar, a
+frontier reached, the map against the room. The stack was left stopped.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
 
-- The head calibration of [`operations.md`](operations.md#head-calibration): pan sign,
-  travel limits, slew rate, and the sonar fan against a target at a known bearing (OQ-21).
-- A stationary head survey with the servos live: does the map match the room (DEC-28)?
-- Collision monitor behaviour against a real obstacle, now that the source is the sonar
-  and the polygons reach past the feet (OQ-03).
+- The I2C bus after a power cycle (OQ-32).
+- A run in open floor on the lidar: a frontier reached, and the map against the room
+  (OQ-34).
+- `scripts/scan-near.py` while walking (OQ-31).
+- Collision monitor behaviour against a real obstacle, now that the source is the lidar
+  (OQ-03).
 - `/imu/data` yaw sign when the robot is turned by hand (OQ-13).
 - A battery run of the full stack after that: does Nav2 reach a frontier on sonar alone,
   and does the head lead the turns (DEC-27)?

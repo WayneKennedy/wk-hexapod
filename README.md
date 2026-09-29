@@ -9,8 +9,9 @@ no reflex tier, the kit's own sensors (DEC-26).
 **Status:** the native stack was verified end to end on the bench (2026-09-09, USB power,
 servos unpowered) and reached a frontier on the battery (2026-09-15), both with a RealSense
 D435i. On 2026-09-19 the D435i left, the kit's camera and ultrasonic returned, and the stack
-was rebuilt around a sonar-fed costmap map (DEC-25, DEC-27, DEC-28); the head calibration and
-a floor run on the battery are next ([`docs/roadmap.md`](docs/roadmap.md)). See
+was rebuilt around a sonar-fed costmap map (DEC-25, DEC-27, DEC-28). On 2026-09-29 an
+RPLIDAR C1 and `slam_toolbox` replaced the sonar and the head was disabled (DEC-32); a
+frontier reached on the lidar is next ([`AGENTS.md`](AGENTS.md#status)). See
 [`docs/roadmap.md`](docs/roadmap.md) for direction, [`docs/decisions.md`](docs/decisions.md)
 for what is settled, and [`docs/open-questions.md`](docs/open-questions.md) for what is not.
 

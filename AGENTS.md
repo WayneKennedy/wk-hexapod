@@ -29,12 +29,12 @@ hardware ceiling is the kit's: no accelerator, no bus servos (DEC-26). Full inte
 
 **Its sensing changed on 2026-09-19** (DEC-25): the Intel RealSense D435i went to the family's
 Orin Nano and the kit's OV5647 camera and HC-SR04 ultrasonic went back on the pan/tilt head.
-**Update 2026-09-28 (DEC-31):** an RPLIDAR C1 now publishes `/scan`, and `slam.launch.py`
-maps from it on the bench, but it is not yet wired into navigation ([OQ-20](docs/open-questions.md)).
-Until it is, the boot stack still works as follows: one 15° sonar cone on a servo is the
-navigation's only range sensor, the head does the looking instead of the body (DEC-27), and the map is Nav2's
-sonar-fed global costmap anchored to odometry, lasting one run (DEC-28). Read those three
-decisions before changing anything in perception or navigation.
+**It changed again on 2026-09-29** ([DEC-32](docs/decisions.md)): an RPLIDAR C1 on the body
+is the only range sensor navigation uses, `slam_toolbox` builds the map from it in the boot
+stack, and the pan/tilt head is disabled because its tilt servo's gears slip
+([OQ-30](docs/open-questions.md)). The sonar and the camera still sit on the head and feed
+nothing. DEC-27 and DEC-28 describe the sonar stack this replaced. Read DEC-31 and DEC-32
+before changing anything in perception or navigation.
 
 **It is a working robot, not a design.** Locomotion, odometry, Nav2 and frontier
 exploration run end to end ([`docs/test-log.md`](docs/test-log.md)). On 2026-09-15, after
@@ -136,17 +136,17 @@ the owner present (below).
 
 ## Status
 
-**Sonar stack verified on the bench, 2026-09-19, USB power.** The whole chain ran
-unattended: head survey → sonar map → frontier goal, with Nav2 active and the dashboard
-answering ([`docs/test-log.md`](docs/test-log.md)). Nav2 reported "failed to make
-progress" because the servos are dead on USB power. **The head servos could not move
-either, so the map's geometry is unverified** — the pipeline is proven, the map is not.
-The camera does not probe ([OQ-23](docs/open-questions.md)); bench runs use
-`camera:=false`. Load average 19–23 on four cores with everything up
+**Lidar stack first run on the battery, 2026-09-29; it has not yet walked to a frontier.**
+`slam_toolbox` maps, both costmaps and the collision monitor read `/scan`, and the planner
+plans to nearby points, but no frontier was reachable where the robot stood
+([OQ-34](docs/open-questions.md)). The startup race that left the legs uninitialised is
+fixed (OQ-28). **The run ended with the I2C bus not answering**
+([OQ-32](docs/open-questions.md)): check that first. All of it is in
+[`docs/test-log.md`](docs/test-log.md). The camera does not probe
+([OQ-23](docs/open-questions.md)). Load average 9–16 on four cores with everything up
 ([OQ-02](docs/open-questions.md)).
 
-**Frontier:** the head calibration in `docs/operations.md` (pan sign, limits, slew rate —
-battery and owner needed), then a survey that matches a real room, then the collision
-monitor against real obstacles ([`docs/roadmap.md`](docs/roadmap.md)). Deciding how the
-robot will know where it is without SLAM ([OQ-20](docs/open-questions.md)) blocks
-milestone 2.
+**Frontier:** the I2C bus (OQ-32), then a run in open floor to see a frontier reached on
+the lidar (OQ-34), then the collision monitor against real obstacles (OQ-03) and the
+dashboard ([OQ-33](docs/open-questions.md)). Saving and reloading a map
+([OQ-20](docs/open-questions.md)) blocks milestone 2.
