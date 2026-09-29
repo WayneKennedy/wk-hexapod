@@ -212,6 +212,14 @@ owner deciding.
 
 ## Perception and sensing
 
+- **OQ-35 — The IMU answers `WHO_AM_I` with `0x70`.** (Read 2026-09-29, 13:02 UTC:
+  `i2cget -y 1 0x68 0x75`.) The documentation here and the kit's call the part an MPU6050.
+  **From memory, not checked against a datasheet this session:** InvenSense gives `0x68`
+  for the MPU-6050 and `0x70` for the MPU-6500. **Unknown:** which part is fitted (read its
+  marking), and whether the `mpu6050-raspberrypi` library's ranges and scale factors hold
+  for it. `/imu/data` has been in use since 2026-09-09 and its yaw sign is still open
+  (OQ-13).
+
 - **OQ-26 — Is the pan/tilt head redundant once the lidar is fitted?** (Owner, 2026-09-23,
   "probably", with the body sweeping the sensor instead: `/body_pose` pitch and roll tilt the
   scan plane, and the IMU reports the angle.) What the lidar replaces outright: the
@@ -294,17 +302,38 @@ owner deciding.
   than modifying this one. Not examined; the shield's charge circuit and rail topology
   would need reading from the vendor schematic first.
 
-- **OQ-32 — The I2C bus stopped answering.** (2026-09-29, [`test-log.md`](test-log.md).)
-  From 12:39:58 UTC, 12 s into the day's seventh start of the stack, the kernel logged
-  `i2c_designware 1f00074000.i2c: controller timed out` 231 times by 12:43:54;
-  `battery_monitor` and `imu_driver` failed every read with `[Errno 110]`, and with the
-  stack stopped `i2cdetect -y 1` found no device and timed out at each address. The ADC,
-  the IMU and both PCA9685 servo drivers are on that bus. `servo_driver` logged no error,
-  so **whether the legs moved in that run is unknown**; the controller reported `home` and
-  `stand` as done. One read got through at 12:40:05 (LOAD 7.06 V, CTRL 7.82 V). Cause
-  unknown: a line held low by a device, a connector disturbed, or the shield losing
-  power. The owner heard the head tilt servo straining earlier the same session (OQ-30).
-  Not tried: a power cycle. `servo_driver` should report a failed write.
+- **OQ-32 — The I2C bus stopped answering: a device held SDA low.** (2026-09-29,
+  [`test-log.md`](test-log.md), two entries.) **Freed the same day without a power cycle;
+  the cause is unknown.**
+  - **What happened.** At 12:39:57.19 UTC, 11 s into the day's seventh start of the stack,
+    the kernel logged `i2c_designware 1f00074000.i2c: i2c_dw_handle_tx_abort: lost
+    arbitration`, the only such line in the robot's journal. From 12:39:58
+    every transfer ended in `controller timed out`, 255 by 12:58. Servo power had been
+    enabled 1.45 s before (12:39:55.74) and both PCA9685s initialised; the bus traffic at
+    that moment was `imu_driver` at 100 Hz and `battery_monitor` at 1 Hz. No servo command
+    had been sent.
+  - **State found, 12:59.** SDA low and static, not driven by the Pi; SCL high; both pins
+    still on their I2C function. Read from the RP1 pad registers, which reconfigures
+    nothing.
+  - **Recovery, 13:02.** `scripts/i2c-recover.py --recover`: one SCL pulse released SDA,
+    so a device was part-way through a transfer and waiting for a clock. After the STOP and
+    a rebind of the controller `i2cdetect -y 1` showed `40 41 48 68`. **Which device held
+    the line is unknown.**
+  - **Corrections to this entry as first written.** `servo_driver` did report the failure:
+    it died at 12:40:16 with `TimeoutError` on the first write of its first
+    `/joint_commands` message, so **no leg command reached a servo in the 12:39 run**, and
+    at 13:03 no PCA9685 channel held a live PWM. The controller's `home` and `stand` "done"
+    say only that it published. The LOAD 7.06 V, CTRL 7.82 V logged at 12:40:05 was
+    `power_indicator`'s 10 s report of a value `battery_monitor` published before the
+    failure, not a read that got through.
+  - **Changed** (commit `40a234b`): `servo_driver` logs a failed transfer, drops that
+    command and keeps running, so a bus that recovers is used again and the servos can be
+    relaxed on shutdown. Tested with a stub, not against a dead bus.
+  - **Open.** Why arbitration was lost: a glitch on SDA as the servo rail came up, the
+    400 kHz clock on the shield's wiring, and a fault in one device are candidates, none
+    examined. Whether it recurs: once in seven starts so far. Nothing in the stack detects
+    a dead bus or clears it; the script needs root and a stopped stack. With the bus dead
+    the state machine still explores on paper ([OQ-33](#perception-and-sensing)).
 
 - **OQ-29 — Undervoltage reset when the stack restarts on the battery.** (Found
   2026-09-29, [`test-log.md`](test-log.md).) `systemctl restart hexapod` with LOAD 7.76 V

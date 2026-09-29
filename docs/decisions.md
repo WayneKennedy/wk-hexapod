@@ -312,3 +312,13 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   (60 s) for a first frontier instead of declaring the room explored. The behaviour trees
   are unchanged. Maps still do not survive a run: `slam_toolbox` can save and reload one,
   and nothing here does yet ([OQ-20](open-questions.md)).
+
+- **DEC-33 — The workstation's checkout and the robot's are in sync before anything is
+  started or restarted on the robot.** (Owner, 2026-09-29, as a house rule; no reason was
+  stated.) It tightens DEC-29's loop. **In sync, as checked:** both checkouts clean,
+  both at the same commit, and that commit `origin/main`. `scripts/sync-check.sh` checks
+  it from the workstation and changes nothing; the commands are in
+  [`operations.md`](operations.md#development-loop). Its effect is that the commit a
+  [`test-log.md`](test-log.md) entry names is the code that ran. A diagnostic copied to the
+  robot's `/tmp` and run from there leaves both checkouts as they were; commit it before it
+  is run again.

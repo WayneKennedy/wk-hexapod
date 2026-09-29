@@ -112,8 +112,9 @@ distressed people in the house. Rules, all of which are enforced by the setup
 Sessions run on the always-on workstation and operate the robot over SSH, as for the
 family's other ROS 2 hosts. Author code in the workstation's checkout and push it. Then
 update the robot's checkout from `origin/main` and test over SSH: the
-[development loop](docs/operations.md#development-loop). A change that moves a leg needs
-the owner present (below).
+[development loop](docs/operations.md#development-loop). **The two checkouts are in sync
+before anything is started or restarted on the robot** ([DEC-33](docs/decisions.md)):
+run `scripts/sync-check.sh`. A change that moves a leg needs the owner present (below).
 
 - ROS is native: `source /opt/ros/jazzy/setup.bash && source ros2_ws/install/setup.bash`,
   or use `scripts/launch.sh`. The stack normally runs under `systemd` (`hexapod.service`);
@@ -136,21 +137,24 @@ the owner present (below).
 
 ## Status
 
-**Lidar stack first run on the battery, 2026-09-29; it has not yet walked to a frontier.**
-`slam_toolbox` maps, both costmaps and the collision monitor read `/scan`, and the planner
-plans to nearby points, but no frontier was reachable where the robot stood
-([OQ-34](docs/open-questions.md)). The startup race that left the legs uninitialised is
-fixed (OQ-28). **The run ended with the I2C bus not answering**
-([OQ-32](docs/open-questions.md)): check that first. All of it is in
+**The lidar stack has run on the battery and has not yet walked to a frontier**
+(2026-09-29). `slam_toolbox` maps, both costmaps and the collision monitor read `/scan`,
+and the planner plans to nearby points, but no frontier was reachable where the robot
+stood ([OQ-34](docs/open-questions.md)). The startup race that left the legs uninitialised
+is fixed (OQ-28). **The I2C bus failed in the last run and was freed afterwards without a
+power cycle; why it failed is unknown** ([OQ-32](docs/open-questions.md)), and **the stack
+has not run since**. No leg command reached a servo in that last run. All of it is in
 [`docs/test-log.md`](docs/test-log.md). The camera does not probe
 ([OQ-23](docs/open-questions.md)). Load average 9–16 on four cores with everything up
 ([OQ-02](docs/open-questions.md)).
 
-**As left on 2026-09-29:** the stack stopped by hand, the robot's checkout clean at
-`origin/main`, `hexapod.service` still enabled, so **the next boot on the battery stands
-and explores**. The battery was last read at LOAD 7.06 V, CTRL 7.82 V.
+**As left on 2026-09-29, 13:05 UTC:** the stack stopped, servo power disabled, the I2C bus
+answering, both checkouts in sync at `origin/main`, `hexapod.service` still enabled, so
+**the next boot on the battery stands and explores**. The battery was last read at LOAD
+7.47 V, CTRL 7.59 V.
 
-**Frontier:** the I2C bus (OQ-32), then a run in open floor to see a frontier reached on
-the lidar (OQ-34), then the collision monitor against real obstacles (OQ-03) and the
-dashboard ([OQ-33](docs/open-questions.md)). Saving and reloading a map
+**Frontier:** a start in open floor with the owner watching, to see the stack run on the
+recovered bus (OQ-32) and a frontier reached on the lidar (OQ-34); then the collision
+monitor against real obstacles (OQ-03) and the dashboard
+([OQ-33](docs/open-questions.md)). Saving and reloading a map
 ([OQ-20](docs/open-questions.md)) blocks milestone 2.

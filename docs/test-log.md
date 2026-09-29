@@ -549,11 +549,49 @@ average 9–16. Times UTC.
 `scripts/scan-near.py`; OQ-31 to OQ-34. **Not shown:** the robot walking on the lidar, a
 frontier reached, the map against the room. The stack was left stopped.
 
+### 2026-09-29 · The I2C bus freed without a power cycle; the room seen by the lidar alone
+
+**Conditions:** same boot as the entry above (up since 12:16 UTC), on the battery, stack
+stopped since 12:44, servo power disabled (GPIO 4 high), driven over SSH from the
+workstation. Nothing moved a leg. Robot's checkout `489fbe9`, then `40a234b`. Times UTC.
+
+**Result:**
+
+1. **12:58, the bus was still dead.** `i2cget` to `0x40`, `0x41`, `0x48` and `0x68` each
+   failed after 1.0 s with a kernel `controller timed out`.
+2. **12:59, SDA was held low.** RP1 pad registers, 200 samples over 1 s: SDA 0, SCL 1,
+   neither driven by the Pi, both pins on function 3 (I2C).
+3. **The journal, read again, corrects the entry above** on three points: the arbitration
+   loss at 12:39:57.19, `servo_driver`'s death at 12:40:16, and the 12:40:05 voltages
+   ([OQ-32](open-questions.md)).
+4. **13:02, `scripts/i2c-recover.py --recover` freed it with one SCL pulse.**
+   `i2cdetect -y 1`: `40 41 48 68`. Both PCA9685s read `MODE1` `0x00`, `PRESCALE` `0x79`,
+   and no channel held a live PWM. The IMU read `WHO_AM_I` `0x70`
+   ([OQ-35](open-questions.md)). No kernel timeout followed. The script was run from
+   `/tmp` before it was committed; `40a234b` is the same file.
+5. **13:02, the battery.** Three reads 0.5 s apart: LOAD 7.59, 7.47, 7.47 V; CTRL 7.53,
+   7.59, 7.59 V. `vcgencmd get_throttled` `0x0`.
+6. **13:03, the `servo_driver` guard against a stub:** three `TimeoutError`s logged and
+   counted, a good call passed through, a `ValueError` still raised. Not tested against a
+   dead bus.
+7. **13:04, `sllidar_node` alone, 53 scans, robot lying with its legs limp.** Nearest
+   return by 30° sector of body bearing (0° ahead, + left), from −180°: 0.55, 0.58, 0.72,
+   0.61, 0.52, 0.79, 1.87 (0° to +30°), 0.62, 0.54, 0.54, 0.62, 0.90 m. None nearer than
+   0.50 m. The 12:39 run had 0.34–0.38 m in the three sectors astern: the robot or what
+   stood behind it has moved since, which one is not known. Health `OK`, 10.0 Hz.
+8. **`timeout` on `ros2 run` orphans the node.** The signal reaches the `ros2 run` wrapper;
+   the node and the static transform publisher were left under PID 1, and had exited
+   seconds later when looked for.
+
+**What changed:** `scripts/i2c-recover.py`, `scripts/sync-check.sh`, the `servo_driver`
+guard, [DEC-33](decisions.md), OQ-32 rewritten, OQ-35 opened. **Not shown:** why
+arbitration was lost, the stack running on the recovered bus, anything walking.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
 
-- The I2C bus after a power cycle (OQ-32).
+- The stack on the recovered I2C bus, and whether the bus fails again (OQ-32).
 - A run in open floor on the lidar: a frontier reached, and the map against the room
   (OQ-34).
 - `scripts/scan-near.py` while walking (OQ-31).

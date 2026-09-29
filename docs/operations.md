@@ -219,9 +219,15 @@ Authoring happens on the workstation, and the robot is driven over SSH ([DEC-29]
 # workstation: commit and push, then on the robot
 ssh <robot> 'cd ~/Code/wk-hexapod && [ -z "$(git status --porcelain)" ] && git fetch && git reset --hard origin/main'
 ssh <robot> 'cd ~/Code/wk-hexapod/ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build --symlink-install'
+scripts/sync-check.sh <robot> &&                 # DEC-33: no start or restart out of sync
 ssh <robot> 'sudo systemctl restart hexapod'     # one call; inspect in another
 ```
 
+- **The two checkouts are in sync before anything is started or restarted on the robot**
+  ([DEC-33](decisions.md)): both clean, both at `origin/main`. `scripts/sync-check.sh`
+  prints the three commits and exits non-zero when they differ or either tree is dirty.
+- **`timeout ... ros2 run ...` leaves the node running** (2026-09-29): the signal reaches
+  the `ros2 run` wrapper and the node is orphaned. Check for it by parent, as below.
 - **Restart in one SSH call and inspect in another.** A cleanup that kills by pattern also
   matches an SSH session whose command line names a node.
 - **Starting `scripts/launch.sh` in the background** (`setsid nohup ... &`): `$!` is the
@@ -275,6 +281,12 @@ changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (th
   and "scan frequency:10.0 Hz". "Cannot start scan: 80008002" means apt's `rplidar_ros`, not
   `sllidar_ros2`, is driving it (DEC-31). No `/dev/ttyUSB0`: check the USB lead
   (`lsusb` shows `10c4:ea60`); the user needs the `dialout` group.
+- **Every I2C read fails with `[Errno 110]`, and the kernel logs `controller timed out`.**
+  A device is holding SDA low ([OQ-32](open-questions.md)). Stop the service, then
+  `sudo python3 scripts/i2c-recover.py` reports the two lines and `--recover` clocks the
+  device free and rebinds the controller; `i2cdetect -y 1` must then show `40 41 48 68`.
+  It refuses to run with the service active or servo power enabled. If SDA stays low, or
+  SCL is the line held, power the robot off and on.
 - **The buzzer sounds.** Something released GPIO 17. `systemctl status hexapod-buzzer-guard`
   and [`hardware.md`](hardware.md#the-buzzer-hazard).
 - **A tool loops or hangs under load.** `ros2 topic hz` has been seen to hang at load
