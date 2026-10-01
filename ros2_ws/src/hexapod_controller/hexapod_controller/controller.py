@@ -217,7 +217,12 @@ class HexapodController(Node):
         self.imu_roll = 0.0
         self.imu_pitch = 0.0
         self.imu_yaw = 0.0
-        self.imu_yaw_rad = 0.0  # Raw yaw in radians for odometry sync
+        self.imu_yaw_rad = 0.0  # Raw yaw in radians
+        # odom_yaw - imu_yaw_rad when the current walk began. The filter's
+        # absolute yaw is arbitrary (it starts wherever the gravity vector put
+        # it, -3 deg one boot and -91 deg the next), so fusion follows the
+        # IMU's change in yaw since the walk began, never its absolute value.
+        self.imu_yaw_offset = 0.0
 
         # ===== Odometry State =====
         # Position in world frame (meters)
@@ -656,21 +661,16 @@ class HexapodController(Node):
 
         self.odom_pub.publish(odom)
 
-    def _reset_odometry(self, sync_imu_yaw=True):
-        """Reset odometry to origin, optionally syncing yaw with IMU."""
+    def _reset_odometry(self):
+        """Reset odometry to origin."""
         self.odom_x = 0.0
         self.odom_y = 0.0
         self.odom_vx = 0.0
         self.odom_vy = 0.0
         self.odom_vyaw = 0.0
 
-        # Sync yaw with IMU if enabled and IMU data available
-        if sync_imu_yaw and self.get_parameter('odometry.imu_fusion').value:
-            self.odom_yaw = self.imu_yaw_rad
-            self.get_logger().info(f'Odometry reset, yaw synced to IMU: {math.degrees(self.odom_yaw):.1f}°')
-        else:
-            self.odom_yaw = 0.0
-            self.get_logger().info('Odometry reset to origin')
+        self.odom_yaw = 0.0
+        self.get_logger().info('Odometry reset to origin')
 
     # ===== Body Pose Commands =====
 
@@ -798,8 +798,14 @@ class HexapodController(Node):
                 self.is_walking = False
                 self._reset_to_stand()
             return
-        self.is_walking = True
+        self._begin_walk()
         self._walk_cycle(vx, vy, wz)
+
+    def _begin_walk(self):
+        """Mark walking; anchor the IMU yaw fusion to the heading odometry holds now."""
+        if not self.is_walking:
+            self.imu_yaw_offset = self.odom_yaw - self.imu_yaw_rad
+            self.is_walking = True
 
     def _walk_cycle(self, vx, vy, wz):
         """
@@ -1112,15 +1118,15 @@ class HexapodController(Node):
         imu_yaw_rad = math.atan2(siny_cosp, cosy_cosp)
         self.imu_yaw = math.degrees(imu_yaw_rad)
 
-        # Store raw IMU yaw for reset sync
         self.imu_yaw_rad = imu_yaw_rad
 
         # Fuse IMU yaw with odometry using complementary filter
         if self.get_parameter('odometry.imu_fusion').value and self.is_walking:
-            # During walking, blend IMU yaw with gait-integrated yaw
+            # During walking, blend the IMU's yaw change since the walk began
+            # with gait-integrated yaw
             alpha = self.get_parameter('odometry.imu_yaw_weight').value
             # Compute difference and apply weighted correction
-            yaw_diff = imu_yaw_rad - self.odom_yaw
+            yaw_diff = (imu_yaw_rad + self.imu_yaw_offset) - self.odom_yaw
             # Normalize difference to [-pi, pi]
             while yaw_diff > math.pi:
                 yaw_diff -= 2 * math.pi
@@ -1270,7 +1276,7 @@ class HexapodController(Node):
                     return result
 
                 # Execute one gait cycle
-                self.is_walking = True
+                self._begin_walk()
                 self._walk_cycle(speed * direction, 0.0, 0.0)
 
                 # Calculate distance traveled from odometry
