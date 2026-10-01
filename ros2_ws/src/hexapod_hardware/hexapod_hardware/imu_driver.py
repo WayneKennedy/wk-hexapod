@@ -30,11 +30,18 @@ class ImuDriver(Node):
         self.declare_parameter('imu.publish_rate', 100.0)
         self.declare_parameter('imu.accel_range', 2)
         self.declare_parameter('imu.gyro_range', 250)
+        # Rotation about z, degrees, that turns a vector in the chip's axes into
+        # the body's (x forward, y left). -90 since 2026-10-01: tilted by hand,
+        # the chip's y axis pointed forward and its x axis to the robot's right
+        # (test-log.md, OQ-13). Everything downstream reads body axes.
+        self.declare_parameter('imu.mounting_yaw_deg', -90.0)
 
         # Get parameters
         bus = self.get_parameter('i2c.bus').value
         addr = self.get_parameter('i2c.mpu6050_addr').value
         publish_rate = self.get_parameter('imu.publish_rate').value
+        yaw = math.radians(self.get_parameter('imu.mounting_yaw_deg').value)
+        self.cos_yaw, self.sin_yaw = math.cos(yaw), math.sin(yaw)
 
         # Initialize sensor
         if HARDWARE_AVAILABLE:
@@ -71,6 +78,10 @@ class ImuDriver(Node):
 
         self.get_logger().info(f'IMU driver started at {publish_rate} Hz')
 
+    def _to_body(self, x, y):
+        return (self.cos_yaw * x - self.sin_yaw * y,
+                self.sin_yaw * x + self.cos_yaw * y)
+
     def publish_imu_data(self):
         msg = Imu()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -81,14 +92,18 @@ class ImuDriver(Node):
                 accel = self.sensor.get_accel_data()
                 gyro = self.sensor.get_gyro_data()
 
+                # Chip axes to body axes (imu.mounting_yaw_deg)
+                ax, ay = self._to_body(accel['x'], accel['y'])
+                gx, gy = self._to_body(gyro['x'], gyro['y'])
+
                 # Linear acceleration (m/s^2)
-                msg.linear_acceleration.x = accel['x']
-                msg.linear_acceleration.y = accel['y']
+                msg.linear_acceleration.x = ax
+                msg.linear_acceleration.y = ay
                 msg.linear_acceleration.z = accel['z']
 
                 # Angular velocity (rad/s) - convert from deg/s
-                msg.angular_velocity.x = math.radians(gyro['x'])
-                msg.angular_velocity.y = math.radians(gyro['y'])
+                msg.angular_velocity.x = math.radians(gx)
+                msg.angular_velocity.y = math.radians(gy)
                 msg.angular_velocity.z = math.radians(gyro['z'])
 
                 # Orientation not provided by raw sensor

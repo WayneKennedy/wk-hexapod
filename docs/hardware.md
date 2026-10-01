@@ -100,7 +100,7 @@ ribbon is the suspect — seating, contact orientation, or the wrong connector o
 | Pi camera | CSI CAM0 | OV5647; `camera_auto_detect=0` and `dtoverlay=ov5647,cam0` in `config.txt` |
 | Legs | leg 1 RF 15,14,13 · leg 2 RM 12,11,10 · leg 3 RR 9,8,**31** · leg 4 LR 22,23,**27** · leg 5 LM 19,20,21 · leg 6 LF 16,17,18 | coxa, femur, tibia; legs 3 and 4 have non-contiguous tibia channels |
 | Servo power enable | GPIO 4 | **Low = enabled.** Firmware boots it high (off); `servo_driver` drives it low on start; the service leaves it high on stop |
-| Body IMU | I2C bus 1, `0x68` | MPU6050 per the kit; it answers `WHO_AM_I` `0x70` ([OQ-35](open-questions.md)). ±2 g, ±250 °/s, polled at 100 Hz |
+| Body IMU | I2C bus 1, `0x68` | MPU6050 per the kit; it answers `WHO_AM_I` `0x70` ([OQ-35](open-questions.md)). ±2 g, ±250 °/s, polled at 100 Hz. **The chip sits turned 90° from the body** (its y forward, its x to the right; tilted by hand 2026-10-01): `imu_driver` rotates its axes into the body's (`imu.mounting_yaw_deg`), so `/imu/data_raw` and everything after it are in body axes |
 | Battery ADC | I2C bus 1, `0x48` | ADS7830; channel 0 = LOAD rail (servos), channel 4 = CTRL rail (Pi) |
 | LED strip | SPI0 MOSI (GPIO 10), `/dev/spidev0.0` | 7× WS2812, GRB, 50 % brightness |
 | Buzzer | GPIO 17 | See the hazard below |

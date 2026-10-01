@@ -56,10 +56,11 @@ owner deciding.
   +53°, the turn's true size unmeasured); **tilting the nose down moved the controller's
   roll and tilting the left side down moved its pitch**, so the chip's axes sit 90° from
   `base_link` and nothing in the chain (URDF `imu_joint` `rpy="0 0 0"`, the filter, the
-  controller) corrects it. Pending the owner confirming the move order. **Then:** set the
-  mounting yaw in the URDF and in the controller's use of `/imu/data`, or rotate the
-  driver's axes, and re-test; and measure a turn of known size for the yaw magnitude
-  (OQ-36).
+  controller) corrected it; the owner confirmed the order. **Fixed in the driver the same
+  day:** `imu_driver` rotates accelerations and rates by `imu.mounting_yaw_deg` (−90) into
+  body axes, so the URDF's `rpy="0 0 0"` is now right. **Still to do:** repeat the hand
+  tilts to confirm nose down reads positive pitch and left down negative roll; measure a
+  turn of known size for the yaw magnitude (OQ-36).
 
 - **OQ-20 — The map drifts and does not survive the run.** (2026-09-19,
   [DEC-28](decisions.md).) `map → odom` is a static identity, so the map is only as good as

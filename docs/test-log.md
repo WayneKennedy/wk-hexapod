@@ -675,8 +675,7 @@ documentation only. Times UTC, 13:38–13:40.
 6. **Turned 90° anticlockwise:** yaw went from −3° to +50°, holding +49…+50° afterwards;
    raw gyro z was positive during the turn.
 
-**Reading, if the moves were made in the order asked (the owner has not yet confirmed
-the order):** the IMU's y axis points along the body's forward axis and its x axis to the
+**Reading (the owner confirmed the order):** the IMU's y axis points along the body's forward axis and its x axis to the
 body's right — the chip sits turned 90° from `base_link`, while the URDF's `imu_joint`
 says `rpy="0 0 0"` and `imu_filter_madgwick` and the controller use the quaternion as if
 the frames agreed. The controller's `imu_roll` is therefore the body's pitch and
@@ -684,7 +683,8 @@ the frames agreed. The controller's `imu_roll` is therefore the body's pitch and
 sign is right for ENU (anticlockwise positive), and the magnitude was 53° for a turn
 asked as 90°: the turn's true size was not measured.
 
-**What changed:** OQ-13 and OQ-37 updated.
+**What changed:** OQ-13 and OQ-37 updated; `imu_driver` rotates the chip's axes into
+the body's (`imu.mounting_yaw_deg`, −90).
 
 ## Next entries expected
 
