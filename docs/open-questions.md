@@ -184,9 +184,19 @@ owner deciding.
   the part may not be the one its library was written for
   ([OQ-35](#perception-and-sensing)). **Why it matters:** `slam_toolbox` corrects
   `map → odom` only when it takes a scan, every 0.2 m or 0.3 rad of odometry; between
-  corrections the costmaps mark what the lidar sees at the odometry's heading. Test: the
-  movement calibration in [`operations.md`](operations.md#movement-calibration), then the
-  three headings again after a turn of known size.
+  corrections the costmaps mark what the lidar sees at the odometry's heading.
+  **Found in the code, 2026-10-01:** while walking, the fusion (weight 0.98 per 100 Hz
+  sample) replaced the odometry heading with the IMU's *absolute* yaw within a few
+  samples, and in the boot stack odometry is never synced to it (`home` arrives by topic,
+  which does not reset odometry). The filter's absolute yaw is arbitrary, it starts
+  wherever the gravity vector put it: −3° on 2026-09-29, −91° and −97° on two starts after
+  the axis fix of 2026-10-01. So the first step of every run turned the odometry heading
+  by that much, and the heading while walking was the IMU's, which then drifts standing
+  still (−48.9° to +4.4° cannot both be right). **Changed the same day** (`07842a1`,
+  untested: no walk yet): the fusion follows the IMU's change in yaw since the walk
+  began, anchored to the heading odometry held then. Test: the movement calibration in
+  [`operations.md`](operations.md#movement-calibration), then the three headings again
+  after a turn of known size.
 
 - **OQ-37 — Hold the scan plane level while walking, from the IMU.** (Owner, 2026-09-29:
   can tilt measured by the IMU correct all the legs during the gait, with the lidar's
