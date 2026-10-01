@@ -647,6 +647,45 @@ since is documentation. `hexapod.service` is enabled.
 updated, OQ-36 opened; OQ-11 has its first case. **Not shown:** a frontier reached, the
 robot walking at 80 mm, the map against the room.
 
+### 2026-10-01 · The IMU tilted by hand: its axes lie 90° from the body's; the LOAD drain of 2026-09-29
+
+**Conditions:** first boot since the 2026-09-29 switch-off, USB power, legs limp, the stack
+running from the service; `/imu/data` read at 1 Hz by an ad hoc recorder in `/tmp` using
+the controller's own quaternion-to-Euler formulas. The owner tilted the robot by hand in
+the order asked: nose down about 20°, left side down about 20°, then lifted it, turned it
+90° anticlockwise and set it down. Checkouts: robot `9fa34b5`, workstation ahead by
+documentation only. Times UTC, 13:38–13:40.
+
+**Result:**
+
+1. **Both file systems were clean** after the switch-off (ext4 state `clean`; `fsck.vfat
+   -n` found nothing).
+2. **The 2026-09-29 boot's end, from its journal:** the robot stood from 13:28:36 and never
+   moved; exploration ended `Timeout reached` at 13:39:54; the last journal line is
+   14:32:23. `power_indicator` logs only colour changes: LOAD 7.47 V at 13:14:25, first
+   YELLOW 6.59 V at 13:14:35 (the stand), first RED 6.41 V at 14:12:36, last 6.47 V at
+   14:20:26. So **about 64 min standing at 80 mm took LOAD from ~7.4 V to ~6.4 V**, with
+   no walking.
+3. **Level, lying on the floor:** roll 0.0°, pitch −2.5°, yaw −3°; raw accel (+0.4, 0.0,
+   +10.0) m/s².
+4. **Nose down:** the controller's *roll* went to −28…−30°, pitch stayed −1°; raw accel y
+   −5.0 m/s², x unchanged.
+5. **Left side down:** the controller's *pitch* went to −29…−34°, roll stayed −2°; raw
+   accel x +5.0…+5.8 m/s², y unchanged.
+6. **Turned 90° anticlockwise:** yaw went from −3° to +50°, holding +49…+50° afterwards;
+   raw gyro z was positive during the turn.
+
+**Reading, if the moves were made in the order asked (the owner has not yet confirmed
+the order):** the IMU's y axis points along the body's forward axis and its x axis to the
+body's right — the chip sits turned 90° from `base_link`, while the URDF's `imu_joint`
+says `rpy="0 0 0"` and `imu_filter_madgwick` and the controller use the quaternion as if
+the frames agreed. The controller's `imu_roll` is therefore the body's pitch and
+`imu_pitch` the body's roll, with nose down and left down both reading negative. The yaw
+sign is right for ENU (anticlockwise positive), and the magnitude was 53° for a turn
+asked as 90°: the turn's true size was not measured.
+
+**What changed:** OQ-13 and OQ-37 updated.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

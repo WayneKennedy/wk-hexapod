@@ -51,7 +51,15 @@ owner deciding.
 - **OQ-13 — IMU filter conventions.** `imu_filter_madgwick` was added on 2026-09-09 to
   provide `/imu/data` (DEC-19). Whether its ENU yaw sign and frame match what the
   controller's complementary filter and balance loop assume has not been checked against
-  the robot turning. Check before trusting yaw fusion.
+  the robot turning. Check before trusting yaw fusion. **Tilted and turned by hand,
+  2026-10-01** ([`test-log.md`](test-log.md)): yaw sign right (90° anticlockwise read
+  +53°, the turn's true size unmeasured); **tilting the nose down moved the controller's
+  roll and tilting the left side down moved its pitch**, so the chip's axes sit 90° from
+  `base_link` and nothing in the chain (URDF `imu_joint` `rpy="0 0 0"`, the filter, the
+  controller) corrects it. Pending the owner confirming the move order. **Then:** set the
+  mounting yaw in the URDF and in the controller's use of `/imu/data`, or rotate the
+  driver's axes, and re-test; and measure a turn of known size for the yaw magnitude
+  (OQ-36).
 
 - **OQ-20 — The map drifts and does not survive the run.** (2026-09-19,
   [DEC-28](decisions.md).) `map → odom` is a static identity, so the map is only as good as
@@ -191,8 +199,10 @@ owner deciding.
   timer, which only `/hexapod/enable_balance` does. **Height is not the IMU's to hold:**
   it measures tilt, not height, and on a flat floor the body's height is what the leg
   kinematics command. **Unknown, and first:** how much the body pitches and rolls in the
-  gait, at what frequency, at 30 mm and at 80 mm (log `/imu/data` during a walk); and the
-  sign of roll and pitch (OQ-13), since a loop with the sign wrong tips the robot further.
+  gait, at what frequency, at 30 mm and at 80 mm (log `/imu/data` during a walk).
+  **Found 2026-10-01 (OQ-13):** the controller's roll is the body's pitch and vice versa,
+  so the loop as written would correct each axis with the other's error; fix the frame
+  before enabling it.
   **Limits to expect, none measured here:** the servos take a new pulse at 50 Hz and
   report nothing, and the Madgwick filter lags. If the rocking repeats with the gait
   phase, a correction keyed to the phase may do more than feedback. **Cheaper
