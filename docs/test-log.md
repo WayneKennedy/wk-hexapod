@@ -709,6 +709,48 @@ owner tilted nose down, then left side down, each about 50° this time, 12:56 UT
 **What changed:** OQ-13 closed for roll and pitch; OQ-36 and OQ-37 updated; `imu_driver`
 takes the gyro bias at start-up and on `/imu/calibrate_gyro`.
 
+### 2026-10-02 · Battery: the bus died standing still; on a pillar at 50 mm the lidar never sees the legs
+
+**Conditions:** the owner switched the robot from USB to the battery at 13:07 UTC with the
+stack from the USB boot still running (the Pi did not reboot, up 23 h); batteries 7.94 V
+and 8.12 V. Then, on the owner's word, the robot on the bench on a pillar with the legs
+free. Checkouts in sync at `d74b59b`, then `1f74057` (50 mm stand). Times UTC.
+
+**Result:**
+
+1. **13:07, the battery came on under a running stack.** The servos received the standing
+   pose that had been commanded on USB and the robot stood up by itself. The stack was in
+   `error`.
+2. **13:08:36, the I2C bus died with the robot standing still** (`lost arbitration`, then
+   `controller timed out`), 4 s before the stop issued at 13:08:41 and 90 s after the
+   servo rail came alive. Nothing had been commanded. The controller's relax at 13:08:43
+   never reached the servos (`Servos NOT relaxed on shutdown`); all 18 leg channels still
+   held the standing pose. The start at 13:09:00 found the bus dead: `servo_driver`'s
+   PCA9685 init failed, the robot stood on the old pose, exploration failed three goals
+   on paper and went to `error` at 13:09:56. **Second occurrence of OQ-32; both on the
+   battery with the servo rail energised; none in the many USB runs.**
+3. **13:11, `scripts/i2c-recover.py --recover`** freed SDA with one pulse again; both
+   PCA9685s read `MODE1 0x00` with the 18 leg channels live, LOAD 8.18 V, CTRL 8.06 V.
+4. **13:14, bench stack** (`scripts/launch.sh` as the transient unit `hexapod-bench`:
+   drivers and controllers, no Nav2): stood at 50 mm, `SAFE` at 13:14:44. The start-up
+   gyro bias was skipped (`the robot moved`, std 3.46°/s: the robot was being handled);
+   `/imu/calibrate_gyro` standing took −5.34, +1.57, +0.16 °/s.
+5. **13:16, walking on the pillar, `/cmd_vel` published by hand:** 20 s at 0.05 m/s, 10 s
+   at 0.3 rad/s, 15 s at 0.10 m/s. `scripts/scan-near.py` for 3 s standing, 10 s at 0.05
+   and 8 s at 0.10: **no return nearer than 0.45 m in any sector**; nearest 0.567 m (the
+   bench) in every run. The owner, watching: the knees are "way lower than the lidar
+   plane". OQ-31 closed.
+6. **Odometry on the pillar:** 0.778 m after the 0.05 m/s walk (commanded 1.0 m, scaled
+   0.82), 1.114 m more after the 0.10 m/s walk. During the turn the heading stayed 1.4–
+   1.6° (the IMU saw none); when the turn ended it jumped to 13.2° (OQ-36). IMU roll and
+   pitch stayed within ±3° throughout: the pillar held the body, so this says nothing
+   about the gait on the floor.
+7. **The bus held** through the bench run: no I2C error from 13:11 to the stop at 13:18,
+   and both nodes relaxed the servos cleanly.
+
+**What changed:** DEC-34 amended to 50 mm and banked; OQ-31 closed; OQ-32 has its second
+case; OQ-36 updated.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

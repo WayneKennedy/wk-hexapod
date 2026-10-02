@@ -137,28 +137,24 @@ run `scripts/sync-check.sh`. A change that moves a leg needs the owner present (
 
 ## Status
 
-**The lidar stack runs on the battery and has not yet walked to a frontier** (2026-09-29).
-The robot stands, maps and plans. Twice it stood in a pocket the planner could not leave
-([OQ-34](docs/open-questions.md)), and started within 0.3 m of an object the collision
-monitor holds it still. **The I2C bus failed once, was freed without a power cycle and
-held through two runs; why it failed is unknown** ([OQ-32](docs/open-questions.md)).
-**The robot stands at 80 mm since [DEC-34](docs/decisions.md); it has not walked at that
-height.** SLAM, odometry and the IMU disagree on heading by tens of degrees
-([OQ-36](docs/open-questions.md)). All of it is in [`docs/test-log.md`](docs/test-log.md).
-The camera does not probe ([OQ-23](docs/open-questions.md)). Load average 9–16 on four
-cores with everything up ([OQ-02](docs/open-questions.md)).
+**The lidar stack runs on the battery and has not yet walked to a frontier** (2026-10-02).
+The robot stands, maps and plans; twice it stood in a pocket the planner could not leave
+([OQ-34](docs/open-questions.md)). **The I2C bus has died twice on the battery with the
+servo rail energised, never on USB; `scripts/i2c-recover.py` frees it, nothing does so
+automatically yet** ([OQ-32](docs/open-questions.md)). The IMU chain was put right on
+2026-10-01/02: axes rotated into the body frame, roll and pitch verified by hand, gyro
+bias removed, yaw fusion made relative ([OQ-13](docs/open-questions.md),
+[OQ-36](docs/open-questions.md)). **The robot stands at 50 mm ([DEC-34](docs/decisions.md))
+and the lidar does not see its legs walking** (OQ-31). All of it is in
+[`docs/test-log.md`](docs/test-log.md). The camera does not probe
+([OQ-23](docs/open-questions.md)). Load average 9–16 on four cores with everything up
+([OQ-02](docs/open-questions.md)).
 
-**As left on 2026-09-29:** switched off by the owner when the LED ring showed the LOAD
-batteries red; it was not shut down. **Before the next run:** charge the LOAD batteries,
-check the file systems, read that boot's LOAD readings, and bring the robot's checkout to
-`origin/main` (DEC-33). All four are in the last entry of
-[`docs/test-log.md`](docs/test-log.md). `hexapod.service` is enabled, so **a boot on the
-battery stands and explores before anyone can do any of that**: boot on USB power, where
-the servos are dead ([`docs/hardware.md`](docs/hardware.md#power)).
+**As left:** see the last entry of [`docs/test-log.md`](docs/test-log.md).
+`hexapod.service` is enabled, so **a boot on the battery stands and explores**.
 
-**Frontier:** a start at least 0.6 m from anything, with the owner watching, to see a
-frontier reached (OQ-34) and the legs in the scan while walking
-([OQ-31](docs/open-questions.md)); then the headings (OQ-36, OQ-13), the collision monitor
-against real obstacles (OQ-03) and the rest of the dashboard
+**Frontier:** automatic I2C recovery (OQ-32); a floor run to a frontier (OQ-34) with the
+headings watched (OQ-36); the gait's pitch and roll on the floor (OQ-37); the collision
+monitor against real obstacles (OQ-03); the rest of the dashboard
 ([OQ-33](docs/open-questions.md)). Saving and reloading a map
 ([OQ-20](docs/open-questions.md)) blocks milestone 2.

@@ -328,7 +328,10 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   **amended by the owner on 2026-10-02 after seeing the robot stand at 80: "80mm is too
   high, let's reduce to 50mm"**.) `body.default_height` is 50; `/body_pose` accepts z to
   −100 where it took −50. At 80 the robot stood twice (2026-09-29, 2026-10-02) and never
-  walked. **Why:**
+  walked. **Banked at 50 by the owner on 2026-10-02** after the bench run: walking on a
+  pillar at 0.05 and 0.10 m/s and turning in place, the lidar saw nothing nearer than
+  0.45 m, and the owner saw the knees "way lower than the lidar plane"
+  ([`test-log.md`](test-log.md), OQ-31 closed). **Why:**
   the owner suspects the lidar sees the knees while walking
   ([OQ-31](open-questions.md)). **By the leg geometry, not measured:** the knee axis
   stands 59 mm above the femur joint with the foot down and 82 mm with it lifted 40 mm at

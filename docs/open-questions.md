@@ -153,7 +153,12 @@ owner deciding.
   the body at 30 mm and at 80 mm. **Walking: not measured.** The owner suspects the knees
   show in the gait and raised the stand for it ([DEC-34](decisions.md)). The dashboard's
   lidar view is in the body frame, so a return from the robot stays put in it while the
-  room moves.
+  room moves. **Closed 2026-10-02 at the 50 mm stand** ([`test-log.md`](test-log.md)):
+  on a pillar with the legs free, walking at 0.05 and 0.10 m/s and turning in place, no
+  return nearer than 0.45 m in any sector over 18 s of scans, and the owner watching saw
+  the knees well below the plane. Legs in the air are unloaded; on the floor the body
+  sags under load by an unmeasured amount, so the margin is not known, only that it
+  exists.
 
 - **OQ-34 — No frontier was reachable from where the robot stood.** (2026-09-29,
   [`test-log.md`](test-log.md).) With the map reset at the standing pose the planner
@@ -193,9 +198,14 @@ owner deciding.
   wherever the gravity vector put it: −3° on 2026-09-29, −91° and −97° on two starts after
   the axis fix of 2026-10-01. So the first step of every run turned the odometry heading
   by that much, and the heading while walking was the IMU's, which then drifts standing
-  still (−48.9° to +4.4° cannot both be right). **Changed the same day** (`07842a1`,
-  untested: no walk yet): the fusion follows the IMU's change in yaw since the walk
-  began, anchored to the heading odometry held then. **Measured 2026-10-02:** at rest the filter's yaw
+  still (−48.9° to +4.4° cannot both be right). **Changed the same day** (`07842a1`): the
+  fusion follows the IMU's change in yaw since the walk began, anchored to the heading
+  odometry held then. **Seen working on the bench, 2026-10-02:** a 10 s turn commanded
+  with the body held on a pillar left the odometry heading at 1.5° (the IMU saw no turn)
+  instead of the ~120° the gait integrated. **Wrinkle found there:** when the turn ended
+  the heading jumped by 11.6°, one cycle's worth, so the last cycle's gait integration
+  escapes the fusion once walking stops; on the floor the two mostly agree, so the jump
+  is the per-cycle gait-versus-IMU difference, not 11.6°. Not fixed. **Measured 2026-10-02:** at rest the filter's yaw
   moves −0.21°/s (11.6° in 55 s) while the raw gyro z reads +0.1…+0.3°/s, a bias nothing
   removes: a one-minute walk inherits about 12° from it. **Bias removed the same day:**
   `imu_driver` averages 200 readings at start-up (and on `/imu/calibrate_gyro`), skips
