@@ -131,7 +131,8 @@ owner deciding.
   angle turns the head) and the travel limits, kept at ±40° inside the vendor app's 50–180
   clamp. **2026-10-02:** pan is channel 1 and tilt channel 0, the reverse of the vendor's
   code (`hardware.yaml` corrected); a rising tilt angle raises the head (`tilt_direction`
-  +1 holds); tilt level is servo 65°, not 90° (`tilt_center` set); tilting 15–20° up brings the head beside the lidar's base (OQ-26, OQ-30). Needs the battery and the owner: command known angles, watch the head, and check
+  +1 holds); tilt level is servo 65°, not 90° (`tilt_center` set),
+  and tilt is locked to 65–45°, level and down ([DEC-35](decisions.md)); tilting 15–20° up brings the head beside the lidar's base (OQ-26, OQ-30). Needs the battery and the owner: command known angles, watch the head, and check
   `/ultrasonic/range` against a target at a known bearing (the dashboard's sonar fan went
   on 2026-09-29). Cheapest mitigation if the
   model proves poor: only trust readings taken while the head is settled.

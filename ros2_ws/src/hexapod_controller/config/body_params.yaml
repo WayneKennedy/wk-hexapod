@@ -61,11 +61,12 @@ head_controller:
     tilt_center: 65.0           # level, phone inclinometer, 2026-10-02 (OQ-21)
     pan_direction: 1.0
     tilt_direction: 1.0
-    # Relative limits (deg). The vendor app clamps pan to servo 50-180 and
-    # tilt to 0-180 (server.py CMD_CAMERA); +/-40 stays inside that.
+    # Relative limits (deg). The vendor app clamps pan to servo 50-180; +/-40
+    # stays inside that. Tilt: level and down only, servo 65 to 45 (DEC-35);
+    # servo_driver clamps the same range.
     pan_limit_left: 40.0
     pan_limit_right: 40.0
-    tilt_limit_up: 20.0
+    tilt_limit_up: 0.0
     tilt_limit_down: 20.0
     slew_rate: 300.0            # deg/s servo model for joint states; unmeasured
     # Default scan: a sector centred on the Nav2 carrot, the turn, or ahead

@@ -33,6 +33,10 @@
       head_channels:
         pan: 1
         tilt: 0
+      # Tilt locked to servo 45-65: 65 is level, 45 is 18 deg down; never up, the
+      # head nears the lidar (owner, DEC-35). A backstop to head_controller's limits.
+      head_tilt_min: 45.0
+      head_tilt_max: 65.0
       # false since 2026-09-29: the tilt servo's gears slip (OQ-30). Keep in step
       # with head_controller's `enabled` in hexapod_controller body_params.yaml.
       head_enabled: false

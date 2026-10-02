@@ -342,3 +342,15 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   above the floor, so anything lower is not seen; the servo load and the battery drain at
   this stance are unmeasured. The standalone tests
   (`test_init.py`, `test_walk.py`) and `servo_driver`'s own `stand` keep 30.
+
+- **DEC-35 — The head tilts level and down only: servo 65° to 45°.** (Owner, 2026-10-02:
+  "set tilt range as locked between 45-65, and avoid up tilt entirely. 65 keeps it well
+  below lidar plane".) Measured that day with both batteries on
+  ([`test-log.md`](test-log.md)): servo 65° is level and 45° is 18° down (phone
+  inclinometer); tilted well up, the head stood beside the lidar's base. Enforced twice:
+  `head_controller` `tilt_limit_up` 0 and `tilt_limit_down` 20 about `tilt_center` 65
+  (`body_params.yaml`), and `servo_driver` clamps the tilt channel to
+  `servos.head_tilt_min`/`max` 45/65 whatever it is sent (`hardware.yaml`);
+  `scripts/head-range.py` clamps the same. **Why:** keep the head out of the lidar's
+  view and away from it; the sonar's use is low and ahead (OQ-26). The head itself stays
+  disabled (OQ-30) until the owner decides otherwise.

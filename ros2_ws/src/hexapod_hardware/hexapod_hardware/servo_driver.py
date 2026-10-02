@@ -140,6 +140,9 @@ class ServoDriver(Node):
         self.declare_parameter('servos.head_channels.tilt', 1)
         # False: the head channels are never written, so both servos stay limp
         self.declare_parameter('servos.head_enabled', True)
+        # Tilt is clamped to these servo angles whatever is commanded (DEC-35)
+        self.declare_parameter('servos.head_tilt_min', 45.0)
+        self.declare_parameter('servos.head_tilt_max', 65.0)
 
         # Get parameters
         bus = self.get_parameter('i2c.bus').value
@@ -152,6 +155,8 @@ class ServoDriver(Node):
         self.head_pan_channel = self.get_parameter('servos.head_channels.pan').value
         self.head_tilt_channel = self.get_parameter('servos.head_channels.tilt').value
         self.head_enabled = self.get_parameter('servos.head_enabled').value
+        self.head_tilt_min = self.get_parameter('servos.head_tilt_min').value
+        self.head_tilt_max = self.get_parameter('servos.head_tilt_max').value
         if not self.head_enabled:
             self.get_logger().warn('Head servos DISABLED: pan and tilt are not driven')
 
@@ -474,7 +479,8 @@ class ServoDriver(Node):
             return
 
         self.set_servo_angle(self.head_pan_channel, msg.data[0])
-        self.set_servo_angle(self.head_tilt_channel, msg.data[1])
+        self.set_servo_angle(self.head_tilt_channel,
+                             self._clamp(msg.data[1], self.head_tilt_min, self.head_tilt_max))
 
     @bus_guarded
     def relax_callback(self, msg):
