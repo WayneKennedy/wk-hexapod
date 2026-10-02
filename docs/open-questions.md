@@ -339,6 +339,12 @@ owner deciding.
     lower than that; body pitch is a shallow sweep (range unrecorded — measure
     it), reaching a low obstacle a metre out, not the floor at the feet. The ultrasonic
     covered that band badly; the lidar does not cover it at all.
+    **Seen 2026-10-02 (owner):** the robot approached a step it cannot climb, below the
+    scan plane (about 0.21 m at the 50 mm stand, DEC-34), which the lidar did not see;
+    step height and run time not recorded. The owner's view: the sonar is needed, tilted
+    down to read low and directly ahead. **Next, with the battery and the owner:** run the
+    head through its range, tilt above all, to find whether tilting up meets the lidar or
+    its plane, and whether the slipping tilt gears (OQ-30) hold a fixed down angle.
   - **The camera.** It shares the head. Not working (OQ-23), but face recognition and
     `head/look_at` are in the autonomy stack; removing the head means a body mount and a
     body-yaw look-at, decided deliberately.
