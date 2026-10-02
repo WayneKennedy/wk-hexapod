@@ -110,14 +110,13 @@ owner deciding.
   (check [wk-inventory](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md)
   first), fix the head level mechanically, or remove the head (OQ-26). The lidar as the
   range source ([OQ-20](#locomotion-and-navigation)) removes the dependence either way.
-  **2026-10-02, driven by hand on the battery** ([`test-log.md`](test-log.md)): the tilt
-  servo **drives up but not down**. From level, set by hand, a first pulse of 100°, 90° and
-  70° lifted the head 15–20°, about 10° and 2–3°; from there 85° and 80° moved nothing,
-  while it held rigid against a push both ways, and the PCA9685 read back the commanded
-  pulse. Pan held and moved. **The tilt servo is faulty: replace it.** Its model is not
-  recorded here; read its label. wk-inventory lists no spare hexapod servo; standard-size
-  servos bought for the written-off Seagull (Savox SC-0253MG, Hitec HS-425BB) may survive,
-  unrecorded.
+  **2026-10-02, driven by hand on the battery** ([`test-log.md`](test-log.md)): **with
+  LOAD on and CTRL off** (the Pi on USB) the tilt servo drove up but not down, with the
+  commanded pulse read back from the PCA9685. **With both on it tracked both ways and
+  repeated:** level at 65°, 18° below level at 45° (phone inclinometer), twice; down travel
+  ends at 40° on the wiring and bracket; no gear noise. So the servo is not shown faulty.
+  **Open:** why CTRL off stops it driving down (the ADC also read 0 V on both rails then),
+  and whether the slipping of 09-29, with both on, recurs under the gait's shaking.
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
@@ -127,7 +126,7 @@ owner deciding.
   angle turns the head) and the travel limits, kept at ±40° inside the vendor app's 50–180
   clamp. **2026-10-02:** pan is channel 1 and tilt channel 0, the reverse of the vendor's
   code (`hardware.yaml` corrected); a rising tilt angle raises the head (`tilt_direction`
-  +1 holds); tilting 15–20° up brings the head beside the lidar's base (OQ-26, OQ-30). Needs the battery and the owner: command known angles, watch the head, and check
+  +1 holds); tilt level is servo 65°, not 90° (`tilt_center` set); tilting 15–20° up brings the head beside the lidar's base (OQ-26, OQ-30). Needs the battery and the owner: command known angles, watch the head, and check
   `/ultrasonic/range` against a target at a known bearing (the dashboard's sonar fan went
   on 2026-09-29). Cheapest mitigation if the
   model proves poor: only trust readings taken while the head is settled.
@@ -365,9 +364,14 @@ owner deciding.
     down to read low and directly ahead. **Next, with the battery and the owner:** run the
     head through its range, tilt above all, to find whether tilting up meets the lidar or
     its plane, and whether the slipping tilt gears (OQ-30) hold a fixed down angle.
-    **Done 2026-10-02:** 15–20° up already puts the head beside the lidar's base, so the
-    usable tilt is level and below; the tilt servo cannot drive down at all (OQ-30), so
-    a downward sonar waits for a replacement servo.
+    **Done 2026-10-02:** tilted well up (channel 0 at 100°, 35° above the 65° level by
+    command; the owner judged 15–20° from where it rested) the head stands beside the
+    lidar's base, so the useful tilt is level and below. Down to 18° below level at 45°;
+    travel ends at 40° (OQ-30). **By arithmetic from the URDF, unverified:** the sonar
+    sits about 0.10 m above the floor at the 50 mm stand, so at 18° down its axis meets
+    the floor about 0.31 m ahead of it, and the HC-SR04's ~15° cone spans roughly
+    0.21–0.54 m: it would read the floor itself, inside the 0.32 m stop polygon. A
+    step detector needs a shallower angle or floor-return handling; not designed.
   - **The camera.** It shares the head. Not working (OQ-23), but face recognition and
     `head/look_at` are in the autonomy stack; removing the head means a body mount and a
     body-yaw look-at, decided deliberately.

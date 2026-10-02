@@ -58,7 +58,7 @@ head_controller:
     # relative angle (+ left, + up) into servo degrees. Unverified on the
     # robot: check the pan sign with the owner present (docs/operations.md).
     pan_center: 90.0
-    tilt_center: 90.0
+    tilt_center: 65.0           # level, phone inclinometer, 2026-10-02 (OQ-21)
     pan_direction: 1.0
     tilt_direction: 1.0
     # Relative limits (deg). The vendor app clamps pan to servo 50-180 and

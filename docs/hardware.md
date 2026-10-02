@@ -96,7 +96,7 @@ ribbon is the suspect — seating, contact orientation, or the wrong connector o
 | Function | Interface | Detail |
 |---|---|---|
 | Servo drivers | I2C bus 1, `0x41` and `0x40` | 0x41 serves channels 0–15, 0x40 channels 16–31 (the reference code's ordering, kept). 50 Hz, 500–2500 µs |
-| Head pan / tilt | 0x41 channels **1 / 0** (the vendor's code has 0 / 1; found 2026-10-02) | 90° = centred (unverified; tilt's level was 65–70° on the faulty servo, [OQ-30](open-questions.md)). The vendor app clamps pan to 50–180 and tilt to 0–180; `head_controller` stays inside ±40° of centre. **Both disabled since 2026-09-29: the tilt servo's gears slip** ([OQ-30](open-questions.md)) |
+| Head pan / tilt | 0x41 channels **1 / 0** (the vendor's code has 0 / 1; found 2026-10-02) | Pan 90° = centred (unverified); **tilt level = 65°**, 18° down at 45°, travel ends at 40° (wiring, bracket); measured 2026-10-02. **Tilt drives down only with CTRL on** ([OQ-30](open-questions.md)). The vendor app clamps pan to 50–180 and tilt to 0–180; `head_controller` stays inside ±40° of centre. **Both disabled since 2026-09-29: the tilt servo's gears slip** ([OQ-30](open-questions.md)) |
 | Ultrasonic | GPIO 27 (trigger), GPIO 22 (echo) | HC-SR04 on the head; echo timed from kernel edge timestamps |
 | Pi camera | CSI CAM0 | OV5647; `camera_auto_detect=0` and `dtoverlay=ov5647,cam0` in `config.txt` |
 | Legs | leg 1 RF 15,14,13 · leg 2 RM 12,11,10 · leg 3 RR 9,8,**31** · leg 4 LR 22,23,**27** · leg 5 LM 19,20,21 · leg 6 LF 16,17,18 | coxa, femur, tibia; legs 3 and 4 have non-contiguous tibia channels |

@@ -837,7 +837,7 @@ widening behind); then the stack on USB on the desk (servo rail dead, LOAD and C
 
 **What changed:** OQ-34 updated. **Not shown:** the change on the floor.
 
-### 2026-10-02 · The head driven by hand: channels swapped, the tilt servo drives up only
+### 2026-10-02 · The head driven by hand: channels swapped; tilt drives down only with CTRL on
 
 **Conditions:** robot on a pillar on the desk, LOAD on, CTRL off, the Pi on USB; stack
 stopped; `scripts/head-range.py` holding servo power, all leg channels relaxed; owner
@@ -852,7 +852,7 @@ watching. Times UTC, 14:19–14:36.
 3. **Clearance:** with tilt 15–20° above level (channel 0 at 100°, first pulse from rest),
    the head's top edge stood level with the lidar's base, beside it (owner's photo: "too
    close for comfort").
-4. **The tilt servo drives up only.** Relaxed and set level by hand, a first pulse of 90°
+4. **With CTRL off, the tilt servo drove up only.** Relaxed and set level by hand, a first pulse of 90°
    lifted the head about 10°, and 70° (from level again) 2–3°; from the 90° position, 85°
    and 80° moved nothing. Powered, both servos held rigid against a light push both ways.
    The PCA9685 read back the commanded pulses (1.39 ms at 80°, 1.44 ms at 85°, 50 Hz).
@@ -860,8 +860,15 @@ watching. Times UTC, 14:19–14:36.
    while the servos were plainly powered. Cause unknown; with both on, LOAD read correctly
    (8.18 V, 2026-10-02 floor run).
 6. Ended 14:36: all channels relaxed, servo power off.
+7. **CTRL on as well** (USB still in), 14:37–14:43, at the owner's question: the ADC read
+   LOAD 7.18 V, CTRL 7.94 V. Head set level by hand; tilt 90° lifted it 8–10°; 80° brought
+   it down about 5°, 70° to just above level, 60° just below, 50° lower, 40° slightly lower,
+   where the wiring and bracket end its travel (owner). 45°: 18° below level on the owner's
+   phone inclinometer; 65°: level; 45° again: 18°. No gear noise. Ended 14:42:53, relaxed.
 
-**What changed:** `hardware.yaml` head channels; OQ-21, OQ-26, OQ-30 updated.
+**What changed:** `hardware.yaml` head channels; `tilt_center` 90 → 65 in
+`body_params.yaml`; OQ-21, OQ-26, OQ-30 updated. The first write-up of this entry called
+the servo faulty; step 7 overturned that.
 
 ## Next entries expected
 
