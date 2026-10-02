@@ -153,8 +153,8 @@ everything up ([OQ-02](docs/open-questions.md)).
 **As left:** see the last entry of [`docs/test-log.md`](docs/test-log.md).
 `hexapod.service` is enabled, so **a boot on the battery stands and explores**.
 
-**Frontier:** I2C recovery against a real fault on the battery (OQ-32); the explorer choosing reachable frontiers
-and not ending in `error` (OQ-34); the gait's pitch and roll on the floor (OQ-37); the
+**Frontier:** I2C recovery against a real fault on the battery (OQ-32); the explorer's reachable-frontier
+aiming and pause-and-retry on the floor, and a per-goal time limit (OQ-34); the gait's pitch and roll on the floor (OQ-37); the
 collision monitor against real obstacles (OQ-03); the rest of the dashboard
 ([OQ-33](docs/open-questions.md)). Saving and reloading a map
 ([OQ-20](docs/open-questions.md)) blocks milestone 2.
