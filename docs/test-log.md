@@ -879,6 +879,27 @@ watching. Times UTC, 14:19–14:36.
 `body_params.yaml`; OQ-21, OQ-26, OQ-30 updated. The first write-up of this entry called
 the servo faulty; step 7 overturned that.
 
+### 2026-10-02 · The head back on: survey runs, camera still absent, the LOAD pack flat
+
+**Conditions:** robot on a pillar on the desk, LOAD and CTRL on, USB in; checkouts in
+sync with the head enabled (DEC-35 limits); `hexapod.service` started 14:56:25 and
+stopped 14:57:28 once exploring began. Times UTC.
+
+**Result:**
+
+1. **Head survey:** `Survey: 2 sweep(s), 50 positions` at 14:56:55, `Survey complete: 204
+   ranges` 14 s later; `head_controller` reported pan −60..+60°. Exploring followed.
+2. **Sonar:** `ultrasonic_driver` started at 15 Hz (0.03–2.0 m) and fed the survey; a CLI
+   sample afterwards found the topic not yet discovered.
+3. **Camera:** `camera_node` died at once, `no cameras available` (OQ-23, unchanged).
+4. **LOAD battery:** `power_indicator` logged LOAD 4.88 V (red) during the stand at
+   14:56:43; at rest after the stop the ADC read 5.65 V three times, against 7.18 V at
+   14:37 and 8.18 V that morning. About 2.8 V per cell: at the discharge floor. Nothing
+   cut the servos off (OQ-11).
+5. Stopped 14:57:28; both nodes relaxed the servos.
+
+**What changed:** nothing; the LOAD pack needs charging before more servo work.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
