@@ -783,8 +783,13 @@ and the nearest return per sector once a second. Times UTC.
    0.45 m, all while passing objects (the bench run showed none from the legs).
 6. **Stopped at 13:24:19;** both nodes relaxed the servos; LOAD 8.18 V before and after.
 
-**What changed:** OQ-34 and OQ-36 updated. **Not shown:** the gait's pitch and roll on
-the floor were recorded and not yet analysed (OQ-37); the map against the room.
+7. **The gait's pitch and roll on the floor** (OQ-37), from the recorder's 100 Hz
+   `/imu/data`: standing still, roll sd 0.28° and pitch sd 0.16°; while `/cmd_vel` was
+   non-zero (17,960 samples), roll sd 1.43° with extremes −7.2° and +3.1°, pitch sd
+   1.09° with extremes −3.3° and +5.0°; standing between goals, sd 0.6–0.7° with one
+   roll excursion to −11.2°. The period of the rocking was not extracted.
+
+**What changed:** OQ-34, OQ-36 and OQ-37 updated. **Not shown:** the map against the room.
 
 ## Next entries expected
 

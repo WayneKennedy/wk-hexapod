@@ -237,8 +237,11 @@ owner deciding.
   writes the servos itself; and `balance.enabled: true` sets a flag without starting the
   timer, which only `/hexapod/enable_balance` does. **Height is not the IMU's to hold:**
   it measures tilt, not height, and on a flat floor the body's height is what the leg
-  kinematics command. **Unknown, and first:** how much the body pitches and rolls in the
-  gait, at what frequency, at 30 mm and at 80 mm (log `/imu/data` during a walk).
+  kinematics command. **Measured on the floor at 50 mm, 2026-10-02** ([`test-log.md`](test-log.md)): walking,
+  roll sd 1.4° (−7.2° to +3.1°) and pitch sd 1.1° (−3.3° to +5.0°) against sd 0.2–0.3°
+  standing; the period was not extracted. A 5° pitch at the 0.21 m scan height meets the
+  floor at 2.4 m, inside the costmap's 3 m marking range, so the peaks can mark floor as
+  obstacles; gating scans on tilt would remove that for little effort.
   **Frame fixed 2026-10-01 and verified 2026-10-02 (OQ-13):** nose down is positive pitch
   and left side down negative roll at the controller. Still unknown: which way a positive
   `body_orientation` roll or pitch tilts the body (needs servos), so the loop's sign is
