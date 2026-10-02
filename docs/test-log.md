@@ -817,6 +817,26 @@ sync at `35ea55c`. `hexapod-i2c1-recovery.dtbo` built on the robot, enabled in
 come on the battery with the servo rail live; whether the held line on the robot is
 released by clocking alone is known only from the 09-29 manual recovery (one pulse).
 
+### 2026-10-02 · The explorer's reachable-frontier aiming, offline and on USB
+
+**Conditions:** offline, `aim_frontiers` on a synthetic 10 × 10 m costmap at 0.05 m (a 4 m
+room, 0.24 m inscribed and 0.35 m inflation bands, a 1.0 m opening, a 0.40 m passage
+widening behind); then the stack on USB on the desk (servo rail dead, LOAD and CTRL
+0.00 V), started 14:01:07 at the explorer change, checkouts in sync. Times UTC.
+
+**Result:**
+
+1. **Offline:** the frontier behind the 0.40 m passage (size 1.50 m) was dropped as
+   unreachable; the opening's was aimed at a reachable cell (cost 30) 0.27 m inside its
+   centroid; flood fill 0.07 s on the robot for 5,000 reachable cells. A 0.45 m passage
+   stayed passable (its centre cell 0.25 m from each wall, beyond the 0.24 m radius).
+2. **USB:** exploring at 14:01:37; first goal (−0.75, 1.01) chosen in 0.16 s. With the
+   legs unpowered nothing moved, and Nav2 aborted the goal at 14:08:58, after 7 min 21 s of
+   its recovery cycle. The 300 s session had expired, so exploration ended
+   `Timeout reached` → `exploration_complete`. The pause-and-retry path did not run.
+
+**What changed:** OQ-34 updated. **Not shown:** the change on the floor.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

@@ -185,6 +185,16 @@ owner deciding.
   from reachable space): it should drop goals whose cell the planner cannot reach, or
   plan to the nearest reachable cell; and three failed goals end exploration in `error`
   (`max_nav_failures`), where waiting and retrying would suit a room people move in.
+  **Changed 2026-10-02** (`frontier_explorer`, commit `6d83602`): each frontier's
+  goal is the reachable costmap cell nearest its cells (a flood fill over known cells below
+  inscribed, as `scripts/costmap-reach.py`); frontiers with none within `max_goal_offset`
+  (1.0 m) are skipped; "closest" is by path length; after `max_nav_failures` in a row, or
+  with nothing reachable, it waits `retry_wait_sec` (30 s) and retries with the failed goals
+  forgotten, so exploration ends only on no frontiers, the session timeout or a cancel.
+  Checked on a synthetic map and on USB ([`test-log.md`](test-log.md)); **not on the
+  floor.** **Found on USB:** a goal the robot cannot make progress on is held by Nav2's
+  recovery cycle for 7 min 21 s, longer than the 300 s session (`exploration_timeout_sec`),
+  which the explorer checks only between goals; there is no per-goal limit.
 
 - **OQ-36 — Three headings, three answers.** (2026-09-29, 13:26 UTC,
   [`test-log.md`](test-log.md).) After one `backup` of about 0.2 m and nothing else
