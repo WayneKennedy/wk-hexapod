@@ -65,7 +65,7 @@ mask on the scan is cheap insurance.
   (CP2102N). apt's `rplidar_ros` 2.1.0 does not run it.
 - **Height:** scan plane ~155 mm above the belly, belly ~35 mm off the floor at the 30 mm
   stand (owner's measurements, 2026-09-28), so ~190 mm above the floor then. **At the
-  80 mm stand ([DEC-34](decisions.md)) that is ~240 mm, by arithmetic, not measured.**
+  50 mm stand ([DEC-34](decisions.md)) that is ~210 mm, by arithmetic, not measured.**
   `laser_frame` z = 0.16 m above `base_link`. Nothing lower than the scan plane is seen
   when the body is level.
 - **Plan position:** lidar centre 10 mm forward of the body centre, centred side to side
@@ -114,7 +114,7 @@ see [`operations.md`](operations.md#troubleshooting) and [OQ-32](open-questions.
 Link lengths coxa **33**, femur **90**, tibia **110 mm**. Leg mounting angles
 `[54, 0, −54, −126, 180, 126]°` and offsets `[94, 85, 94, 94, 85, 94] mm` from the body
 origin; default foot positions at `(±137.1, ±189.4)` and `(±225, 0)` mm, all from the reference
-`control.py`. The stand raises the body 80 mm above the home pose
+`control.py`. The stand raises the body 50 mm above the home pose
 ([DEC-34](decisions.md)); the reference stands at 25 mm and its app offers 10–50. See
 `hexapod_controller/config/body_params.yaml` for the tunable subset.
 

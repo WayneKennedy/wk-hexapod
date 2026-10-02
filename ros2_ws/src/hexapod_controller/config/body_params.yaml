@@ -9,9 +9,9 @@ hexapod_controller:
     # Body geometry (mm, degrees) - from fn-hexapod control.py
     body.leg_angles: [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]
     body.leg_offsets: [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]
-    # mm the stand raises the body above home. 80 since 2026-09-29 (DEC-34), to
-    # keep the knees below the lidar's scan plane; the vendor's app offers 10-50.
-    body.default_height: 80.0
+    # mm the stand raises the body above home. 50 since 2026-10-02 (DEC-34, as
+    # amended: 80 was too high), the top of the vendor app's 10-50 range.
+    body.default_height: 50.0
     body.height_offset: 14.0
 
     # IMU balance (incremental PID on roll/pitch). Off by default.

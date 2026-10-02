@@ -133,7 +133,7 @@ class HexapodController(Node):
         self.declare_parameters(namespace='', parameters=[
             ('body.leg_angles', [54.0, 0.0, -54.0, -126.0, 180.0, 126.0]),
             ('body.leg_offsets', [94.0, 85.0, 94.0, 94.0, 85.0, 94.0]),
-            ('body.default_height', 80.0),
+            ('body.default_height', 50.0),
             ('body.height_offset', 14.0),
             ('balance.enabled', False),
             ('balance.kp', 0.5),

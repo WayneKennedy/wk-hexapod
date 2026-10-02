@@ -323,16 +323,19 @@ on 2026-09-09 were made during the native bring-up, with the owner where marked.
   robot's `/tmp` and run from there leaves both checkouts as they were; commit it before it
   is run again.
 
-- **DEC-34 — The robot stands 80 mm above home, not 30.** (Owner, 2026-09-29: "raise body
-  default height by 50mm, so the walk gait keeps the legs lower relative to the sensor".)
-  `body.default_height` is 80; `/body_pose` accepts z to −100 where it took −50. **Why:**
+- **DEC-34 — The robot stands 50 mm above home, not 30.** (Owner, 2026-09-29: "raise body
+  default height by 50mm, so the walk gait keeps the legs lower relative to the sensor";
+  **amended by the owner on 2026-10-02 after seeing the robot stand at 80: "80mm is too
+  high, let's reduce to 50mm"**.) `body.default_height` is 50; `/body_pose` accepts z to
+  −100 where it took −50. At 80 the robot stood twice (2026-09-29, 2026-10-02) and never
+  walked. **Why:**
   the owner suspects the lidar sees the knees while walking
   ([OQ-31](open-questions.md)). **By the leg geometry, not measured:** the knee axis
   stands 59 mm above the femur joint with the foot down and 82 mm with it lifted 40 mm at
-  the 30 mm stand, and 15 mm and 51 mm at 80 mm. How far the scan plane is above the femur
-  joints is not known, so whether a knee reached it at 30 mm is not known either.
-  **Outside the vendor's range:** the reference stands at 25 mm and its app offers 10–50;
-  its own validity check (leg length 90–248 mm) passes at 169 mm. **Costs:** the scan
-  plane rises from ~0.19 m to ~0.24 m above the floor, so anything lower is not seen; the
-  servo load and the battery drain at this stance are unmeasured. The standalone tests
+  the 30 mm stand, 15 mm and 51 mm at 80 mm, and 42 mm and 72 mm at 50 mm. How far the
+  scan plane is above the femur joints is not known, so whether a knee reached it at 30 mm
+  is not known either. **The vendor's range:** the reference stands at 25 mm and its app
+  offers 10–50; 50 is its top. **Costs:** the scan plane rises from ~0.19 m to ~0.21 m
+  above the floor, so anything lower is not seen; the servo load and the battery drain at
+  this stance are unmeasured. The standalone tests
   (`test_init.py`, `test_walk.py`) and `servo_driver`'s own `stand` keep 30.

@@ -234,7 +234,7 @@ owner deciding.
   `odom → base_footprint` fails ("not part of the same tree"). Nothing uses it today —
   `slam_params.yaml` sets `base_frame: base_link` for that reason, and no Nav2 parameter names
   it. Fix when anything needs a ground-plane frame: invert the joint (`base_link →
-  base_footprint`, z −0.08 at the 80 mm stand of [DEC-34](decisions.md); the URDF still
+  base_footprint`, z −0.05 at the 50 mm stand of [DEC-34](decisions.md); the URDF still
   says 0.03).
 
 ## Compute

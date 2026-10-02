@@ -105,8 +105,8 @@ local_costmap:
           # figure); 0.25 m is inside robot_radius either way.
           obstacle_min_range: 0.25
           # Short of the C1's 12 m: the scan plane tilts with the gait, and at
-          # 0.24 m above the floor (80 mm stand, DEC-34) a 3 deg pitch meets the
-          # floor at 4.6 m.
+          # 0.21 m above the floor (50 mm stand, DEC-34) a 3 deg pitch meets the
+          # floor at 4.0 m.
           obstacle_max_range: 3.0
           raytrace_min_range: 0.0
           raytrace_max_range: 3.5
@@ -150,8 +150,8 @@ global_costmap:
           # figure); 0.25 m is inside robot_radius either way.
           obstacle_min_range: 0.25
           # Short of the C1's 12 m: the scan plane tilts with the gait, and at
-          # 0.24 m above the floor (80 mm stand, DEC-34) a 3 deg pitch meets the
-          # floor at 4.6 m.
+          # 0.21 m above the floor (50 mm stand, DEC-34) a 3 deg pitch meets the
+          # floor at 4.0 m.
           obstacle_max_range: 3.0
           raytrace_min_range: 0.0
           raytrace_max_range: 3.5
