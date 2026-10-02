@@ -115,8 +115,13 @@ owner deciding.
   commanded pulse read back from the PCA9685. **With both on it tracked both ways and
   repeated:** level at 65°, 18° below level at 45° (phone inclinometer), twice; down travel
   ends at 40° on the wiring and bracket; no gear noise. So the servo is not shown faulty.
-  **Open:** why CTRL off stops it driving down (the ADC also read 0 V on both rails then),
-  and whether the slipping of 09-29, with both on, recurs under the gait's shaking.
+  **Open:** why CTRL off stops it driving down (the ADC also read 0 V on both rails then).
+  **Owner's hypothesis:** no common ground between the USB-powered Pi and the LOAD rail
+  with CTRL off, so the servo signal is referenced to a shifted ground; pan behaving
+  normally is not explained by it. Check with a meter: continuity Pi GND to LOAD battery
+  negative (all off), and DC volts between them with LOAD on, CTRL off, the Pi on USB.
+  Until settled, drive servos with CTRL on. Also open: whether the slipping of 09-29,
+  with both on, recurs under the gait's shaking.
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
