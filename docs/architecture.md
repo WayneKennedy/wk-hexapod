@@ -69,10 +69,11 @@ slots of `/joint_commands`, and nothing else publishes `/head_command`.
 | Out | `/head_command` (servo degrees), `/joint_states` (`head_pan_joint`, `head_tilt_joint`) |
 | Action | `/look_around` (`LookAround`): full-width pan sweeps with the body still |
 
-**The head is disabled since 2026-09-29** ([OQ-30](open-questions.md)): `enabled: false`
-in `body_params.yaml` and `servos.head_enabled: false` in `hardware.yaml`. Nothing is
-published on `/head_command`, `/look_around` goals are rejected, the head joints are
-published at zero, and `servo_driver` never writes the two channels.
+**The head is on** (owner, 2026-10-02; off 2026-09-29 to 10-02, [OQ-30](open-questions.md)):
+`enabled` in `body_params.yaml` and `servos.head_enabled` in `hardware.yaml`, which must
+agree. With either false nothing is published on `/head_command`, `/look_around` goals are
+rejected, the head joints are published at zero, and `servo_driver` never writes the two
+channels. Its range is limited in both nodes ([DEC-35](decisions.md)).
 
 Behaviours, highest priority first: the **survey** (the `LookAround` action), a **look_at**
 gaze held for a few seconds, and otherwise a continuous **scan** — the pan sweeps a ±30°
@@ -124,8 +125,8 @@ Since 2026-09-29 ([DEC-32](decisions.md), superseding DEC-28):
 - **The frontier explorer and the dashboard read `/global_costmap/costmap`**, which is
   `/map` plus live obstacles and inflation. Unknown cells stay unknown.
 - **Nothing is saved and nothing is localized against** ([OQ-20](open-questions.md)).
-- **The sonar feeds nothing**: the head is disabled and its direction unknown
-  ([OQ-30](open-questions.md)).
+- **The sonar feeds nothing**: `/ultrasonic/range` is published and on TF, but no costmap
+  or collision-monitor source reads it (DEC-32); its use low and ahead is open (OQ-26).
 - **The camera feeds no part of navigation.** `camera_ros` publishes `/camera/image_raw`
   for the dashboard and face recognition only ([OQ-22](open-questions.md)).
 

@@ -5,7 +5,7 @@ autonomy_manager:
     # Time to wait for external mission before auto-exploring
     mission_timeout_sec: 60.0
     # Head survey (LookAround, head_controller) before exploring: sweeps.
-    # Rejected while the head is disabled (OQ-30); the state machine goes on.
+    # If rejected (head disabled), the state machine goes on.
     survey_sweeps: 2
     # State publish rate
     state_publish_rate_hz: 2.0
@@ -36,8 +36,8 @@ frontier_explorer:
     map_topic: "/global_costmap/costmap"
     # How long a first map with no frontier counts as "not ready yet"
     initial_map_timeout_sec: 60.0
-    # Head survey at each reached frontier; 0 disables. The head is disabled
-    # (OQ-30), so the survey is skipped.
+    # Head survey at each reached frontier; 0 disables. Kept 0 with the head
+    # back on (2026-10-02): the lidar sees all round and the sonar feeds nothing.
     survey_sweeps: 0
     # Ignore frontiers nearer than this (m): the unseen cells beside the body
     min_goal_distance: 0.4

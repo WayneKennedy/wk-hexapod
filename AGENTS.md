@@ -31,9 +31,9 @@ hardware ceiling is the kit's: no accelerator, no bus servos (DEC-26). Full inte
 Orin Nano and the kit's OV5647 camera and HC-SR04 ultrasonic went back on the pan/tilt head.
 **It changed again on 2026-09-29** ([DEC-32](docs/decisions.md)): an RPLIDAR C1 on the body
 is the only range sensor navigation uses, `slam_toolbox` builds the map from it in the boot
-stack, and the pan/tilt head is disabled because its tilt servo's gears slip
-([OQ-30](docs/open-questions.md)). The sonar and the camera still sit on the head and feed
-nothing. DEC-27 and DEC-28 describe the sonar stack this replaced. Read DEC-31 and DEC-32
+stack. The pan/tilt head, disabled from 2026-09-29 for a slipping tilt servo
+([OQ-30](docs/open-questions.md)), is back on since 2026-10-02, calibrated and range-limited
+([DEC-35](docs/decisions.md)). The sonar and the camera sit on it and feed no navigation. DEC-27 and DEC-28 describe the sonar stack this replaced. Read DEC-31 and DEC-32
 before changing anything in perception or navigation.
 
 **It is a working robot, not a design.** Locomotion, odometry, Nav2 and frontier

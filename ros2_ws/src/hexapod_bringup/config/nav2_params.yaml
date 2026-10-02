@@ -2,7 +2,7 @@
 # Tuned for a slow-moving hexapod. The range sensor is the RPLIDAR C1 (/scan,
 # 360 deg at 10 Hz). slam_toolbox builds /map from it and publishes map -> odom
 # (DEC-32); the global costmap is /map plus live obstacles and inflation. The
-# head's sonar is not a source: the head is disabled (OQ-30).
+# head's sonar is not a source (DEC-32); it publishes /ultrasonic/range only.
 
 bt_navigator:
   ros__parameters:

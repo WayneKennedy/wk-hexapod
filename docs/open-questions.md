@@ -98,7 +98,7 @@ owner deciding.
   collision monitor and `slam_toolbox` runs in the boot stack. **Still open:** saving a map
   and localizing against it on the next boot, which milestone 2 needs.
 
-- **OQ-30 — The head tilt servo's gears slip; the head is disabled.** (Owner, 2026-09-29:
+- **OQ-30 — The head tilt servo's gears slip; the head was disabled (back on 2026-10-02).** (Owner, 2026-09-29:
   the servo could be heard trying to lower with the gears jumping, during the battery runs
   in [`test-log.md`](test-log.md).) Pan and tilt are both off by the owner's instruction:
   `head_controller` `enabled: false` and `servo_driver` `servos.head_enabled: false`, two
@@ -120,7 +120,8 @@ owner deciding.
   with CTRL off, so the servo signal is referenced to a shifted ground; pan behaving
   normally is not explained by it. Check with a meter: continuity Pi GND to LOAD battery
   negative (all off), and DC volts between them with LOAD on, CTRL off, the Pi on USB.
-  Until settled, drive servos with CTRL on. Also open: whether the slipping of 09-29,
+  Until settled, drive servos with CTRL on. **The owner turned the head back on
+  2026-10-02** (DEC-35 limits). Also open: whether the slipping of 09-29,
   with both on, recurs under the gait's shaking.
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)

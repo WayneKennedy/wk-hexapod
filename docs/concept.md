@@ -14,7 +14,8 @@ camera and HC-SR04 ultrasonic went back on the pan/tilt head (DEC-25,
 That made the robot's only range sensor **one 15° cone on a servo**, and from 2026-09-19 it
 mapped with swept sonar in an odometry-anchored frame (DEC-27, DEC-28). **Since 2026-09-29
 an RPLIDAR C1 on the body is the range sensor and `slam_toolbox` the map** (DEC-31,
-DEC-32), and the head is disabled ([OQ-30](open-questions.md)).
+DEC-32); the head, disabled from 2026-09-29 ([OQ-30](open-questions.md)), is back on since
+2026-10-02, range-limited ([DEC-35](decisions.md)).
 
 Everything hangs directly off the Pi: servos on two I2C PWM chips, IMU and battery ADC on
 I2C, LEDs on SPI, buzzer, servo-power enable and the ultrasonic on GPIO, the camera on

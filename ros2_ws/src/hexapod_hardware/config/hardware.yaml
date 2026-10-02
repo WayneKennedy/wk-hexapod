@@ -40,9 +40,9 @@
       head_pan_max: 163.0
       head_tilt_min: 45.0
       head_tilt_max: 65.0
-      # false since 2026-09-29: the tilt servo's gears slip (OQ-30). Keep in step
-      # with head_controller's `enabled` in hexapod_controller body_params.yaml.
-      head_enabled: false
+      # true again since 2026-10-02 (owner, DEC-35); off 2026-09-29 to 10-02 (OQ-30).
+      # Keep in step with head_controller's `enabled` in body_params.yaml.
+      head_enabled: true
       # Link lengths in mm (for IK)
       link_lengths:
         coxa: 33
