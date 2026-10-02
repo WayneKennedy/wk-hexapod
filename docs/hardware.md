@@ -105,6 +105,7 @@ ribbon is the suspect — seating, contact orientation, or the wrong connector o
 | LED strip | SPI0 MOSI (GPIO 10), `/dev/spidev0.0` | 7× WS2812, GRB, 50 % brightness |
 | Buzzer | GPIO 17 | See the hazard below |
 | I2C clock | `dtparam=i2c_arm=on,i2c_arm_baudrate=400000` | 100 kHz makes the robot walk visibly slowly (Freenove) |
+| I2C bus recovery | `dtoverlay=hexapod-i2c1-recovery` | GPIO 3/2 as `scl-gpios`/`sda-gpios`: the kernel clocks a held SDA free on a timeout ([OQ-32](open-questions.md)) |
 
 Verify the bus with `i2cdetect -y 1`: expect `40 41 48 68`. If every address times out,
 see [`operations.md`](operations.md#troubleshooting) and [OQ-32](open-questions.md).

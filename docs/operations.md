@@ -20,7 +20,8 @@ sudo reboot                           # config.txt and group changes
 ```
 
 The setup script: enables I2C at 400 kHz and SPI, writes the safe GPIO defaults
-([`hardware.md`](hardware.md#the-buzzer-hazard)) and the OV5647 camera overlay, adds the
+([`hardware.md`](hardware.md#the-buzzer-hazard)), the OV5647 camera overlay and the I2C
+bus-recovery overlay (`boot/hexapod-i2c1-recovery.dts`, [OQ-32](open-questions.md)), adds the
 ROS 2 apt source, installs ROS 2 Jazzy plus Nav2, `camera_ros` (which brings libcamera
 with the Pi 5 PiSP pipeline), `imu_filter_madgwick` and the Python hardware libraries
 and `slam_toolbox` from apt, imports the source dependencies pinned in `ros2_ws/deps.repos`
@@ -284,7 +285,11 @@ changing `hexapod_interfaces`, any `setup.py`, launch files, or config files (th
   `sllidar_ros2`, is driving it (DEC-31). No `/dev/ttyUSB0`: check the USB lead
   (`lsusb` shows `10c4:ea60`); the user needs the `dialout` group.
 - **Every I2C read fails with `[Errno 110]`, and the kernel logs `controller timed out`.**
-  A device is holding SDA low ([OQ-32](open-questions.md)). Stop the service, then
+  A device is holding SDA low ([OQ-32](open-questions.md)). The kernel clears this itself
+  when the recovery overlay is loaded: `dmesg | grep "gpio recovery"` must show `running
+  with gpio recovery mode! scl,sda`; if not, rerun step 2 of the setup script and reboot.
+  `sudo python3 scripts/i2c-fault-test.py` checks the recovery end to end. If the
+  failures continue anyway, stop the service, then
   `sudo python3 scripts/i2c-recover.py` reports the two lines and `--recover` clocks the
   device free and rebinds the controller; `i2cdetect -y 1` must then show `40 41 48 68`.
   It refuses to run with the service active or servo power enabled. If SDA stays low, or

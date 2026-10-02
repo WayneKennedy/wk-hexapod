@@ -792,11 +792,36 @@ and the nearest return per sector once a second. Times UTC.
 
 **What changed:** OQ-34, OQ-36 and OQ-37 updated. **Not shown:** the map against the room.
 
+### 2026-10-02 · I2C bus recovery by the kernel, with a held SDA simulated on USB
+
+**Conditions:** robot on a pillar on the desk, USB power, servo rail dead, checkouts in
+sync at `35ea55c`. `hexapod-i2c1-recovery.dtbo` built on the robot, enabled in
+`config.txt`, rebooted at 13:48. Times UTC.
+
+**Result:**
+
+1. **At boot:** `i2c_designware 1f00074000.i2c: running with gpio recovery mode! scl,sda`
+   and `i2c i2c-1: using pinctrl states for GPIO recovery`; both pins back on their I2C
+   function (FUNCSEL 3) after probe; `i2cdetect -y 1` showed `40 41 48 68`.
+2. **Stack starting, `i2cget` traffic (13:49:23):** SDA held low from the pad override
+   (`scripts/i2c-fault-test.py`). The first read failed after the 1 s adapter timeout
+   (`controller timed out`), the override was cleared by the recovery 1.32 s after the
+   hold, the second read failed, the third returned `WHO_AM_I` `0x70`.
+3. **Stack running, IMU at 95.5 Hz (13:49:49):** the kernel logged `lost arbitration`
+   then `controller timed out`, the 2026-09-29 sequence; released after 1.06 s;
+   `imu_driver` logged one `[Errno 110]` and `/imu/data_raw` measured 89.4 Hz in the 5 s
+   after. `i2cdetect` then showed `40 41 48 68`. No unbind, no stopped stack, no root
+   for the recovery itself.
+
+**What changed:** OQ-32 updated. **Not shown:** recovery from a real fault, which has only
+come on the battery with the servo rail live; whether the held line on the robot is
+released by clocking alone is known only from the 09-29 manual recovery (one pulse).
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
 
-- Whether the I2C bus fails again (OQ-32).
+- Whether the I2C bus fails again, and whether the kernel recovers it (OQ-32).
 - A run in open floor on the lidar, started at least 0.6 m from anything: a frontier
   reached, and the map against the room (OQ-34).
 - The three headings after a measured turn (OQ-36, OQ-13).

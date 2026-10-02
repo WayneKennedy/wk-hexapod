@@ -144,15 +144,16 @@ and the IMU now agree on heading ([OQ-36](docs/open-questions.md)) after the IMU
 put right on 10-01/02 (axes, roll and pitch, gyro bias, relative yaw fusion). It then
 stopped at a passage 0.5–0.6 m wide and ended in `error` after choosing two more
 unreachable frontiers ([OQ-34](docs/open-questions.md)). **The I2C bus has died twice on
-the battery with the servo rail energised, never on USB; `scripts/i2c-recover.py` frees
-it, nothing does so automatically yet** ([OQ-32](docs/open-questions.md)). The camera does
+the battery with the servo rail energised, never on USB; since 2026-10-02 the kernel
+clears a held SDA by itself (a boot overlay), proven on USB against a simulated fault,
+not yet against a real one** ([OQ-32](docs/open-questions.md)). The camera does
 not probe ([OQ-23](docs/open-questions.md)). Load average 9–16 on four cores with
 everything up ([OQ-02](docs/open-questions.md)).
 
 **As left:** see the last entry of [`docs/test-log.md`](docs/test-log.md).
 `hexapod.service` is enabled, so **a boot on the battery stands and explores**.
 
-**Frontier:** automatic I2C recovery (OQ-32); the explorer choosing reachable frontiers
+**Frontier:** I2C recovery against a real fault on the battery (OQ-32); the explorer choosing reachable frontiers
 and not ending in `error` (OQ-34); the gait's pitch and roll on the floor (OQ-37); the
 collision monitor against real obstacles (OQ-03); the rest of the dashboard
 ([OQ-33](docs/open-questions.md)). Saving and reloading a map

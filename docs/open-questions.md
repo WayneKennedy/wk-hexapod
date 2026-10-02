@@ -433,11 +433,21 @@ owner deciding.
   - **Changed** (commit `40a234b`): `servo_driver` logs a failed transfer, drops that
     command and keeps running, so a bus that recovers is used again and the servos can be
     relaxed on shutdown. Tested with a stub, not against a dead bus.
+  - **Recovered by the kernel since 2026-10-02** (commit `35ea55c`,
+    [`test-log.md`](test-log.md)). `boot/hexapod-i2c1-recovery.dts` names GPIO 3 and 2 as
+    the controller's `scl-gpios` and `sda-gpios`, so on every `controller timed out` the
+    DesignWare driver clocks SCL until SDA is released and re-initialises itself, with the
+    stack running. Tested on USB by holding SDA low from the pad
+    (`scripts/i2c-fault-test.py`): the 09-29 log lines, then the IMU back at about 90 Hz
+    within about 1 s. **Not yet seen against a real fault on the battery.**
   - **Open.** Why arbitration was lost: a glitch on SDA as the servo rail came up, the
     400 kHz clock on the shield's wiring, and a fault in one device are candidates, none
-    examined. Whether it recurs: once in seven starts so far. Nothing in the stack detects
-    a dead bus or clears it; the script needs root and a stopped stack. With the bus dead
-    the state machine still explores on paper ([OQ-33](#perception-and-sensing)).
+    examined. Whether it recurs: twice so far (09-29, 10-02), both on the battery with the
+    servo rail energised. A held SCL is not recoverable by clocking. Whether flash-kernel
+    leaves the custom `.dtbo` in `/boot/firmware/overlays/` across kernel updates is
+    unverified: after one, check `dmesg | grep "gpio recovery"`. The stack does not report
+    bus faults; with the bus dead the state machine still explores on paper
+    ([OQ-33](#perception-and-sensing)).
 
 - **OQ-29 — Undervoltage reset when the stack restarts on the battery.** (Found
   2026-09-29, [`test-log.md`](test-log.md).) `systemctl restart hexapod` with LOAD 7.76 V
