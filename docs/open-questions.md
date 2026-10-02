@@ -176,9 +176,15 @@ owner deciding.
   established:** the 0.24 m radius in a passage that narrow, or obstacles marked while
   the heading was wrong ([OQ-36](#locomotion-and-navigation)); the costmap held 430 lethal
   cells against `/map`'s 278. `scripts/costmap-reach.py` reports the pocket. **Started
-  within `PolygonStop` of anything, the robot does not move at all** (13:28). **Also
-  open:** three failed goals end exploration in `error` (`max_nav_failures`), where
-  waiting and retrying would suit a room people move in.
+  within `PolygonStop` of anything, the robot does not move at all** (13:28).
+  **2026-10-02: a frontier reached** ([`test-log.md`](test-log.md)), from a start with
+  free floor ahead and 0.5 m each side. The next frontier lay up a passage 0.5–0.6 m
+  wide, which the planner refuses at `robot_radius` 0.24 m with 0.35 m inflation, and
+  the run ended in `error` after two more failed goals. **Still open:** the explorer
+  keeps choosing frontiers it cannot reach (the goal's own cell was inscribed, 1.46 m
+  from reachable space): it should drop goals whose cell the planner cannot reach, or
+  plan to the nearest reachable cell; and three failed goals end exploration in `error`
+  (`max_nav_failures`), where waiting and retrying would suit a room people move in.
 
 - **OQ-36 — Three headings, three answers.** (2026-09-29, 13:26 UTC,
   [`test-log.md`](test-log.md).) After one `backup` of about 0.2 m and nothing else
@@ -205,7 +211,12 @@ owner deciding.
   instead of the ~120° the gait integrated. **Wrinkle found there:** when the turn ended
   the heading jumped by 11.6°, one cycle's worth, so the last cycle's gait integration
   escapes the fusion once walking stops; on the floor the two mostly agree, so the jump
-  is the per-cycle gait-versus-IMU difference, not 11.6°. Not fixed. **Measured 2026-10-02:** at rest the filter's yaw
+  is the per-cycle gait-versus-IMU difference, not 11.6°. Not fixed. **Largely resolved
+  on the floor, 2026-10-02:** over 4 min and more than a full rotation SLAM and odometry
+  stayed within 0–5° and the IMU's yaw change matched SLAM to 0.2°
+  ([`test-log.md`](test-log.md)). The 53° for a hand turn on 10-01 was the hand turn.
+  **Left:** the 0–5° gap is the gait's per-cycle integration between IMU samples and the
+  end-of-walk jump above; neither matters at this size. **Measured 2026-10-02:** at rest the filter's yaw
   moves −0.21°/s (11.6° in 55 s) while the raw gyro z reads +0.1…+0.3°/s, a bias nothing
   removes: a one-minute walk inherits about 12° from it. **Bias removed the same day:**
   `imu_driver` averages 200 readings at start-up (and on `/imu/calibrate_gyro`), skips

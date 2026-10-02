@@ -751,6 +751,41 @@ free. Checkouts in sync at `d74b59b`, then `1f74057` (50 mm stand). Times UTC.
 **What changed:** DEC-34 amended to 50 mm and banked; OQ-31 closed; OQ-32 has its second
 case; OQ-36 updated.
 
+### 2026-10-02 · **A frontier reached on the lidar**, then a passage too narrow; the three headings agree
+
+**Conditions:** same session and battery (LOAD 8.18 V throughout), 50 mm stand, robot on
+the floor with free floor ahead and about 0.5 m each side and behind (owner), room not
+described. Service started at 13:19:26 with the checkouts in sync at `5d4ca4d`; the ad hoc
+recorder logged `/imu/data` at full rate and `map → base_link`, `/odom`, the IMU yaw
+and the nearest return per sector once a second. Times UTC.
+
+**Result:**
+
+1. **Start-up clean:** gyro bias −5.30, +1.58, +0.14 °/s taken at 13:19:39; home 13:19:43;
+   stand 13:19:53–55; `SAFE` 13:19:55; exploring 13:19:56. No I2C fault in the run.
+2. **13:20:50, `Reached frontier, total explored: 1`:** goal (1.72, 0.88), 53 s after
+   setting off from the origin, with the collision monitor slowing it several times on
+   the way. **The first frontier the robot has ever reached on the lidar**, and the first
+   on the battery since 2026-09-15 on the D435i.
+3. **Then boxed.** The second goal (0.46, 2.73) lay up a passage 0.5–0.6 m wide running
+   away from the start band; the robot walked back to (0.5, 0.4) and every plan failed
+   (`no valid path found`), with waits and backups; the third goal (−2.53, −0.64) failed
+   in 22 s; `error` at 13:23:48. `scripts/costmap-reach.py` at 13:23:23: 2.66 m²
+   reachable, 8 cells beside unknown space, the goal's cell at cost 99, 1.46 m from the
+   nearest reachable cell. The dashboard map showed the live scan lying on the mapped
+   walls.
+4. **The three headings agree** (OQ-36): over 4 min of walking and turning, through more
+   than a full rotation, `map → base_link` and `/odom` stayed within 0–5° of each other
+   (e.g. 124.0/126.8, −176.9/−174.1, 114.3/116.1), and the IMU yaw change matched SLAM to
+   0.2° (IMU − SLAM = 172.0 ± 0.2° at every sample).
+5. **Collision monitor:** 5 stops and many 50 % slowdowns, all released; it was not driven
+   into anything the owner reported. 269 of 3504 sector-samples held a return nearer than
+   0.45 m, all while passing objects (the bench run showed none from the legs).
+6. **Stopped at 13:24:19;** both nodes relaxed the servos; LOAD 8.18 V before and after.
+
+**What changed:** OQ-34 and OQ-36 updated. **Not shown:** the gait's pitch and roll on
+the floor were recorded and not yet analysed (OQ-37); the map against the room.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
