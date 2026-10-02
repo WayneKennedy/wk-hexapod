@@ -773,7 +773,8 @@ and the nearest return per sector once a second. Times UTC.
    in 22 s; `error` at 13:23:48. `scripts/costmap-reach.py` at 13:23:23: 2.66 m²
    reachable, 8 cells beside unknown space, the goal's cell at cost 99, 1.46 m from the
    nearest reachable cell. The dashboard map showed the live scan lying on the mapped
-   walls.
+   walls, and the owner, watching the dashboard through the run, found the lidar view
+   and the map "coherent and aligned" (OQ-33).
 4. **The three headings agree** (OQ-36): over 4 min of walking and turning, through more
    than a full rotation, `map → base_link` and `/odom` stayed within 0–5° of each other
    (e.g. 124.0/126.8, −176.9/−174.1, 114.3/116.1), and the IMU yaw change matched SLAM to
