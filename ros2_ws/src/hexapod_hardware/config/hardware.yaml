@@ -48,6 +48,10 @@
       # Chip axes to body axes, degrees about z. The chip's y points forward
       # and its x to the robot's right (tilted by hand 2026-10-01, OQ-13).
       mounting_yaw_deg: -90.0
+      # Gyro bias: mean of this many readings while still, at start-up and on
+      # /imu/calibrate_gyro; skipped if the robot moved (std above the limit).
+      gyro_bias_samples: 200
+      gyro_bias_max_std_dps: 1.0
 
     # HC-SR04 ultrasonic on the head (vendor pins). Echo timed from kernel
     # edge timestamps; no echo within max_range is published as max_range.
