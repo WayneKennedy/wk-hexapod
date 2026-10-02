@@ -58,9 +58,10 @@ owner deciding.
   `base_link` and nothing in the chain (URDF `imu_joint` `rpy="0 0 0"`, the filter, the
   controller) corrected it; the owner confirmed the order. **Fixed in the driver the same
   day:** `imu_driver` rotates accelerations and rates by `imu.mounting_yaw_deg` (−90) into
-  body axes, so the URDF's `rpy="0 0 0"` is now right. **Still to do:** repeat the hand
-  tilts to confirm nose down reads positive pitch and left down negative roll; measure a
-  turn of known size for the yaw magnitude (OQ-36).
+  body axes, so the URDF's `rpy="0 0 0"` is now right. **Verified 2026-10-02:** nose down
+  reads pitch +50°, left side down roll −50°, as ROS expects
+  ([`test-log.md`](test-log.md)). **Roll, pitch and the yaw sign are settled.** Left:
+  the yaw magnitude after a turn of known size, and the gyro bias (both under OQ-36).
 
 - **OQ-20 — The map drifts and does not survive the run.** (2026-09-19,
   [DEC-28](decisions.md).) `map → odom` is a static identity, so the map is only as good as
@@ -194,9 +195,13 @@ owner deciding.
   by that much, and the heading while walking was the IMU's, which then drifts standing
   still (−48.9° to +4.4° cannot both be right). **Changed the same day** (`07842a1`,
   untested: no walk yet): the fusion follows the IMU's change in yaw since the walk
-  began, anchored to the heading odometry held then. Test: the movement calibration in
-  [`operations.md`](operations.md#movement-calibration), then the three headings again
-  after a turn of known size.
+  began, anchored to the heading odometry held then. **Measured 2026-10-02:** at rest the filter's yaw
+  moves −0.21°/s (11.6° in 55 s) while the raw gyro z reads +0.1…+0.3°/s, a bias nothing
+  removes: a one-minute walk inherits about 12° from it. **Next:** remove the gyro bias
+  (average the gyro while the robot is known to be still, at start-up, and subtract it in
+  `imu_driver`; or the filter's drift-compensation gain, unread), then the movement
+  calibration in [`operations.md`](operations.md#movement-calibration), then the three
+  headings again after a turn of known size.
 
 - **OQ-37 — Hold the scan plane level while walking, from the IMU.** (Owner, 2026-09-29:
   can tilt measured by the IMU correct all the legs during the gait, with the lidar's
@@ -211,9 +216,10 @@ owner deciding.
   it measures tilt, not height, and on a flat floor the body's height is what the leg
   kinematics command. **Unknown, and first:** how much the body pitches and rolls in the
   gait, at what frequency, at 30 mm and at 80 mm (log `/imu/data` during a walk).
-  **Found 2026-10-01 (OQ-13):** the controller's roll is the body's pitch and vice versa,
-  so the loop as written would correct each axis with the other's error; fix the frame
-  before enabling it.
+  **Frame fixed 2026-10-01 and verified 2026-10-02 (OQ-13):** nose down is positive pitch
+  and left side down negative roll at the controller. Still unknown: which way a positive
+  `body_orientation` roll or pitch tilts the body (needs servos), so the loop's sign is
+  untested.
   **Limits to expect, none measured here:** the servos take a new pulse at 50 Hz and
   report nothing, and the Madgwick filter lags. If the rocking repeats with the gait
   phase, a correction keyed to the phase may do more than feedback. **Cheaper

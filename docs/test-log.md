@@ -686,6 +686,24 @@ asked as 90°: the turn's true size was not measured.
 **What changed:** OQ-13 and OQ-37 updated; `imu_driver` rotates the chip's axes into
 the body's (`imu.mounting_yaw_deg`, −90).
 
+### 2026-10-02 · The IMU tilted again, on the rotated axes: roll and pitch now read as ROS expects
+
+**Conditions:** the same boot, still on USB power (up 23 h), the stack running from the
+service at `8c1ca5c`, both checkouts in sync. The same 1 Hz recorder as 2026-10-01. The
+owner tilted nose down, then left side down, each about 50° this time, 12:56 UTC.
+
+**Result:**
+
+1. **Level:** roll −3.3°, pitch +0.1°; raw accel (0.0, −0.6, +10.0) m/s², i.e. the robot
+   lies with its left side slightly low, which the roll now says.
+2. **Nose down:** pitch +48…+50°, roll −10° (the tilt was not pure); raw accel x −7.5.
+3. **Left side down:** roll −50…−51°, pitch −2°; raw accel y −7.6.
+4. **Yaw drift at rest:** +106.2° to +94.6° over the 55 s before the tilts, −0.21°/s; the
+   raw gyro z read +0.1…+0.3°/s throughout, an uncompensated bias. Overnight the yaw had
+   gone from −97° to +106° (about 21 h). During each tilt the yaw moved 10–30° more.
+
+**What changed:** OQ-13 closed for roll and pitch; OQ-36 and OQ-37 updated.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:
