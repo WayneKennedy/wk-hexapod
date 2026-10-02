@@ -866,7 +866,12 @@ watching. Times UTC, 14:19–14:36.
    where the wiring and bracket end its travel (owner). 45°: 18° below level on the owner's
    phone inclinometer; 65°: level; 45° again: 18°. No gear noise. Ended 14:42:53, relaxed.
 
-**What changed:** `hardware.yaml` head channels; `tilt_center` 90 → 65 in
+8. **Pan centre**, 14:45–14:52, both batteries on, tilt at 65°: pan 90° held 3–4° right
+   once powered (it was limp at first and the owner moved it by hand), 94° 3–4° right,
+   100° 1–2° right (pulse read back 1.61 ms), **103° dead ahead by eye**. A higher angle
+   turns the head left. Ended 14:52, relaxed, servo power off.
+
+**What changed:** `pan_center` 90 → 103; `hardware.yaml` head channels; `tilt_center` 90 → 65 in
 `body_params.yaml`; OQ-21, OQ-26, OQ-30 updated. The first write-up of this entry called
 the servo faulty; step 7 overturned that.
 
