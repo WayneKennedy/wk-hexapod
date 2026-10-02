@@ -1,0 +1,46 @@
+// Kernel bus recovery for I2C bus 1 (GPIO 2 SDA, GPIO 3 SCL) on the Pi 5 (OQ-32).
+//
+// With scl-gpios and sda-gpios named, the DesignWare driver registers bus
+// recovery at probe ("running with gpio recovery mode! scl,sda"). On every
+// "controller timed out" it then switches both pins to GPIO (the "gpio" state),
+// clocks SCL until SDA is released, re-initialises the controller and returns
+// the pins to I2C (the "default" state). No unbind, no root, no stopped stack.
+//
+// The "init" state is needed on the RP1: requesting a GPIO there switches the
+// pin to its GPIO function, so the driver's own probe would take both pins off
+// I2C. With an "init" state the driver core selects "default" again after probe.
+//
+// Build and install: sudo scripts/ubuntu-setup.sh (step 2), or by hand:
+//   dtc -@ -I dts -O dtb -o /boot/firmware/overlays/hexapod-i2c1-recovery.dtbo boot/hexapod-i2c1-recovery.dts
+// and "dtoverlay=hexapod-i2c1-recovery" in /boot/firmware/config.txt, then reboot.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2712";
+
+	fragment@0 {
+		target = <&rp1_gpio>;
+		__overlay__ {
+			hexapod_i2c1_gpio: hexapod_i2c1_gpio {
+				function = "gpio";
+				pins = "gpio2", "gpio3";
+				bias-pull-up;
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			pinctrl-names = "default", "init", "gpio";
+			pinctrl-0 = <&rp1_i2c1_2_3>;
+			pinctrl-1 = <&rp1_i2c1_2_3>;
+			pinctrl-2 = <&hexapod_i2c1_gpio>;
+			// 6 = GPIO_OPEN_DRAIN
+			scl-gpios = <&rp1_gpio 3 6>;
+			sda-gpios = <&rp1_gpio 2 6>;
+		};
+	};
+};

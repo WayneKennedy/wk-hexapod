@@ -68,6 +68,12 @@ ensure_config_line "gpio=4=op,dh"
 # overlay is explicit; libcamera then finds it through camera_ros.
 ensure_config_line "camera_auto_detect=0"
 ensure_config_line "dtoverlay=ov5647,cam0"
+# Kernel recovery of a stuck I2C bus 1 (OQ-32): boot/hexapod-i2c1-recovery.dts.
+OVERLAY=/boot/firmware/overlays/hexapod-i2c1-recovery.dtbo
+log "  building $OVERLAY"
+command -v dtc >/dev/null || run apt-get install -y -qq device-tree-compiler
+run dtc -q -@ -I dts -O dtb -o "$OVERLAY" "$REPO_DIR/boot/hexapod-i2c1-recovery.dts"
+ensure_config_line "dtoverlay=hexapod-i2c1-recovery"
 
 # ---------------------------------------------------------------------------
 log "Step 3: ROS 2 apt repository"
