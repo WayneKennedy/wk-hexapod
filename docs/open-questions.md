@@ -197,11 +197,13 @@ owner deciding.
   untested: no walk yet): the fusion follows the IMU's change in yaw since the walk
   began, anchored to the heading odometry held then. **Measured 2026-10-02:** at rest the filter's yaw
   moves −0.21°/s (11.6° in 55 s) while the raw gyro z reads +0.1…+0.3°/s, a bias nothing
-  removes: a one-minute walk inherits about 12° from it. **Next:** remove the gyro bias
-  (average the gyro while the robot is known to be still, at start-up, and subtract it in
-  `imu_driver`; or the filter's drift-compensation gain, unread), then the movement
-  calibration in [`operations.md`](operations.md#movement-calibration), then the three
-  headings again after a turn of known size.
+  removes: a one-minute walk inherits about 12° from it. **Bias removed the same day:**
+  `imu_driver` averages 200 readings at start-up (and on `/imu/calibrate_gyro`), skips
+  them if the robot moved, and subtracts the mean; the start-up bias read −5.39, +1.60,
+  +0.10 °/s and the yaw then held to +0.006°/s over 100 s at rest. The start-up window is
+  the first 2 s of the driver, before the legs home. **Next:** the movement calibration in
+  [`operations.md`](operations.md#movement-calibration), then the three headings again
+  after a turn of known size.
 
 - **OQ-37 — Hold the scan plane level while walking, from the IMU.** (Owner, 2026-09-29:
   can tilt measured by the IMU correct all the legs during the gait, with the lidar's

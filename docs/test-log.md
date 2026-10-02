@@ -701,8 +701,13 @@ owner tilted nose down, then left side down, each about 50° this time, 12:56 UT
 4. **Yaw drift at rest:** +106.2° to +94.6° over the 55 s before the tilts, −0.21°/s; the
    raw gyro z read +0.1…+0.3°/s throughout, an uncompensated bias. Overnight the yaw had
    gone from −97° to +106° (about 21 h). During each tilt the yaw moved 10–30° more.
+5. **13:02, gyro bias removal** (`imu_driver`, commit after `a93141a`; service restarted
+   on USB): bias taken at start-up as −5.39, +1.60, +0.10 °/s on the chip's axes from 200
+   readings (spread up to 0.54). Over the next 100 s at rest the yaw went from −103.3° to
+   −102.7°, +0.006°/s, and the published gyro z averaged −0.045°/s.
 
-**What changed:** OQ-13 closed for roll and pitch; OQ-36 and OQ-37 updated.
+**What changed:** OQ-13 closed for roll and pitch; OQ-36 and OQ-37 updated; `imu_driver`
+takes the gyro bias at start-up and on `/imu/calibrate_gyro`.
 
 ## Next entries expected
 
