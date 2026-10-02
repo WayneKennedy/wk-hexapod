@@ -8,7 +8,7 @@ Battery (LOAD) on, the owner watching, hexapod.service stopped:
     tail -f /tmp/head-range.log
 
 Commands: `pan <deg>` and `tilt <deg>` move to a servo angle (the scale servo_driver
-uses, 0-180 = 500-2500 us; tilt is clamped to 45-65, DEC-35), ramping 1 deg
+uses, 0-180 = 500-2500 us; clamped to pan 43-163, tilt 45-65, DEC-35), ramping 1 deg
 per 20 ms from the last commanded angle. The first command for a servo jumps:
 where a limp servo rests is unknown. `relax <pan|tilt>` stops that servo's pulses;
 `quit` ends. On start every one of the 32 channels is relaxed, so the legs stay
@@ -30,7 +30,7 @@ FIFO, LOG = '/tmp/head-range', '/tmp/head-range.log'
 GPIOCHIP, SERVO_POWER = 4, 4
 BUS, ADDR_0_15, ADDR_16_31 = 1, 0x41, 0x40
 CHANNEL = {'pan': 1, 'tilt': 0}         # this robot's wiring (hardware.yaml, OQ-21)
-LIMIT = {'pan': (0.0, 180.0), 'tilt': (45.0, 65.0)}   # tilt: level and down only (DEC-35)
+LIMIT = {'pan': (43.0, 163.0), 'tilt': (45.0, 65.0)}  # DEC-35
 STEP_DEG, STEP_SEC = 1.0, 0.02
 IDLE_SEC = 15 * 60
 

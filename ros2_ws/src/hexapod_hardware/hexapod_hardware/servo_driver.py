@@ -140,7 +140,9 @@ class ServoDriver(Node):
         self.declare_parameter('servos.head_channels.tilt', 1)
         # False: the head channels are never written, so both servos stay limp
         self.declare_parameter('servos.head_enabled', True)
-        # Tilt is clamped to these servo angles whatever is commanded (DEC-35)
+        # Pan and tilt are clamped to these servo angles whatever is commanded (DEC-35)
+        self.declare_parameter('servos.head_pan_min', 43.0)
+        self.declare_parameter('servos.head_pan_max', 163.0)
         self.declare_parameter('servos.head_tilt_min', 45.0)
         self.declare_parameter('servos.head_tilt_max', 65.0)
 
@@ -155,6 +157,8 @@ class ServoDriver(Node):
         self.head_pan_channel = self.get_parameter('servos.head_channels.pan').value
         self.head_tilt_channel = self.get_parameter('servos.head_channels.tilt').value
         self.head_enabled = self.get_parameter('servos.head_enabled').value
+        self.head_pan_min = self.get_parameter('servos.head_pan_min').value
+        self.head_pan_max = self.get_parameter('servos.head_pan_max').value
         self.head_tilt_min = self.get_parameter('servos.head_tilt_min').value
         self.head_tilt_max = self.get_parameter('servos.head_tilt_max').value
         if not self.head_enabled:
@@ -478,7 +482,8 @@ class ServoDriver(Node):
         if len(msg.data) < 2 or not self.head_enabled:
             return
 
-        self.set_servo_angle(self.head_pan_channel, msg.data[0])
+        self.set_servo_angle(self.head_pan_channel,
+                             self._clamp(msg.data[0], self.head_pan_min, self.head_pan_max))
         self.set_servo_angle(self.head_tilt_channel,
                              self._clamp(msg.data[1], self.head_tilt_min, self.head_tilt_max))
 

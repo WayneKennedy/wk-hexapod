@@ -871,7 +871,11 @@ watching. Times UTC, 14:19–14:36.
    100° 1–2° right (pulse read back 1.61 ms), **103° dead ahead by eye**. A higher angle
    turns the head left. Ended 14:52, relaxed, servo power off.
 
-**What changed:** `pan_center` 90 → 103; `hardware.yaml` head channels; `tilt_center` 90 → 65 in
+9. **Pan extents**, 14:52–14:55, tilt level: 10° steps from 103°; 113° and 123° turned the
+   head 10° and 20° left (owner); clear at 133°, 143°, 153° and 163° (60° left, "call that
+   the useful limit"); right clear at 73° and 43° (60° right). Centred and relaxed.
+
+**What changed:** pan limits ±60 and the 43–163 / 45–65 clamps (DEC-35); `pan_center` 90 → 103; `hardware.yaml` head channels; `tilt_center` 90 → 65 in
 `body_params.yaml`; OQ-21, OQ-26, OQ-30 updated. The first write-up of this entry called
 the servo faulty; step 7 overturned that.
 
