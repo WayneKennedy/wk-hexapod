@@ -7,11 +7,14 @@ Implements frontier-based exploration:
    slam_toolbox's /map from the lidar)
 2. Detect frontier cells (unknown adjacent to free)
 3. Cluster frontiers and filter by size
-4. Select closest frontier as navigation goal
-5. Send goal to Nav2 /navigate_to_pose
+4. Aim each at the nearest cell the robot can reach in the costmap (OQ-34);
+   drop frontiers with none within max_goal_offset
+5. Send the closest (by path) to Nav2 /navigate_to_pose
 6. On arrival, survey with the head (LookAround) so the map grows without
    the body turning
-7. Repeat until no frontiers remain
+7. Repeat until no frontiers remain. After max_nav_failures failed goals in
+   a row, or with no reachable frontier, wait retry_wait_sec and try again
+   with the failed goals forgotten: people and doors move.
 """
 
 import rclpy
@@ -62,6 +65,8 @@ class FrontierExplorer(Node):
         self.declare_parameter('survey_sweeps', 1)
         self.declare_parameter('min_goal_distance', 0.4)
         self.declare_parameter('initial_map_timeout_sec', 60.0)
+        self.declare_parameter('max_goal_offset', 1.0)
+        self.declare_parameter('retry_wait_sec', 30.0)
 
         self.min_frontier_size = self.get_parameter('min_frontier_size').value
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
@@ -72,6 +77,8 @@ class FrontierExplorer(Node):
         self.max_nav_failures = self.get_parameter('max_nav_failures').value
         self.survey_sweeps = self.get_parameter('survey_sweeps').value
         self.min_goal_distance = self.get_parameter('min_goal_distance').value
+        self.max_goal_offset = self.get_parameter('max_goal_offset').value
+        self.retry_wait = self.get_parameter('retry_wait_sec').value
 
         # State
         self.current_map = None
@@ -176,8 +183,8 @@ class FrontierExplorer(Node):
     def cluster_frontiers(self, frontier_cells, info):
         """
         Group 8-connected frontier cells (a flood fill, linear in the cell
-        count). Returns list of (centroid_x, centroid_y, size_meters) in the
-        map frame.
+        count). Returns list of (centroid_x, centroid_y, size_meters, cells)
+        in the map frame; cells is an (n, 2) array of (row, col).
         """
         remaining = set(map(tuple, frontier_cells.tolist()))
         res = info.resolution
@@ -199,8 +206,69 @@ class FrontierExplorer(Node):
             cells = np.array(members)
             centroid_x = ox + (cells[:, 1].mean() + 0.5) * res
             centroid_y = oy + (cells[:, 0].mean() + 0.5) * res
-            clusters.append((centroid_x, centroid_y, len(members) * res))
+            clusters.append((centroid_x, centroid_y, len(members) * res, cells))
         return clusters
+
+    def reachable(self, occupancy_grid, robot_x, robot_y):
+        """Path length in cells from the robot to every cell it can reach, -1 elsewhere.
+
+        A 4-connected flood fill over known cells cheaper than inscribed (99 on
+        the costmap's 0-100 scale): the cells the planner can put the robot's
+        centre on (scripts/costmap-reach.py, OQ-34). Unknown cells are not
+        crossed, although the planner may cross them (allow_unknown).
+        The robot's own cell is the seed whatever its cost.
+        """
+        info = occupancy_grid.info
+        grid = np.array(occupancy_grid.data, dtype=np.int16).reshape(info.height, info.width)
+        passable = (grid >= 0) & (grid < 99)
+        dist = np.full(grid.shape, -1, dtype=np.int32)
+        c = int((robot_x - info.origin.position.x) / info.resolution)
+        r = int((robot_y - info.origin.position.y) / info.resolution)
+        if not (0 <= r < info.height and 0 <= c < info.width):
+            return dist
+        dist[r, c] = 0
+        queue = deque([(r, c)])
+        h, w = grid.shape
+        while queue:
+            r, c = queue.popleft()
+            d = dist[r, c] + 1
+            for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+                if 0 <= nr < h and 0 <= nc < w and passable[nr, nc] and dist[nr, nc] < 0:
+                    dist[nr, nc] = d
+                    queue.append((nr, nc))
+        return dist
+
+    def aim_frontiers(self, clusters, dist, info):
+        """Move each frontier's goal onto the reachable cell nearest its cells.
+
+        A cluster's centroid can lie in unknown space or in a passage narrower
+        than the robot (OQ-34, 2026-10-02: an inscribed cell 1.46 m from
+        reachable space). Returns (goal_x, goal_y, size, path_m) for clusters
+        with a reachable cell within max_goal_offset of one of their cells;
+        the rest are unreachable from here.
+        """
+        res = info.resolution
+        ox, oy = info.origin.position.x, info.origin.position.y
+        reach = np.argwhere(dist >= 0)
+        aimed = []
+        if len(reach) == 0:
+            return aimed
+        max_cells = self.max_goal_offset / res
+        for _, _, size, cells in clusters:
+            members = cells[::max(1, len(cells) // 50)]   # at most ~50 for speed
+            # Nearest reachable cell to any member, cells only within the box
+            lo, hi = members.min(axis=0) - max_cells, members.max(axis=0) + max_cells
+            near = reach[np.all((reach >= lo) & (reach <= hi), axis=1)]
+            if len(near) == 0:
+                continue
+            d2 = ((near[:, None, :] - members[None, :, :]) ** 2).sum(axis=2).min(axis=1)
+            best = int(np.argmin(d2))
+            if d2[best] > max_cells ** 2:
+                continue
+            r, c = near[best]
+            aimed.append((ox + (c + 0.5) * res, oy + (r + 0.5) * res, size,
+                          dist[r, c] * res))
+        return aimed
 
     def filter_frontiers(self, clusters, min_size):
         """Filter clusters by minimum size."""
@@ -211,7 +279,7 @@ class FrontierExplorer(Node):
         Select next exploration goal from frontier clusters.
 
         Strategies:
-        - closest: Nearest frontier
+        - closest: shortest path through the costmap (the flood fill's length)
         - largest: Biggest frontier
         """
         if not frontiers:
@@ -223,11 +291,7 @@ class FrontierExplorer(Node):
             return frontiers[0]
 
         # Default: closest
-        def distance(f):
-            return math.sqrt((f[0] - robot_x) ** 2 + (f[1] - robot_y) ** 2)
-
-        frontiers = sorted(frontiers, key=distance)
-        return frontiers[0]
+        return min(frontiers, key=lambda f: f[3])
 
     def get_robot_pose(self):
         """
@@ -303,7 +367,7 @@ class FrontierExplorer(Node):
         marker_array.markers.append(delete_marker)
 
         # Add frontier markers
-        for i, (x, y, size) in enumerate(frontiers):
+        for i, (x, y, size, *_) in enumerate(frontiers):
             marker = Marker()
             marker.header.frame_id = 'map'
             marker.header.stamp = self.get_clock().now().to_msg()
@@ -455,35 +519,33 @@ class FrontierExplorer(Node):
                     goal_handle.succeed()
                     return result
 
-                # Skip frontiers near goals Nav2 already failed to reach
-                frontiers = [f for f in frontiers if not self._is_blacklisted(f[0], f[1])]
-                if not frontiers:
-                    self.get_logger().info('All remaining frontiers are unreachable, exploration complete')
-                    result.success = True
-                    result.message = 'Remaining frontiers unreachable'
-                    result.frontiers_explored = self.frontiers_explored
-                    goal_handle.succeed()
-                    return result
-
-                # Get robot pose and select goal. Frontiers at the robot's own
-                # feet (cells beside the body the forward sonar never sees)
-                # would be "reached" at once, forever; skip them.
+                # Aim each frontier at a cell the robot can reach; skip goals
+                # Nav2 already failed to reach, and goals at the robot's own
+                # feet, which would be "reached" at once, forever.
                 robot_x, robot_y = self.get_robot_pose()
-                frontiers = [f for f in frontiers
-                             if math.hypot(f[0] - robot_x, f[1] - robot_y) >= self.min_goal_distance]
-                if not frontiers:
+                dist = self.reachable(self.current_map, robot_x, robot_y)
+                aimed = self.aim_frontiers(frontiers, dist, info)
+                fresh = [f for f in aimed if not self._is_blacklisted(f[0], f[1])]
+                candidates = [f for f in fresh
+                              if math.hypot(f[0] - robot_x, f[1] - robot_y) >= self.min_goal_distance]
+                if not candidates and len(fresh) == len(frontiers):
                     self.get_logger().info('Only frontiers within min_goal_distance remain, exploration complete')
                     result.success = True
                     result.message = 'No frontiers beyond min_goal_distance'
                     result.frontiers_explored = self.frontiers_explored
                     goal_handle.succeed()
                     return result
-                selected = self.select_goal(frontiers, robot_x, robot_y, self.goal_strategy)
-
-                if selected is None:
+                if not candidates:
+                    await self._pause(
+                        goal_handle, f'No reachable frontier: {len(frontiers)} found, '
+                        f'{len(frontiers) - len(aimed)} unreachable from here, '
+                        f'{len(aimed) - len(fresh)} failed before, '
+                        f'{len(fresh)} within min_goal_distance')
                     continue
+                selected = self.select_goal(candidates, robot_x, robot_y, self.goal_strategy)
+                frontiers = candidates
 
-                goal_x, goal_y, _ = selected
+                goal_x, goal_y = selected[0], selected[1]
 
                 # Publish markers
                 self.publish_frontier_markers(frontiers, (goal_x, goal_y))
@@ -512,11 +574,8 @@ class FrontierExplorer(Node):
                     self.get_logger().warn(f'Navigation failed: {message}')
 
                     if self.nav_failures >= self.max_nav_failures:
-                        result.success = False
-                        result.message = f'Too many navigation failures: {message}'
-                        result.frontiers_explored = self.frontiers_explored
-                        goal_handle.abort()
-                        return result
+                        await self._pause(
+                            goal_handle, f'{self.nav_failures} navigation failures in a row')
 
                 # Small delay before next iteration
                 await self._sleep(0.5)
@@ -531,6 +590,19 @@ class FrontierExplorer(Node):
 
         finally:
             self.goal_handle = None
+
+    async def _pause(self, goal_handle, reason):
+        """Wait retry_wait_sec, then forget the failed goals and try again.
+
+        Cancellation and the exploration timeout are checked by the main loop
+        on return; the wait itself is cut short by a cancel request.
+        """
+        self.get_logger().warn(f'{reason}: retrying in {self.retry_wait:.0f} s')
+        end = time.monotonic() + self.retry_wait
+        while time.monotonic() < end and not goal_handle.is_cancel_requested:
+            await self._sleep(1.0)
+        self.failed_goals = []
+        self.nav_failures = 0
 
     def _sleep(self, duration):
         """Awaitable sleep driven by the rclpy executor.

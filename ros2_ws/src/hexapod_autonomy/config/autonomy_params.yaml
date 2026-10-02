@@ -23,8 +23,14 @@ frontier_explorer:
     # OccupancyGrid value thresholds
     unknown_threshold: -1
     free_threshold: 50
-    # Maximum navigation failures before aborting
+    # Failed goals in a row before a pause of retry_wait_sec (not an abort)
     max_nav_failures: 3
+    # With no reachable frontier, or after max_nav_failures, wait this long
+    # (s) and retry with the failed goals forgotten (OQ-34)
+    retry_wait_sec: 30.0
+    # A frontier's goal is the reachable costmap cell nearest its cells; with
+    # none within this (m) the frontier is skipped as unreachable (OQ-34)
+    max_goal_offset: 1.0
     # The map: Nav2's global costmap, which is slam_toolbox's /map plus live
     # lidar obstacles and inflation (nav2_params.yaml, DEC-32)
     map_topic: "/global_costmap/costmap"
