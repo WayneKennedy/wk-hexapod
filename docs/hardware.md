@@ -55,7 +55,8 @@ with a photo). In that photo the USB lead leaves the back of the lidar and drops
 looping at about plate height, below the scan window; not measured. Seen in the 2026-09-26 dry-fit photo, for OQ-19: the USB lead was coiled
 beside the lidar *in* the scan plane (30 mm above the base) — route it down through the plate;
 the pan/tilt head tops out near the lidar's mid-height, so whether it crosses the plane
-depends on tilt — measure; a raised leg reaches the plane in swing, so a body-radius range
+depends on tilt — 2026-10-02: tilted 15–20° above level, the head's top edge stood level with
+the lidar's base, beside it (owner's photo, "too close for comfort"); not measured further; a raised leg reaches the plane in swing, so a body-radius range
 mask on the scan is cheap insurance.
 
 **Bench facts, 2026-09-28, USB power, legs limp** ([`test-log.md`](test-log.md)):
@@ -95,7 +96,7 @@ ribbon is the suspect — seating, contact orientation, or the wrong connector o
 | Function | Interface | Detail |
 |---|---|---|
 | Servo drivers | I2C bus 1, `0x41` and `0x40` | 0x41 serves channels 0–15, 0x40 channels 16–31 (the reference code's ordering, kept). 50 Hz, 500–2500 µs |
-| Head pan / tilt | 0x41 channels 0 / 1 | 90° = centred. The vendor app clamps pan to 50–180 and tilt to 0–180; `head_controller` stays inside ±40° of centre. **Both disabled since 2026-09-29: the tilt servo's gears slip** ([OQ-30](open-questions.md)) |
+| Head pan / tilt | 0x41 channels **1 / 0** (the vendor's code has 0 / 1; found 2026-10-02) | 90° = centred (unverified; tilt's level was 65–70° on the faulty servo, [OQ-30](open-questions.md)). The vendor app clamps pan to 50–180 and tilt to 0–180; `head_controller` stays inside ±40° of centre. **Both disabled since 2026-09-29: the tilt servo's gears slip** ([OQ-30](open-questions.md)) |
 | Ultrasonic | GPIO 27 (trigger), GPIO 22 (echo) | HC-SR04 on the head; echo timed from kernel edge timestamps |
 | Pi camera | CSI CAM0 | OV5647; `camera_auto_detect=0` and `dtoverlay=ov5647,cam0` in `config.txt` |
 | Legs | leg 1 RF 15,14,13 · leg 2 RM 12,11,10 · leg 3 RR 9,8,**31** · leg 4 LR 22,23,**27** · leg 5 LM 19,20,21 · leg 6 LF 16,17,18 | coxa, femur, tibia; legs 3 and 4 have non-contiguous tibia channels |

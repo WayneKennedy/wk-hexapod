@@ -837,6 +837,32 @@ widening behind); then the stack on USB on the desk (servo rail dead, LOAD and C
 
 **What changed:** OQ-34 updated. **Not shown:** the change on the floor.
 
+### 2026-10-02 · The head driven by hand: channels swapped, the tilt servo drives up only
+
+**Conditions:** robot on a pillar on the desk, LOAD on, CTRL off, the Pi on USB; stack
+stopped; `scripts/head-range.py` holding servo power, all leg channels relaxed; owner
+watching. Times UTC, 14:19–14:36.
+
+**Result:**
+
+1. **Channels swapped.** Commands to channel 1 (configured as tilt) moved pan and the owner,
+   watching tilt, saw nothing; channel 0 (configured as pan) moved tilt. `hardware.yaml`
+   corrected: pan 1, tilt 0.
+2. **Tilt direction:** a higher angle raises the head.
+3. **Clearance:** with tilt 15–20° above level (channel 0 at 100°, first pulse from rest),
+   the head's top edge stood level with the lidar's base, beside it (owner's photo: "too
+   close for comfort").
+4. **The tilt servo drives up only.** Relaxed and set level by hand, a first pulse of 90°
+   lifted the head about 10°, and 70° (from level again) 2–3°; from the 90° position, 85°
+   and 80° moved nothing. Powered, both servos held rigid against a light push both ways.
+   The PCA9685 read back the commanded pulses (1.39 ms at 80°, 1.44 ms at 85°, 50 Hz).
+5. **The battery ADC read 0 V on both rails** (raw 0 and 1) with LOAD on and CTRL off,
+   while the servos were plainly powered. Cause unknown; with both on, LOAD read correctly
+   (8.18 V, 2026-10-02 floor run).
+6. Ended 14:36: all channels relaxed, servo power off.
+
+**What changed:** `hardware.yaml` head channels; OQ-21, OQ-26, OQ-30 updated.
+
 ## Next entries expected
 
 From [`roadmap.md`](roadmap.md) milestone 1, all needing the battery and the owner:

@@ -29,7 +29,7 @@ import smbus
 FIFO, LOG = '/tmp/head-range', '/tmp/head-range.log'
 GPIOCHIP, SERVO_POWER = 4, 4
 BUS, ADDR_0_15, ADDR_16_31 = 1, 0x41, 0x40
-CHANNEL = {'pan': 0, 'tilt': 1}
+CHANNEL = {'pan': 1, 'tilt': 0}         # this robot's wiring (hardware.yaml, OQ-21)
 STEP_DEG, STEP_SEC = 1.0, 0.02
 IDLE_SEC = 15 * 60
 

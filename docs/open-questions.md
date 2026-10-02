@@ -110,6 +110,14 @@ owner deciding.
   (check [wk-inventory](https://github.com/WayneKennedy/wk-inventory/blob/main/docs/stock.md)
   first), fix the head level mechanically, or remove the head (OQ-26). The lidar as the
   range source ([OQ-20](#locomotion-and-navigation)) removes the dependence either way.
+  **2026-10-02, driven by hand on the battery** ([`test-log.md`](test-log.md)): the tilt
+  servo **drives up but not down**. From level, set by hand, a first pulse of 100°, 90° and
+  70° lifted the head 15–20°, about 10° and 2–3°; from there 85° and 80° moved nothing,
+  while it held rigid against a push both ways, and the PCA9685 read back the commanded
+  pulse. Pan held and moved. **The tilt servo is faulty: replace it.** Its model is not
+  recorded here; read its label. wk-inventory lists no spare hexapod servo; standard-size
+  servos bought for the written-off Seagull (Savox SC-0253MG, Hitec HS-425BB) may survive,
+  unrecorded.
 
 - **OQ-21 — The head has no feedback, so its joint states are a model.** (2026-09-19.)
   `head_controller` publishes head joint states from a slew-rate model (`slew_rate`,
@@ -117,7 +125,9 @@ owner deciding.
   tree. If it is wrong, or a servo stalls, readings taken while the head moves land at the
   wrong bearing in the map. Also unverified: `pan_direction` (which way a rising servo
   angle turns the head) and the travel limits, kept at ±40° inside the vendor app's 50–180
-  clamp. Needs the battery and the owner: command known angles, watch the head, and check
+  clamp. **2026-10-02:** pan is channel 1 and tilt channel 0, the reverse of the vendor's
+  code (`hardware.yaml` corrected); a rising tilt angle raises the head (`tilt_direction`
+  +1 holds); tilting 15–20° up brings the head beside the lidar's base (OQ-26, OQ-30). Needs the battery and the owner: command known angles, watch the head, and check
   `/ultrasonic/range` against a target at a known bearing (the dashboard's sonar fan went
   on 2026-09-29). Cheapest mitigation if the
   model proves poor: only trust readings taken while the head is settled.
@@ -355,6 +365,9 @@ owner deciding.
     down to read low and directly ahead. **Next, with the battery and the owner:** run the
     head through its range, tilt above all, to find whether tilting up meets the lidar or
     its plane, and whether the slipping tilt gears (OQ-30) hold a fixed down angle.
+    **Done 2026-10-02:** 15–20° up already puts the head beside the lidar's base, so the
+    usable tilt is level and below; the tilt servo cannot drive down at all (OQ-30), so
+    a downward sonar waits for a replacement servo.
   - **The camera.** It shares the head. Not working (OQ-23), but face recognition and
     `head/look_at` are in the autonomy stack; removing the head means a body mount and a
     body-yaw look-at, decided deliberately.

@@ -27,10 +27,12 @@
       leg_4: [22, 23, 27]  # LR - tibia on ch 27!
       leg_5: [19, 20, 21]  # LM
       leg_6: [16, 17, 18]  # LF
-      # Head/camera servo channels (from fn-hexapod server.py CMD_CAMERA handler)
+      # Head servo channels on PCA9685 @ 0x41. The vendor's server.py has pan 0,
+      # tilt 1; on this robot channel 0 moves tilt and 1 pan (owner watching,
+      # 2026-10-02, scripts/head-range.py; OQ-21).
       head_channels:
-        pan: 0    # Channel 0 on PCA9685 @ 0x41
-        tilt: 1   # Channel 1 on PCA9685 @ 0x41
+        pan: 1
+        tilt: 0
       # false since 2026-09-29: the tilt servo's gears slip (OQ-30). Keep in step
       # with head_controller's `enabled` in hexapod_controller body_params.yaml.
       head_enabled: false
