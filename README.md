@@ -18,8 +18,8 @@ D435i. On 2026-09-19 the D435i left, the kit's camera and ultrasonic returned, a
 was rebuilt around a sonar-fed costmap map (DEC-25, DEC-27, DEC-28). On 2026-09-29 an
 RPLIDAR C1 and `slam_toolbox` replaced the sonar and the head was disabled (DEC-32); a
 frontier reached on the lidar is next ([`AGENTS.md`](AGENTS.md#status)). See
-[`docs/roadmap.md`](docs/roadmap.md) for direction, [`docs/decisions.md`](docs/decisions.md)
-for what is settled, and [`docs/open-questions.md`](docs/open-questions.md) for what is not.
+[*Hexapod Roadmap*](memory://main/robotics/hexapod/hexapod-roadmap) for direction, [*Hexapod Decisions*](memory://main/robotics/hexapod/hexapod-decisions)
+for what is settled, and [*Hexapod Open Questions*](memory://main/robotics/hexapod/hexapod-open-questions) for what is not.
 
 ## What it is
 
@@ -40,15 +40,15 @@ for what is settled, and [`docs/open-questions.md`](docs/open-questions.md) for 
 | File | Contents |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | Onboarding for any AI assistant or contributor — **start here** |
-| [`docs/concept.md`](docs/concept.md) | What it is, what it is for, and the history |
-| [`docs/architecture.md`](docs/architecture.md) | Buses, nodes, topics, frames; the tier model |
-| [`docs/hardware.md`](docs/hardware.md) | The kit, the sensor swap, pin map, power, calibration, the buzzer hazard |
-| [`docs/operations.md`](docs/operations.md) | Install, run, service, maps, remote missions, tests |
-| [`docs/decisions.md`](docs/decisions.md) | Banked decisions — the durable *why* |
-| [`docs/open-questions.md`](docs/open-questions.md) | Unresolved. Never state these as settled |
-| [`docs/roadmap.md`](docs/roadmap.md) | Milestones |
-| [`docs/references.md`](docs/references.md) | Upstream code, vendor reference, versions |
-| [`docs/test-log.md`](docs/test-log.md) | What was actually run |
+| [*Hexapod Concept*](memory://main/robotics/hexapod/hexapod-concept) | What it is, what it is for, and the history |
+| [*Hexapod Architecture*](memory://main/robotics/hexapod/hexapod-architecture) | Buses, nodes, topics, frames; the tier model |
+| [*Hexapod Hardware*](memory://main/robotics/hexapod/hexapod-hardware) | The kit, the sensor swap, pin map, power, calibration, the buzzer hazard |
+| [*Hexapod Operations*](memory://main/robotics/hexapod/hexapod-operations) | Install, run, service, maps, remote missions, tests |
+| [*Hexapod Decisions*](memory://main/robotics/hexapod/hexapod-decisions) | Banked decisions — the durable *why* |
+| [*Hexapod Open Questions*](memory://main/robotics/hexapod/hexapod-open-questions) | Unresolved. Never state these as settled |
+| [*Hexapod Roadmap*](memory://main/robotics/hexapod/hexapod-roadmap) | Milestones |
+| [*Hexapod References*](memory://main/robotics/hexapod/hexapod-references) | Upstream code, vendor reference, versions |
+| [*Hexapod Test Log*](memory://main/robotics/hexapod/hexapod-test-log) | What was actually run |
 
 ## Quick start
 
@@ -60,7 +60,7 @@ scripts/mission.sh -H <robot> state
 ```
 
 Details, including what runs at boot and how to save a map, are in
-[`docs/operations.md`](docs/operations.md).
+[*Hexapod Operations*](memory://main/robotics/hexapod/hexapod-operations).
 
 ## Family
 
@@ -69,7 +69,7 @@ the compute tiers, the topic contract, perception placement, power integrity —
 [wk-robotics](https://github.com/WayneKennedy/wk-robotics). Facts that belong there are
 linked, never copied. The kit's vendor code is read from
 [Freenove's upstream repository](https://github.com/Freenove/Freenove_Big_Hexapod_Robot_Kit_for_Raspberry_Pi)
-directly ([`docs/references.md`](docs/references.md)).
+directly ([*Hexapod References*](memory://main/robotics/hexapod/hexapod-references)).
 
 ## Licence
 
