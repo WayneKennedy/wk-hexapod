@@ -1,5 +1,11 @@
 # wk-hexapod
 
+> **The project record moved to Basic Memory on 2026-11-10** (project `main`, folder `robotics/hexapod/`; start at the
+> *Hexapod* note). `README.md` and `docs/` — concept, architecture, decisions, open questions, roadmap, hardware,
+> test log, references, operations — are canonical there; the copies here were deleted on 2026-11-10 (git history keeps them). This repo keeps what is about the code
+> and artefacts: `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, `ros2_ws/`, `scripts/`, `systemd/`, `boot/`, `requirements.txt`.
+
+
 **A ROS 2 autonomous hexapod on Freenove Big Hexapod hardware**, running natively on a
 Raspberry Pi 5. It walks with an analytic inverse-kinematics tripod gait, navigates with
 Nav2, and explores frontiers on its own unless an external mission planner gives it

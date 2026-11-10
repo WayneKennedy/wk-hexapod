@@ -1,5 +1,11 @@
 # wk-hexapod — agent / contributor onboarding
 
+> **The project record moved to Basic Memory on 2026-11-10** (project `main`, folder `robotics/hexapod/`; start at the
+> *Hexapod* note). `README.md` and `docs/` — concept, architecture, decisions, open questions, roadmap, hardware,
+> test log, references, operations — are canonical there; the copies here were deleted on 2026-11-10 (git history keeps them). This repo keeps what is about the code
+> and artefacts: `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, `ros2_ws/`, `scripts/`, `systemd/`, `boot/`, `requirements.txt`.
+
+
 **Read this first.** It is the entry point for any AI assistant or human working in
 this repository, and it is written to be complete on a first read with no prior
 context. It is **provider-neutral**: `CLAUDE.md` and `GEMINI.md` do nothing but
